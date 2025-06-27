@@ -1,0 +1,94 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="hero">
+    <h1>Welcome to TimeTrack</h1>
+    <p>Track your work hours easily and efficiently</p>
+</div>
+
+<div class="timetrack-container">
+    <h2>Time Tracking</h2>
+
+    <div class="timer-section">
+        {% if active_entry %}
+            <div class="active-timer">
+                <h3>Currently Working</h3>
+                <p>Started at: {{ active_entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                <div id="timer"
+                     data-start="{{ active_entry.arrival_time.timestamp() }}"
+                     data-breaks="{{ active_entry.total_break_duration }}"
+                     data-paused="{{ 'true' if active_entry.is_paused else 'false' }}">00:00:00</div>
+
+                {% if active_entry.is_paused %}
+                <p class="break-info">On break since {{ active_entry.pause_start_time.strftime('%H:%M:%S') }}</p>
+                {% endif %}
+
+                {% if active_entry.total_break_duration > 0 %}
+                <p class="break-total">Total break time: {{ '%d:%02d:%02d'|format(active_entry.total_break_duration//3600, (active_entry.total_break_duration%3600)//60, active_entry.total_break_duration%60) }}</p>
+                {% endif %}
+
+                <div class="button-group">
+                    <button id="pause-btn" class="{% if active_entry.is_paused %}resume-btn{% else %}pause-btn{% endif %}" data-id="{{ active_entry.id }}">
+                        {% if active_entry.is_paused %}Resume work{% else %}Pause{% endif %}
+                    </button>
+                    <button id="leave-btn" class="leave-btn" data-id="{{ active_entry.id }}">Leave</button>
+                </div>
+            </div>
+        {% else %}
+            <div class="inactive-timer">
+                <h3>Not Currently Working</h3>
+                <button id="arrive-btn" class="arrive-btn">Arrive</button>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="history-section">
+        <h3>Time Entry History</h3>
+        {% if history %}
+            <table class="time-history">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Arrival</th>
+                        <th>Departure</th>
+                        <th>Work Duration</th>
+                        <th>Break Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in history %}
+                    <tr>
+                        <td>{{ entry.arrival_time.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ entry.arrival_time.strftime('%H:%M:%S') }}</td>
+                        <td>{{ entry.departure_time.strftime('%H:%M:%S') }}</td>
+                        <td>{{ '%d:%02d:%02d'|format(entry.duration//3600, (entry.duration%3600)//60, entry.duration%60) }}</td>
+                        <td>{{ '%d:%02d:%02d'|format(entry.total_break_duration//3600, (entry.total_break_duration%3600)//60, entry.total_break_duration%60) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No time entries recorded yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="features">
+    <div class="feature">
+        <h3>Easy Time Tracking</h3>
+        <p>Simply click "Arrive" when you start working and "Leave" when you're done.</p>
+    </div>
+    <div class="feature">
+        <h3>Break Management</h3>
+        <p>Use the Pause button when taking breaks. Your break time is tracked separately.</p>
+    </div>
+    <div class="feature">
+        <h3>Detailed History</h3>
+        <p>View your complete work history with precise timestamps and durations.</p>
+    </div>
+    <div class="feature">
+        <h3>Simple Interface</h3>
+        <p>No complicated setup or configuration needed. Start tracking right away!</p>
+    </div>
+</div>
+{% endblock %}

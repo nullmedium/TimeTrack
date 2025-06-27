@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="config-container">
+    <h1>Work Configuration</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('config') }}" class="config-form">
+        <div class="form-group">
+            <label for="work_hours_per_day">Work Hours Per Day:</label>
+            <input type="number" id="work_hours_per_day" name="work_hours_per_day"
+                   value="{{ config.work_hours_per_day }}" step="0.5" min="0.5" max="24" required>
+            <small>Standard number of work hours in a day</small>
+        </div>
+
+        <div class="form-section">
+            <h3>Primary Break</h3>
+            <div class="form-group">
+                <label for="mandatory_break_minutes">Mandatory Break Duration (minutes):</label>
+                <input type="number" id="mandatory_break_minutes" name="mandatory_break_minutes"
+                       value="{{ config.mandatory_break_minutes }}" step="1" min="0" max="240" required>
+                <small>Required break time in minutes</small>
+            </div>
+
+            <div class="form-group">
+                <label for="break_threshold_hours">Break Threshold (hours):</label>
+                <input type="number" id="break_threshold_hours" name="break_threshold_hours"
+                       value="{{ config.break_threshold_hours }}" step="0.5" min="0" max="24" required>
+                <small>Work hours after which a break becomes mandatory</small>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Additional Break</h3>
+            <div class="form-group">
+                <label for="additional_break_minutes">Additional Break Duration (minutes):</label>
+                <input type="number" id="additional_break_minutes" name="additional_break_minutes"
+                       value="{{ config.additional_break_minutes }}" step="1" min="0" max="240" required>
+                <small>Duration of additional break in minutes</small>
+            </div>
+
+            <div class="form-group">
+                <label for="additional_break_threshold_hours">Additional Break Threshold (hours):</label>
+                <input type="number" id="additional_break_threshold_hours" name="additional_break_threshold_hours"
+                       value="{{ config.additional_break_threshold_hours }}" step="0.5" min="0" max="24" required>
+                <small>Work hours after which an additional break becomes necessary</small>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Configuration</button>
+    </form>
+</div>
+{% endblock %}

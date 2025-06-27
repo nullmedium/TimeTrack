@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="timetrack-container">
+    <h1>Time Tracking</h1>
+
+    <div class="timer-section">
+        {% if active_entry %}
+            <div class="active-timer">
+                <h2>Currently Working</h2>
+                <p>Started at: {{ active_entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                <div id="timer" data-start="{{ active_entry.arrival_time.timestamp() }}">00:00:00</div>
+                <button id="leave-btn" class="leave-btn" data-id="{{ active_entry.id }}">Leave</button>
+            </div>
+        {% else %}
+            <div class="inactive-timer">
+                <h2>Not Currently Working</h2>
+                <button id="arrive-btn" class="arrive-btn">Arrive</button>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="history-section">
+        <h2>Time Entry History</h2>
+        {% if history %}
+            <table class="time-history">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Arrival</th>
+                        <th>Departure</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in history %}
+                    <tr>
+                        <td>{{ entry.arrival_time.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ entry.arrival_time.strftime('%H:%M:%S') }}</td>
+                        <td>{{ entry.departure_time.strftime('%H:%M:%S') }}</td>
+                        <td>{{ '%d:%02d:%02d'|format(entry.duration//3600, (entry.duration%3600)//60, entry.duration%60) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No time entries recorded yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
