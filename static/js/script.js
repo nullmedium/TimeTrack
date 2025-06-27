@@ -133,3 +133,52 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Add event listener for resume work buttons
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.classList.contains('resume-work-btn')) {
+        const entryId = e.target.getAttribute('data-id');
+        resumeWork(entryId);
+    }
+});
+
+// Function to resume work
+function resumeWork(entryId) {
+    fetch(`/api/resume/${entryId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.message || 'Failed to resume work');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Show a notification
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = data.message;
+            document.body.appendChild(notification);
+
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+
+            // Reload the page to show the active session
+            window.location.reload();
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert(error.message || 'An error occurred while trying to resume work.');
+    });
+}

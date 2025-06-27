@@ -256,5 +256,35 @@ def calculate_work_duration(arrival_time, departure_time, total_break_duration):
 
     return work_duration, effective_break_duration
 
+@app.route('/api/resume/<int:entry_id>', methods=['POST'])
+def resume_entry(entry_id):
+    # Find the entry to resume
+    entry_to_resume = TimeEntry.query.get_or_404(entry_id)
+
+    # Check if there's already an active entry
+    active_entry = TimeEntry.query.filter_by(departure_time=None).first()
+    if active_entry:
+        return jsonify({
+            'success': False,
+            'message': 'Cannot resume this entry. Another session is already active.'
+        }), 400
+
+    # Clear the departure time to make this entry active again
+    entry_to_resume.departure_time = None
+
+    # Reset pause state if it was paused
+    entry_to_resume.is_paused = False
+    entry_to_resume.pause_start_time = None
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Work resumed on existing entry',
+        'id': entry_to_resume.id,
+        'arrival_time': entry_to_resume.arrival_time.strftime('%Y-%m-%d %H:%M:%S'),
+        'total_break_duration': entry_to_resume.total_break_duration
+    })
+
 if __name__ == '__main__':
     app.run(debug=True)

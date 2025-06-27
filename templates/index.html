@@ -65,6 +65,9 @@
                         <td>{{ '%d:%02d:%02d'|format(entry.duration//3600, (entry.duration%3600)//60, entry.duration%60) if entry.duration is not none else 'In progress' }}</td>
                         <td>{{ '%d:%02d:%02d'|format(entry.total_break_duration//3600, (entry.total_break_duration%3600)//60, entry.total_break_duration%60) if entry.total_break_duration is not none else '00:00:00' }}</td>
                         <td>
+                            {% if entry.departure_time and not active_entry %}
+                            <button class="resume-work-btn" data-id="{{ entry.id }}">Resume Work</button>
+                            {% endif %}
                             <button class="edit-entry-btn" data-id="{{ entry.id }}">Edit</button>
                             <button class="delete-entry-btn" data-id="{{ entry.id }}">Delete</button>
                         </td>
