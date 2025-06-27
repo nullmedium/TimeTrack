@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from models import db, TimeEntry, WorkConfig
-from datetime import datetime
+from datetime import datetime, time
 import os
+from sqlalchemy import func
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///timetrack.db'
@@ -13,13 +14,22 @@ db.init_app(app)
 
 @app.route('/')
 def home():
-    # Get the latest time entry that doesn't have a departure time
+    # Get active time entry (if any)
     active_entry = TimeEntry.query.filter_by(departure_time=None).first()
 
-    # Get all completed time entries, ordered by most recent first
-    history = TimeEntry.query.filter(TimeEntry.departure_time.isnot(None)).order_by(TimeEntry.arrival_time.desc()).all()
+    # Get today's date
+    today = datetime.now().date()
 
-    return render_template('index.html', title='Home', active_entry=active_entry, history=history)
+    # Get time entries for today only
+    today_start = datetime.combine(today, time.min)
+    today_end = datetime.combine(today, time.max)
+
+    today_entries = TimeEntry.query.filter(
+        TimeEntry.arrival_time >= today_start,
+        TimeEntry.arrival_time <= today_end
+    ).order_by(TimeEntry.arrival_time.desc()).all()
+
+    return render_template('index.html', title='Home', active_entry=active_entry, history=today_entries)
 
 @app.route('/about')
 def about():
@@ -29,10 +39,6 @@ def about():
 def contact():
     # redacted
     return render_template('contact.html', title='Contact')
-
-@app.route('/thank-you')
-def thank_you():
-    return render_template('thank_you.html', title='Thank You')
 
 # We can keep this route as a redirect to home for backward compatibility
 @app.route('/timetrack')
@@ -65,10 +71,14 @@ def leave(entry_id):
         final_break_duration = int((departure_time - entry.pause_start_time).total_seconds())
         entry.total_break_duration += final_break_duration
         entry.is_paused = False
+        entry.pause_start_time = None
 
-    # Calculate duration in seconds (excluding breaks)
-    raw_duration = (departure_time - entry.arrival_time).total_seconds()
-    entry.duration = int(raw_duration - entry.total_break_duration)
+    # Calculate work duration considering breaks
+    entry.duration, effective_break = calculate_work_duration(
+        entry.arrival_time,
+        departure_time,
+        entry.total_break_duration
+    )
 
     db.session.commit()
 
@@ -77,7 +87,8 @@ def leave(entry_id):
         'arrival_time': entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S'),
         'departure_time': entry.departure_time.strftime('%Y-%m-%d %H:%M:%S'),
         'duration': entry.duration,
-        'total_break_duration': entry.total_break_duration
+        'total_break_duration': entry.total_break_duration,
+        'effective_break_duration': effective_break
     })
 
 # Add this new route to handle pausing/resuming
@@ -151,6 +162,99 @@ def create_tables():
 
     if 'is_paused' not in columns or 'pause_start_time' not in columns or 'total_break_duration' not in columns:
         print("WARNING: Database schema is outdated. Please run migrate_db.py to update it.")
+
+@app.route('/api/delete/<int:entry_id>', methods=['DELETE'])
+def delete_entry(entry_id):
+    entry = TimeEntry.query.get_or_404(entry_id)
+    db.session.delete(entry)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Entry deleted successfully'})
+
+@app.route('/api/update/<int:entry_id>', methods=['PUT'])
+def update_entry(entry_id):
+    entry = TimeEntry.query.get_or_404(entry_id)
+    data = request.json
+
+    if 'arrival_time' in data:
+        try:
+            entry.arrival_time = datetime.strptime(data['arrival_time'], '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Invalid arrival time format'}), 400
+
+    if 'departure_time' in data and data['departure_time']:
+        try:
+            entry.departure_time = datetime.strptime(data['departure_time'], '%Y-%m-%d %H:%M:%S')
+            # Recalculate duration if both times are present
+            if entry.arrival_time and entry.departure_time:
+                # Calculate work duration considering breaks
+                entry.duration, _ = calculate_work_duration(
+                    entry.arrival_time,
+                    entry.departure_time,
+                    entry.total_break_duration
+                )
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Invalid departure time format'}), 400
+
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message': 'Entry updated successfully',
+        'entry': {
+            'id': entry.id,
+            'arrival_time': entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'departure_time': entry.departure_time.strftime('%Y-%m-%d %H:%M:%S') if entry.departure_time else None,
+            'duration': entry.duration,
+            'is_paused': entry.is_paused,
+            'total_break_duration': entry.total_break_duration
+        }
+    })
+
+@app.route('/history')
+def history():
+    # Get all time entries, ordered by most recent first
+    all_entries = TimeEntry.query.order_by(TimeEntry.arrival_time.desc()).all()
+
+    return render_template('history.html', title='Time Entry History', entries=all_entries)
+
+def calculate_work_duration(arrival_time, departure_time, total_break_duration):
+    """
+    Calculate work duration considering both configured and actual break times.
+
+    Args:
+        arrival_time: Datetime of arrival
+        departure_time: Datetime of departure
+        total_break_duration: Actual logged break duration in seconds
+
+    Returns:
+        tuple: (work_duration_in_seconds, effective_break_duration_in_seconds)
+    """
+    # Calculate raw duration
+    raw_duration = (departure_time - arrival_time).total_seconds()
+
+    # Get work configuration for break rules
+    config = WorkConfig.query.order_by(WorkConfig.id.desc()).first()
+    if not config:
+        config = WorkConfig()  # Use default values if no config exists
+
+    # Calculate mandatory breaks based on work duration
+    work_hours = raw_duration / 3600  # Convert seconds to hours
+    configured_break_seconds = 0
+
+    # Apply primary break if work duration exceeds threshold
+    if work_hours > config.break_threshold_hours:
+        configured_break_seconds += config.mandatory_break_minutes * 60
+
+    # Apply additional break if work duration exceeds additional threshold
+    if work_hours > config.additional_break_threshold_hours:
+        configured_break_seconds += config.additional_break_minutes * 60
+
+    # Use the greater of configured breaks or actual logged breaks
+    effective_break_duration = max(configured_break_seconds, total_break_duration)
+
+    # Calculate final work duration
+    work_duration = int(raw_duration - effective_break_duration)
+
+    return work_duration, effective_break_duration
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -69,39 +69,51 @@ main {
 }
 
 .form-group {
-    margin-bottom: 1rem;
+    margin-bottom: 15px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 0.5rem;
+    margin-bottom: 5px;
+    font-weight: bold;
 }
 
 .form-group input,
 .form-group textarea {
     width: 100%;
-    padding: 0.5rem;
+    padding: 8px;
     border: 1px solid #ddd;
-    border-radius: 3px;
+    border-radius: 4px;
 }
 
 button {
     background-color: #4CAF50;
     color: white;
     border: none;
-    padding: 0.5rem 1rem;
+    padding: 8px 16px;
     cursor: pointer;
-    border-radius: 3px;
+    border-radius: 4px;
 }
 
 .btn {
-    display: inline-block;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
     background-color: #4CAF50;
     color: white;
-    padding: 0.5rem 1rem;
-    text-decoration: none;
-    border-radius: 3px;
-    margin-top: 1rem;
+}
+
+.btn:hover {
+    background-color: #45a049;
+}
+
+.btn-danger {
+    background-color: #f44336;
+}
+
+.btn-danger:hover {
+    background-color: #d32f2f;
 }
 
 footer {
@@ -278,7 +290,8 @@ footer {
 .config-form small {
     display: block;
     color: #666;
-    margin-top: 0.25rem;
+    margin-top: 4px;
+    font-style: italic;
 }
 
 .btn-primary {
@@ -311,4 +324,93 @@ footer {
     background-color: #f8d7da;
     color: #721c24;
     border: 1px solid #f5c6cb;
+}
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 5px;
+    width: 80%;
+    max-width: 500px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+    text-decoration: none;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.edit-entry-btn, .delete-entry-btn {
+    padding: 5px 10px;
+    margin-right: 5px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.edit-entry-btn {
+    background-color: #2196F3;
+    color: white;
+}
+
+.edit-entry-btn:hover {
+    background-color: #0b7dda;
+}
+
+.delete-entry-btn {
+    background-color: #f44336;
+    color: white;
+}
+
+.delete-entry-btn:hover {
+    background-color: #d32f2f;
+}
+
+input[type="date"], input[type="time"] {
+    font-family: monospace;
+    padding: 8px;
+    width: 100%;
+}
+
+/* Force consistent date format display */
+input[type="date"]::-webkit-datetime-edit,
+input[type="time"]::-webkit-datetime-edit {
+    font-family: monospace;
+}
+
+/* Add some styling to the format hints */
+.form-group small {
+    display: block;
+    color: #666;
+    margin-top: 4px;
+    font-style: italic;
 }
