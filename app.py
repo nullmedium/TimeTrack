@@ -236,17 +236,23 @@ def calculate_work_duration(arrival_time, departure_time, total_break_duration):
     if not config:
         config = WorkConfig()  # Use default values if no config exists
 
+    # Ensure configuration values are not None, use defaults if they are
+    break_threshold_hours = config.break_threshold_hours if config.break_threshold_hours is not None else 6.0
+    mandatory_break_minutes = config.mandatory_break_minutes if config.mandatory_break_minutes is not None else 30
+    additional_break_threshold_hours = config.additional_break_threshold_hours if config.additional_break_threshold_hours is not None else 9.0
+    additional_break_minutes = config.additional_break_minutes if config.additional_break_minutes is not None else 15
+
     # Calculate mandatory breaks based on work duration
     work_hours = raw_duration / 3600  # Convert seconds to hours
     configured_break_seconds = 0
 
     # Apply primary break if work duration exceeds threshold
-    if work_hours > config.break_threshold_hours:
-        configured_break_seconds += config.mandatory_break_minutes * 60
+    if work_hours > break_threshold_hours:
+        configured_break_seconds += mandatory_break_minutes * 60
 
     # Apply additional break if work duration exceeds additional threshold
-    if work_hours > config.additional_break_threshold_hours:
-        configured_break_seconds += config.additional_break_minutes * 60
+    if work_hours > additional_break_threshold_hours:
+        configured_break_seconds += additional_break_minutes * 60
 
     # Use the greater of configured breaks or actual logged breaks
     effective_break_duration = max(configured_break_seconds, total_break_duration)
