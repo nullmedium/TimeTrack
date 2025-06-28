@@ -82,6 +82,23 @@ def migrate_database():
             print("Adding user_id column to work_config...")
             cursor.execute("ALTER TABLE work_config ADD COLUMN user_id INTEGER")
 
+    # Check if the user table exists and has the verification columns
+    cursor.execute("PRAGMA table_info(user)")
+    user_columns = [column[1] for column in cursor.fetchall()]
+
+    # Add new columns to user table for email verification
+    if 'is_verified' not in user_columns:
+        print("Adding is_verified column to user table...")
+        cursor.execute("ALTER TABLE user ADD COLUMN is_verified BOOLEAN DEFAULT 0")
+        
+    if 'verification_token' not in user_columns:
+        print("Adding verification_token column to user table...")
+        cursor.execute("ALTER TABLE user ADD COLUMN verification_token VARCHAR(100)")
+        
+    if 'token_expiry' not in user_columns:
+        print("Adding token_expiry column to user table...")
+        cursor.execute("ALTER TABLE user ADD COLUMN token_expiry TIMESTAMP")
+
     # Commit changes and close connection
     conn.commit()
     conn.close()
@@ -97,13 +114,20 @@ def migrate_database():
             admin = User(
                 username='admin',
                 email='admin@timetrack.local',
-                is_admin=True
+                is_admin=True,
+                is_verified=True  # Admin is automatically verified
             )
             admin.set_password('admin')  # Default password, should be changed
             db.session.add(admin)
             db.session.commit()
             print("Created admin user with username 'admin' and password 'admin'")
             print("Please change the admin password after first login!")
+        else:
+            # Make sure existing admin user is verified
+            if not hasattr(admin, 'is_verified') or not admin.is_verified:
+                admin.is_verified = True
+                db.session.commit()
+                print("Marked existing admin user as verified")
         
         # Update existing time entries to associate with admin user
         orphan_entries = TimeEntry.query.filter_by(user_id=None).all()
@@ -115,9 +139,15 @@ def migrate_database():
         for config in orphan_configs:
             config.user_id = admin.id
             
+        # Mark all existing users as verified for backward compatibility
+        existing_users = User.query.filter_by(is_verified=None).all()
+        for user in existing_users:
+            user.is_verified = True
+            
         db.session.commit()
         print(f"Associated {len(orphan_entries)} existing time entries with admin user")
         print(f"Associated {len(orphan_configs)} existing work configs with admin user")
+        print(f"Marked {len(existing_users)} existing users as verified")
 
 if __name__ == "__main__":
     migrate_database()

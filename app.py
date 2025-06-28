@@ -5,15 +5,38 @@ from datetime import datetime, time, timedelta
 import os
 from sqlalchemy import func
 from functools import wraps
+from flask_mail import Mail, Message
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///timetrack.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_key_for_timetrack')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Session lasts for 7 days
+
+# Configure Flask-Mail
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.example.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'your-email@example.com')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'your-password')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'TimeTrack <noreply@timetrack.com>')
+
+# Log mail configuration (without password)
+logger.info(f"Mail server: {app.config['MAIL_SERVER']}")
+logger.info(f"Mail port: {app.config['MAIL_PORT']}")
+logger.info(f"Mail use TLS: {app.config['MAIL_USE_TLS']}")
+logger.info(f"Mail username: {app.config['MAIL_USERNAME']}")
+logger.info(f"Mail default sender: {app.config['MAIL_DEFAULT_SENDER']}")
+
+mail = Mail(app)
 
 # Initialize the database with the app
 db.init_app(app)
@@ -22,8 +45,7 @@ db.init_app(app)
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            flash('Please log in to access this page', 'error')
+        if g.user is None:
             return redirect(url_for('login', next=request.url))
         return f(*args, **kwargs)
     return decorated_function
@@ -32,13 +54,8 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            flash('Please log in to access this page', 'error')
-            return redirect(url_for('login', next=request.url))
-        
-        user = User.query.get(session['user_id'])
-        if not user or not user.is_admin:
-            flash('You need administrator privileges to access this page', 'error')
+        if g.user is None or not g.user.is_admin:
+            flash('You need administrator privileges to access this page.', 'error')
             return redirect(url_for('home'))
         return f(*args, **kwargs)
     return decorated_function
@@ -50,29 +67,25 @@ def load_logged_in_user():
         g.user = None
     else:
         g.user = User.query.get(user_id)
+        if g.user and not g.user.is_verified and request.endpoint not in ['verify_email', 'static', 'logout']:
+            # Allow unverified users to access only verification and static resources
+            if request.endpoint not in ['login', 'register']:
+                flash('Please verify your email address before accessing this page.', 'warning')
+                session.clear()
+                return redirect(url_for('login'))
 
 @app.route('/')
 def home():
     if g.user:
-        # Get active time entry (if any) for the current user
-        active_entry = TimeEntry.query.filter_by(user_id=g.user.id, departure_time=None).first()
-
-        # Get today's date
         today = datetime.now().date()
-
-        # Get time entries for today only for the current user
-        today_start = datetime.combine(today, time.min)
-        today_end = datetime.combine(today, time.max)
-
-        today_entries = TimeEntry.query.filter(
+        entries = TimeEntry.query.filter(
             TimeEntry.user_id == g.user.id,
-            TimeEntry.arrival_time >= today_start,
-            TimeEntry.arrival_time <= today_end
+            TimeEntry.arrival_time >= datetime.combine(today, time.min),
+            TimeEntry.arrival_time <= datetime.combine(today, time.max)
         ).order_by(TimeEntry.arrival_time.desc()).all()
-
-        return render_template('index.html', title='Home', active_entry=active_entry, history=today_entries)
+        
+        return render_template('index.html', title='Home', entries=entries)
     else:
-        # Show landing page for non-logged in users
         return render_template('index.html', title='Home')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -80,31 +93,27 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        remember = 'remember' in request.form
         
         user = User.query.filter_by(username=username).first()
         
-        if user and user.check_password(password):
-            session.clear()
-            session['user_id'] = user.id
-            if remember:
-                session.permanent = True
-            
-            next_page = request.args.get('next')
-            if not next_page or not next_page.startswith('/'):
-                next_page = url_for('home')
-                
-            flash(f'Welcome back, {user.username}!', 'success')
-            return redirect(next_page)
+        if user is None or not user.check_password(password):
+            flash('Invalid username or password', 'error')
+            return redirect(url_for('login'))
         
-        flash('Invalid username or password', 'error')
+        if not user.is_verified:
+            flash('Please verify your email address before logging in. Check your inbox for the verification link.', 'warning')
+            return redirect(url_for('login'))
+        
+        session.clear()
+        session['user_id'] = user.id
+        return redirect(url_for('home'))
     
     return render_template('login.html', title='Login')
 
 @app.route('/logout')
 def logout():
     session.clear()
-    flash('You have been logged out', 'info')
+    flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -131,18 +140,61 @@ def register():
             error = 'Email already registered'
             
         if error is None:
-            new_user = User(username=username, email=email)
-            new_user.set_password(password)
-            
-            db.session.add(new_user)
-            db.session.commit()
-            
-            flash('Registration successful! You can now log in.', 'success')
-            return redirect(url_for('login'))
+            try:
+                new_user = User(username=username, email=email, is_verified=False)
+                new_user.set_password(password)
+                
+                # Generate verification token
+                token = new_user.generate_verification_token()
+                
+                db.session.add(new_user)
+                db.session.commit()
+                
+                # Send verification email
+                verification_url = url_for('verify_email', token=token, _external=True)
+                msg = Message('Verify your TimeTrack account', recipients=[email])
+                msg.body = f'''Hello {username},
+
+Thank you for registering with TimeTrack. To complete your registration, please click on the link below:
+
+{verification_url}
+
+This link will expire in 24 hours.
+
+If you did not register for TimeTrack, please ignore this email.
+
+Best regards,
+The TimeTrack Team
+'''
+                mail.send(msg)
+                logger.info(f"Verification email sent to {email}")
+                
+                flash('Registration initiated! Please check your email to verify your account.', 'success')
+                return redirect(url_for('login'))
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Error during registration: {str(e)}")
+                error = f"An error occurred during registration: {str(e)}"
         
         flash(error, 'error')
     
     return render_template('register.html', title='Register')
+
+@app.route('/verify_email/<token>')
+def verify_email(token):
+    user = User.query.filter_by(verification_token=token).first()
+    
+    if not user:
+        flash('Invalid or expired verification link.', 'error')
+        return redirect(url_for('login'))
+    
+    if user.verify_token(token):
+        db.session.commit()
+        flash('Email verified successfully! You can now log in.', 'success')
+    else:
+        flash('Invalid or expired verification link.', 'error')
+    
+    return redirect(url_for('login'))
 
 @app.route('/admin/dashboard')
 @admin_required
@@ -163,6 +215,7 @@ def create_user():
         email = request.form.get('email')
         password = request.form.get('password')
         is_admin = 'is_admin' in request.form
+        auto_verify = 'auto_verify' in request.form  # New checkbox for auto verification
         
         # Validate input
         error = None
@@ -178,13 +231,34 @@ def create_user():
             error = 'Email already registered'
             
         if error is None:
-            new_user = User(username=username, email=email, is_admin=is_admin)
+            new_user = User(username=username, email=email, is_admin=is_admin, is_verified=auto_verify)
             new_user.set_password(password)
+            
+            if not auto_verify:
+                # Generate verification token and send email
+                token = new_user.generate_verification_token()
+                verification_url = url_for('verify_email', token=token, _external=True)
+                msg = Message('Verify your TimeTrack account', recipients=[email])
+                msg.body = f'''Hello {username},
+
+An administrator has created an account for you on TimeTrack. To activate your account, please click on the link below:
+
+{verification_url}
+
+This link will expire in 24 hours.
+
+Best regards,
+The TimeTrack Team
+'''
+                mail.send(msg)
             
             db.session.add(new_user)
             db.session.commit()
             
-            flash(f'User {username} created successfully!', 'success')
+            if auto_verify:
+                flash(f'User {username} created and automatically verified!', 'success')
+            else:
+                flash(f'User {username} created! Verification email sent.', 'success')
             return redirect(url_for('admin_users'))
         
         flash(error, 'error')
@@ -422,10 +496,15 @@ def create_tables():
     # Check if we need to add new columns
     from sqlalchemy import inspect
     inspector = inspect(db.engine)
-    columns = [column['name'] for column in inspector.get_columns('time_entry')]
-
-    if 'is_paused' not in columns or 'pause_start_time' not in columns or 'total_break_duration' not in columns:
-        print("WARNING: Database schema is outdated. Please run migrate_db.py to update it.")
+    
+    # Check if user table exists
+    if 'user' in inspector.get_table_names():
+        columns = [column['name'] for column in inspector.get_columns('user')]
+        
+        # Check for verification columns
+        if 'is_verified' not in columns or 'verification_token' not in columns or 'token_expiry' not in columns:
+            logger.warning("Database schema is outdated. Please run migrate_db.py to update it.")
+            print("WARNING: Database schema is outdated. Please run migrate_db.py to update it.")
 
 @app.route('/api/delete/<int:entry_id>', methods=['DELETE'])
 @login_required
