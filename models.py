@@ -49,6 +49,16 @@ class User(db.Model):
     def __repr__(self):
         return f'<User {self.username}>'
 
+class SystemSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(50), unique=True, nullable=False)
+    value = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.String(255))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<SystemSettings {self.key}={self.value}>'
+
 class TimeEntry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     arrival_time = db.Column(db.DateTime, nullable=False)

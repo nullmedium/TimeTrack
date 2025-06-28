@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g
-from models import db, TimeEntry, WorkConfig, User
+from models import db, TimeEntry, WorkConfig, User, SystemSettings
 import logging
 from datetime import datetime, time, timedelta
 import os
@@ -41,6 +41,23 @@ mail = Mail(app)
 
 # Initialize the database with the app
 db.init_app(app)
+
+# Add this function to initialize system settings
+def init_system_settings():
+    # Check if registration_enabled setting exists, if not create it
+    if not SystemSettings.query.filter_by(key='registration_enabled').first():
+        registration_setting = SystemSettings(
+            key='registration_enabled',
+            value='true',
+            description='Controls whether new user registration is allowed'
+        )
+        db.session.add(registration_setting)
+        db.session.commit()
+
+# Call this function during app initialization (add it where you initialize the app)
+@app.before_first_request
+def initialize_app():
+    init_system_settings()
 
 # Authentication decorator
 def login_required(f):
@@ -123,6 +140,14 @@ def logout():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    # Check if registration is enabled
+    reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
+    registration_enabled = reg_setting and reg_setting.value == 'true'
+    
+    if not registration_enabled:
+        flash('Registration is currently disabled by the administrator.', 'error')
+        return redirect(url_for('login'))
+    
     if request.method == 'POST':
         username = request.form.get('username')
         email = request.form.get('email')
@@ -680,6 +705,28 @@ def toggle_user_status(user_id):
         flash(f'User {user.username} has been unblocked', 'success')
     
     return redirect(url_for('admin_users'))
+
+# Add this route to manage system settings
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@admin_required
+def admin_settings():
+    if request.method == 'POST':
+        # Update registration setting
+        registration_enabled = 'registration_enabled' in request.form
+        
+        reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
+        if reg_setting:
+            reg_setting.value = 'true' if registration_enabled else 'false'
+            db.session.commit()
+            flash('System settings updated successfully!', 'success')
+        
+    # Get current settings
+    settings = {}
+    for setting in SystemSettings.query.all():
+        if setting.key == 'registration_enabled':
+            settings['registration_enabled'] = setting.value == 'true'
+    
+    return render_template('admin_settings.html', title='System Settings', settings=settings)
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="admin-container">
+    <h1>System Settings</h1>
+    
+    <form method="POST" action="{{ url_for('admin_settings') }}">
+        <div class="settings-card">
+            <h2>Registration Settings</h2>
+            
+            <div class="form-group">
+                <label class="checkbox-container">
+                    <input type="checkbox" name="registration_enabled" 
+                           {% if settings.registration_enabled %}checked{% endif %}>
+                    <span class="checkmark"></span>
+                    Enable User Registration
+                </label>
+                <p class="setting-description">
+                    When enabled, new users can register accounts. When disabled, only administrators can create new accounts.
+                </p>
+            </div>
+            
+            <!-- You can add more settings here in the future -->
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

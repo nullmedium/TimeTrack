@@ -1,7 +1,7 @@
 from app import app, db
 import sqlite3
 import os
-from models import User, TimeEntry, WorkConfig
+from models import User, TimeEntry, WorkConfig, SystemSettings
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 
@@ -13,6 +13,9 @@ def migrate_database():
         print("Database doesn't exist. Creating new database.")
         with app.app_context():
             db.create_all()
+            
+            # Initialize system settings
+            init_system_settings()
         return
 
     print("Migrating existing database...")
@@ -104,6 +107,20 @@ def migrate_database():
         print("Adding is_blocked column to user table...")
         cursor.execute("ALTER TABLE user ADD COLUMN is_blocked BOOLEAN DEFAULT 0")
 
+    # Check if the system_settings table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='system_settings'")
+    if not cursor.fetchone():
+        print("Creating system_settings table...")
+        cursor.execute("""
+        CREATE TABLE system_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key VARCHAR(50) UNIQUE NOT NULL,
+            value VARCHAR(255) NOT NULL,
+            description VARCHAR(255),
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
     # Commit changes and close connection
     conn.commit()
     conn.close()
@@ -111,6 +128,9 @@ def migrate_database():
     with app.app_context():
         # Create tables if they don't exist
         db.create_all()
+        
+        # Initialize system settings
+        init_system_settings()
         
         # Check if admin user exists
         admin = User.query.filter_by(username='admin').first()
@@ -153,6 +173,21 @@ def migrate_database():
         print(f"Associated {len(orphan_entries)} existing time entries with admin user")
         print(f"Associated {len(orphan_configs)} existing work configs with admin user")
         print(f"Marked {len(existing_users)} existing users as verified")
+
+def init_system_settings():
+    """Initialize system settings with default values if they don't exist"""
+    # Check if registration_enabled setting exists
+    reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
+    if not reg_setting:
+        print("Adding registration_enabled system setting...")
+        reg_setting = SystemSettings(
+            key='registration_enabled',
+            value='true',  # Default to enabled
+            description='Controls whether new user registration is allowed'
+        )
+        db.session.add(reg_setting)
+        db.session.commit()
+        print("Registration setting initialized to enabled")
 
 if __name__ == "__main__":
     migrate_database()
