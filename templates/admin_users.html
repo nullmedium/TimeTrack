@@ -3,15 +3,7 @@
 {% block content %}
 <div class="admin-container">
     <h1>User Management</h1>
-    
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-    
+        
     <div class="admin-actions">
         <a href="{{ url_for('create_user') }}" class="btn btn-success">Create New User</a>
     </div>

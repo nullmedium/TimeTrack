@@ -3,15 +3,7 @@
 {% block content %}
 <div class="admin-container">
     <h1>Create New User</h1>
-    
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-    
+        
     <form method="POST" action="{{ url_for('create_user') }}" class="user-form">
         <div class="form-group">
             <label for="username">Username</label>

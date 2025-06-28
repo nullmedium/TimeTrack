@@ -3,15 +3,7 @@
 {% block content %}
 <div class="admin-container">
     <h1>Admin Dashboard</h1>
-    
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-    
+        
     <div class="admin-panel">
         <div class="admin-card">
             <h2>User Management</h2>
