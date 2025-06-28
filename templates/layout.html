@@ -12,6 +12,7 @@
             <ul>
                 <li><a href="{{ url_for('home') }}">Home</a></li>
                 <li><a href="{{ url_for('history') }}">Complete History</a></li>
+                <li><a href="{{ url_for('export') }}">Export Data</a></li>
                 <li><a href="{{ url_for('config') }}" {% if title == 'Configuration' %}class="active"{% endif %}>Configuration</a></li>
                 <li><a href="{{ url_for('about') }}">About</a></li>
             </ul>
