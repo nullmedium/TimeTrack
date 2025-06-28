@@ -22,6 +22,9 @@ class User(db.Model):
     time_entries = db.relationship('TimeEntry', backref='user', lazy=True)
     work_config = db.relationship('WorkConfig', backref='user', lazy=True, uselist=False)
     
+    # New field for blocking users
+    is_blocked = db.Column(db.Boolean, default=False)
+    
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
         

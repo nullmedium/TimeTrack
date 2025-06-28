@@ -23,6 +23,7 @@
                     <th>Username</th>
                     <th>Email</th>
                     <th>Role</th>
+                    <th>Status</th>
                     <th>Created</th>
                     <th>Actions</th>
                 </tr>
@@ -33,11 +34,21 @@
                     <td>{{ user.username }}</td>
                     <td>{{ user.email }}</td>
                     <td>{% if user.is_admin %}Admin{% else %}User{% endif %}</td>
+                    <td>
+                        <span class="status-badge {% if user.is_blocked %}status-blocked{% else %}status-active{% endif %}">
+                            {% if user.is_blocked %}Blocked{% else %}Active{% endif %}
+                        </span>
+                    </td>
                     <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
                     <td>
                         <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-sm btn-primary">Edit</a>
                         {% if user.id != g.user.id %}
-                        <button class="btn btn-sm btn-danger" onclick="confirmDelete({{ user.id }}, '{{ user.username }}')">Delete</button>
+                            {% if user.is_blocked %}
+                                <a href="{{ url_for('toggle_user_status', user_id=user.id) }}" class="btn btn-sm btn-success">Unblock</a>
+                            {% else %}
+                                <a href="{{ url_for('toggle_user_status', user_id=user.id) }}" class="btn btn-sm btn-warning">Block</a>
+                            {% endif %}
+                            <button class="btn btn-sm btn-danger" onclick="confirmDelete({{ user.id }}, '{{ user.username }}')">Delete</button>
                         {% endif %}
                     </td>
                 </tr>

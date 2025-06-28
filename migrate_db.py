@@ -98,6 +98,11 @@ def migrate_database():
     if 'token_expiry' not in user_columns:
         print("Adding token_expiry column to user table...")
         cursor.execute("ALTER TABLE user ADD COLUMN token_expiry TIMESTAMP")
+    
+    # Add is_blocked column to user table if it doesn't exist
+    if 'is_blocked' not in user_columns:
+        print("Adding is_blocked column to user table...")
+        cursor.execute("ALTER TABLE user ADD COLUMN is_blocked BOOLEAN DEFAULT 0")
 
     # Commit changes and close connection
     conn.commit()

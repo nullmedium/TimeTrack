@@ -504,3 +504,22 @@ input[type="time"]::-webkit-datetime-edit {
     color: #666;
     margin-bottom: 20px;
 }
+
+/* User status badges */
+.status-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.status-active {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-blocked {
+    background-color: #f8d7da;
+    color: #721c24;
+}

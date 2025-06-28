@@ -7,6 +7,7 @@ from sqlalchemy import func
 from functools import wraps
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
+from werkzeug.security import check_password_hash
 
 # Load environment variables from .env file
 load_dotenv()
@@ -96,17 +97,21 @@ def login():
         
         user = User.query.filter_by(username=username).first()
         
-        if user is None or not user.check_password(password):
+        if user and user.check_password(password):  # Use the check_password method
+            # Check if user is blocked
+            if user.is_blocked:
+                flash('Your account has been disabled. Please contact an administrator.', 'error')
+                return render_template('login.html')
+                
+            # Continue with normal login process
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['is_admin'] = user.is_admin
+            
+            flash('Login successful!', 'success')
+            return redirect(url_for('home'))
+        else:
             flash('Invalid username or password', 'error')
-            return redirect(url_for('login'))
-        
-        if not user.is_verified:
-            flash('Please verify your email address before logging in. Check your inbox for the verification link.', 'warning')
-            return redirect(url_for('login'))
-        
-        session.clear()
-        session['user_id'] = user.id
-        return redirect(url_for('home'))
     
     return render_template('login.html', title='Login')
 
@@ -654,6 +659,27 @@ def test():
 @app.context_processor
 def inject_current_year():
     return {'current_year': datetime.now().year}
+
+@app.route('/admin/users/toggle-status/<int:user_id>')
+@admin_required
+def toggle_user_status(user_id):
+    user = User.query.get_or_404(user_id)
+    
+    # Prevent blocking yourself
+    if user.id == session.get('user_id'):
+        flash('You cannot block your own account', 'error')
+        return redirect(url_for('admin_users'))
+    
+    # Toggle the blocked status
+    user.is_blocked = not user.is_blocked
+    db.session.commit()
+    
+    if user.is_blocked:
+        flash(f'User {user.username} has been blocked', 'success')
+    else:
+        flash(f'User {user.username} has been unblocked', 'success')
+    
+    return redirect(url_for('admin_users'))
 
 if __name__ == '__main__':
     app.run(debug=True)
