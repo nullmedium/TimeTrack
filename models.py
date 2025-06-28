@@ -2,9 +2,31 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import secrets
+import enum
 
 db = SQLAlchemy()
 
+# Define Role as an Enum for better type safety
+class Role(enum.Enum):
+    TEAM_MEMBER = "Team Member"
+    TEAM_LEADER = "Team Leader"
+    SUPERVISOR = "Supervisor"
+    ADMIN = "Administrator"  # Keep existing admin role
+
+# Create Team model
+class Team(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    description = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # Relationship with users (one team has many users)
+    users = db.relationship('User', backref='team', lazy=True)
+    
+    def __repr__(self):
+        return f'<Team {self.name}>'
+
+# Update User model to include role and team relationship
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -18,12 +40,16 @@ class User(db.Model):
     verification_token = db.Column(db.String(100), unique=True, nullable=True)
     token_expiry = db.Column(db.DateTime, nullable=True)
     
+    # New field for blocking users
+    is_blocked = db.Column(db.Boolean, default=False)
+    
+    # New fields for role and team
+    role = db.Column(db.Enum(Role), default=Role.TEAM_MEMBER)
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
+    
     # Relationships
     time_entries = db.relationship('TimeEntry', backref='user', lazy=True)
     work_config = db.relationship('WorkConfig', backref='user', lazy=True, uselist=False)
-    
-    # New field for blocking users
-    is_blocked = db.Column(db.Boolean, default=False)
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

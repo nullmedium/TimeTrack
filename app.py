@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g
-from models import db, TimeEntry, WorkConfig, User, SystemSettings
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role
 import logging
 from datetime import datetime, time, timedelta
 import os
@@ -78,6 +78,38 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# Add this decorator function after your existing decorators
+def role_required(min_role):
+    """
+    Decorator to restrict access based on user role.
+    min_role should be a Role enum value (e.g., Role.TEAM_LEADER)
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if g.user is None:
+                return redirect(url_for('login', next=request.url))
+            
+            # Admin always has access
+            if g.user.is_admin:
+                return f(*args, **kwargs)
+            
+            # Check role hierarchy
+            role_hierarchy = {
+                Role.TEAM_MEMBER: 1,
+                Role.TEAM_LEADER: 2,
+                Role.SUPERVISOR: 3,
+                Role.ADMIN: 4
+            }
+            
+            if role_hierarchy.get(g.user.role, 0) < role_hierarchy.get(min_role, 0):
+                flash('You do not have sufficient permissions to access this page.', 'error')
+                return redirect(url_for('home'))
+                
+            return f(*args, **kwargs)
+        return decorator
+    return decorator
+
 @app.before_request
 def load_logged_in_user():
     user_id = session.get('user_id')
@@ -114,21 +146,44 @@ def login():
         
         user = User.query.filter_by(username=username).first()
         
-        if user and user.check_password(password):  # Use the check_password method
-            # Check if user is blocked
-            if user.is_blocked:
-                flash('Your account has been disabled. Please contact an administrator.', 'error')
-                return render_template('login.html')
+        if user:
+            # Fix role if it's a string or None
+            if isinstance(user.role, str) or user.role is None:
+                # Map string role values to enum values
+                role_mapping = {
+                    'Team Member': Role.TEAM_MEMBER,
+                    'TEAM_MEMBER': Role.TEAM_MEMBER,
+                    'Team Leader': Role.TEAM_LEADER,
+                    'TEAM_LEADER': Role.TEAM_LEADER,
+                    'Supervisor': Role.SUPERVISOR,
+                    'SUPERVISOR': Role.SUPERVISOR,
+                    'Administrator': Role.ADMIN,
+                    'ADMIN': Role.ADMIN
+                }
                 
-            # Continue with normal login process
-            session['user_id'] = user.id
-            session['username'] = user.username
-            session['is_admin'] = user.is_admin
+                if isinstance(user.role, str):
+                    user.role = role_mapping.get(user.role, Role.TEAM_MEMBER)
+                else:
+                    user.role = Role.ADMIN if user.is_admin else Role.TEAM_MEMBER
+                
+                db.session.commit()
             
-            flash('Login successful!', 'success')
-            return redirect(url_for('home'))
-        else:
-            flash('Invalid username or password', 'error')
+            # Now proceed with password check
+            if user.check_password(password):
+                # Check if user is blocked
+                if user.is_blocked:
+                    flash('Your account has been disabled. Please contact an administrator.', 'error')
+                    return render_template('login.html')
+                    
+                # Continue with normal login process
+                session['user_id'] = user.id
+                session['username'] = user.username
+                session['is_admin'] = user.is_admin
+                
+                flash('Login successful!', 'success')
+                return redirect(url_for('home'))
+        
+        flash('Invalid username or password', 'error')
     
     return render_template('login.html', title='Login')
 
@@ -245,7 +300,11 @@ def create_user():
         email = request.form.get('email')
         password = request.form.get('password')
         is_admin = 'is_admin' in request.form
-        auto_verify = 'auto_verify' in request.form  # New checkbox for auto verification
+        auto_verify = 'auto_verify' in request.form
+        
+        # Get role and team
+        role_name = request.form.get('role')
+        team_id = request.form.get('team_id')
         
         # Validate input
         error = None
@@ -261,7 +320,21 @@ def create_user():
             error = 'Email already registered'
             
         if error is None:
-            new_user = User(username=username, email=email, is_admin=is_admin, is_verified=auto_verify)
+            # Convert role string to enum
+            try:
+                role = Role[role_name] if role_name else Role.TEAM_MEMBER
+            except KeyError:
+                role = Role.TEAM_MEMBER
+            
+            # Create new user with role and team
+            new_user = User(
+                username=username, 
+                email=email, 
+                is_admin=is_admin, 
+                is_verified=auto_verify,
+                role=role,
+                team_id=team_id if team_id else None
+            )
             new_user.set_password(password)
             
             if not auto_verify:
@@ -293,7 +366,11 @@ The TimeTrack Team
         
         flash(error, 'error')
     
-    return render_template('create_user.html', title='Create User')
+    # Get all teams for the form
+    teams = Team.query.all()
+    roles = [role for role in Role]
+    
+    return render_template('create_user.html', title='Create User', teams=teams, roles=roles)
 
 @app.route('/admin/users/edit/<int:user_id>', methods=['GET', 'POST'])
 @admin_required
@@ -305,6 +382,10 @@ def edit_user(user_id):
         email = request.form.get('email')
         password = request.form.get('password')
         is_admin = 'is_admin' in request.form
+        
+        # Get role and team
+        role_name = request.form.get('role')
+        team_id = request.form.get('team_id')
         
         # Validate input
         error = None
@@ -322,6 +403,14 @@ def edit_user(user_id):
             user.email = email
             user.is_admin = is_admin
             
+            # Convert role string to enum
+            try:
+                user.role = Role[role_name] if role_name else Role.TEAM_MEMBER
+            except KeyError:
+                user.role = Role.TEAM_MEMBER
+            
+            user.team_id = team_id if team_id else None
+            
             if password:
                 user.set_password(password)
             
@@ -332,7 +421,11 @@ def edit_user(user_id):
         
         flash(error, 'error')
     
-    return render_template('edit_user.html', title='Edit User', user=user)
+    # Get all teams for the form
+    teams = Team.query.all()
+    roles = [role for role in Role]
+    
+    return render_template('edit_user.html', title='Edit User', user=user, teams=teams, roles=roles)
 
 @app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
 @admin_required
@@ -727,6 +820,156 @@ def admin_settings():
             settings['registration_enabled'] = setting.value == 'true'
     
     return render_template('admin_settings.html', title='System Settings', settings=settings)
+
+# Add these routes for team management
+@app.route('/admin/teams')
+@admin_required
+def admin_teams():
+    teams = Team.query.all()
+    return render_template('admin_teams.html', title='Team Management', teams=teams)
+
+@app.route('/admin/teams/create', methods=['GET', 'POST'])
+@admin_required
+def create_team():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        
+        # Validate input
+        error = None
+        if not name:
+            error = 'Team name is required'
+        elif Team.query.filter_by(name=name).first():
+            error = 'Team name already exists'
+            
+        if error is None:
+            new_team = Team(name=name, description=description)
+            db.session.add(new_team)
+            db.session.commit()
+            
+            flash(f'Team "{name}" created successfully!', 'success')
+            return redirect(url_for('admin_teams'))
+        
+        flash(error, 'error')
+    
+    return render_template('create_team.html', title='Create Team')
+
+@app.route('/admin/teams/edit/<int:team_id>', methods=['GET', 'POST'])
+@admin_required
+def edit_team(team_id):
+    team = Team.query.get_or_404(team_id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        
+        # Validate input
+        error = None
+        if not name:
+            error = 'Team name is required'
+        elif name != team.name and Team.query.filter_by(name=name).first():
+            error = 'Team name already exists'
+            
+        if error is None:
+            team.name = name
+            team.description = description
+            db.session.commit()
+            
+            flash(f'Team "{name}" updated successfully!', 'success')
+            return redirect(url_for('admin_teams'))
+        
+        flash(error, 'error')
+    
+    return render_template('edit_team.html', title='Edit Team', team=team)
+
+@app.route('/admin/teams/delete/<int:team_id>', methods=['POST'])
+@admin_required
+def delete_team(team_id):
+    team = Team.query.get_or_404(team_id)
+    
+    # Check if team has members
+    if team.users:
+        flash('Cannot delete team with members. Remove all members first.', 'error')
+        return redirect(url_for('admin_teams'))
+    
+    team_name = team.name
+    db.session.delete(team)
+    db.session.commit()
+    
+    flash(f'Team "{team_name}" deleted successfully!', 'success')
+    return redirect(url_for('admin_teams'))
+
+@app.route('/admin/teams/<int:team_id>', methods=['GET', 'POST'])
+@admin_required
+def manage_team(team_id):
+    team = Team.query.get_or_404(team_id)
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'update_team':
+            # Update team details
+            name = request.form.get('name')
+            description = request.form.get('description')
+            
+            # Validate input
+            error = None
+            if not name:
+                error = 'Team name is required'
+            elif name != team.name and Team.query.filter_by(name=name).first():
+                error = 'Team name already exists'
+                
+            if error is None:
+                team.name = name
+                team.description = description
+                db.session.commit()
+                flash(f'Team "{name}" updated successfully!', 'success')
+            else:
+                flash(error, 'error')
+                
+        elif action == 'add_member':
+            # Add user to team
+            user_id = request.form.get('user_id')
+            if user_id:
+                user = User.query.get(user_id)
+                if user:
+                    user.team_id = team.id
+                    db.session.commit()
+                    flash(f'User {user.username} added to team!', 'success')
+                else:
+                    flash('User not found', 'error')
+            else:
+                flash('No user selected', 'error')
+                
+        elif action == 'remove_member':
+            # Remove user from team
+            user_id = request.form.get('user_id')
+            if user_id:
+                user = User.query.get(user_id)
+                if user and user.team_id == team.id:
+                    user.team_id = None
+                    db.session.commit()
+                    flash(f'User {user.username} removed from team!', 'success')
+                else:
+                    flash('User not found or not in this team', 'error')
+            else:
+                flash('No user selected', 'error')
+    
+    # Get team members
+    team_members = User.query.filter_by(team_id=team.id).all()
+    
+    # Get users not in this team for the add member form
+    available_users = User.query.filter(
+        (User.team_id != team.id) | (User.team_id == None)
+    ).all()
+    
+    return render_template(
+        'manage_team.html', 
+        title=f'Manage Team: {team.name}', 
+        team=team, 
+        team_members=team_members,
+        available_users=available_users
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
