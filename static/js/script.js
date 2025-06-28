@@ -142,24 +142,24 @@ document.addEventListener('DOMContentLoaded', function() {
             const parent = this.parentElement;
             const menu = parent.querySelector('.dropdown-menu');
             
-            // Close all other open dropdowns
-            document.querySelectorAll('.dropdown-menu').forEach(item => {
-                if (item !== menu && item.classList.contains('show')) {
-                    item.classList.remove('show');
-                }
-            });
-            
-            // Toggle current dropdown
-            menu.classList.toggle('show');
+            // Toggle the display of the dropdown menu
+            if (menu.style.display === 'block') {
+                menu.style.display = 'none';
+            } else {
+                // Close all other open dropdowns first
+                document.querySelectorAll('.dropdown-menu').forEach(m => {
+                    if (m !== menu) m.style.display = 'none';
+                });
+                menu.style.display = 'block';
+            }
         });
     });
     
-    // Close dropdown when clicking outside
+    // Close dropdowns when clicking outside
     document.addEventListener('click', function(e) {
-        if (!e.target.matches('.dropdown-toggle')) {
-            const dropdowns = document.querySelectorAll('.dropdown-menu.show');
-            dropdowns.forEach(dropdown => {
-                dropdown.classList.remove('show');
+        if (!e.target.closest('.dropdown')) {
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                menu.style.display = 'none';
             });
         }
     });

@@ -15,20 +15,18 @@
                     <li><a href="{{ url_for('history') }}">History</a></li>
                     <li><a href="{{ url_for('config') }}">Config</a></li>
                     <li><a href="{{ url_for('about') }}">About</a></li>
-                    <li><a href="{{ url_for('contact') }}">Contact</a></li>
                     
-                    <!-- Add Admin dropdown menu here -->
+                    <!-- Admin dropdown menu moved to the rightmost position -->
                     {% if g.user.is_admin %}
-                    <li class="dropdown">
+                    <li class="dropdown admin-dropdown">
                         <a href="#" class="dropdown-toggle">Admin</a>
                         <ul class="dropdown-menu">
-                            <li><a href="{{ url_for('admin_users') }}">User Management</a></li>
+                            <li><a href="{{ url_for('profile') }}">Profile</a></li>
+                            <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                            <li><a href="{{ url_for('logout') }}">Logout</a></li>
                         </ul>
                     </li>
                     {% endif %}
-                    
-                    <li><a href="{{ url_for('profile') }}">Profile</a></li>
-                    <li><a href="{{ url_for('logout') }}">Logout</a></li>
                 {% else %}
                     <li><a href="{{ url_for('login') }}">Login</a></li>
                     <li><a href="{{ url_for('register') }}">Register</a></li>

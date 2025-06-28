@@ -144,6 +144,11 @@ def register():
     
     return render_template('register.html', title='Register')
 
+@app.route('/admin/dashboard')
+@admin_required
+def admin_dashboard():
+    return render_template('admin_dashboard.html', title='Admin Dashboard')
+
 @app.route('/admin/users')
 @admin_required
 def admin_users():
