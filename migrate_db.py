@@ -1,6 +1,9 @@
 from app import app, db
 import sqlite3
 import os
+from models import User, TimeEntry, WorkConfig
+from werkzeug.security import generate_password_hash
+from datetime import datetime
 
 def migrate_database():
     db_path = 'timetrack.db'
@@ -34,6 +37,11 @@ def migrate_database():
     if 'total_break_duration' not in time_entry_columns:
         print("Adding total_break_duration column to time_entry...")
         cursor.execute("ALTER TABLE time_entry ADD COLUMN total_break_duration INTEGER DEFAULT 0")
+        
+    # Add user_id column if it doesn't exist
+    if 'user_id' not in time_entry_columns:
+        print("Adding user_id column to time_entry...")
+        cursor.execute("ALTER TABLE time_entry ADD COLUMN user_id INTEGER")
 
     # Check if the work_config table exists
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='work_config'")
@@ -46,7 +54,8 @@ def migrate_database():
             mandatory_break_minutes INTEGER DEFAULT 30,
             break_threshold_hours FLOAT DEFAULT 6.0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            user_id INTEGER
         )
         """)
         # Insert default config
@@ -67,12 +76,49 @@ def migrate_database():
         if 'additional_break_threshold_hours' not in work_config_columns:
             print("Adding additional_break_threshold_hours column to work_config...")
             cursor.execute("ALTER TABLE work_config ADD COLUMN additional_break_threshold_hours FLOAT DEFAULT 9.0")
+            
+        # Add user_id column to work_config if it doesn't exist
+        if 'user_id' not in work_config_columns:
+            print("Adding user_id column to work_config...")
+            cursor.execute("ALTER TABLE work_config ADD COLUMN user_id INTEGER")
 
     # Commit changes and close connection
     conn.commit()
     conn.close()
 
-    print("Database migration completed successfully!")
+    with app.app_context():
+        # Create tables if they don't exist
+        db.create_all()
+        
+        # Check if admin user exists
+        admin = User.query.filter_by(username='admin').first()
+        if not admin:
+            # Create admin user
+            admin = User(
+                username='admin',
+                email='admin@timetrack.local',
+                is_admin=True
+            )
+            admin.set_password('admin')  # Default password, should be changed
+            db.session.add(admin)
+            db.session.commit()
+            print("Created admin user with username 'admin' and password 'admin'")
+            print("Please change the admin password after first login!")
+        
+        # Update existing time entries to associate with admin user
+        orphan_entries = TimeEntry.query.filter_by(user_id=None).all()
+        for entry in orphan_entries:
+            entry.user_id = admin.id
+        
+        # Update existing work configs to associate with admin user
+        orphan_configs = WorkConfig.query.filter_by(user_id=None).all()
+        for config in orphan_configs:
+            config.user_id = admin.id
+            
+        db.session.commit()
+        print(f"Associated {len(orphan_entries)} existing time entries with admin user")
+        print(f"Associated {len(orphan_configs)} existing work configs with admin user")
 
 if __name__ == "__main__":
     migrate_database()
+    print("Database migration completed")

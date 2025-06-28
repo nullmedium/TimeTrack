@@ -132,6 +132,37 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    // Add dropdown menu functionality
+    const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+    
+    dropdownToggles.forEach(toggle => {
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            const parent = this.parentElement;
+            const menu = parent.querySelector('.dropdown-menu');
+            
+            // Close all other open dropdowns
+            document.querySelectorAll('.dropdown-menu').forEach(item => {
+                if (item !== menu && item.classList.contains('show')) {
+                    item.classList.remove('show');
+                }
+            });
+            
+            // Toggle current dropdown
+            menu.classList.toggle('show');
+        });
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.matches('.dropdown-toggle')) {
+            const dropdowns = document.querySelectorAll('.dropdown-menu.show');
+            dropdowns.forEach(dropdown => {
+                dropdown.classList.remove('show');
+            });
+        }
+    });
 });
 
 // Add event listener for resume work buttons

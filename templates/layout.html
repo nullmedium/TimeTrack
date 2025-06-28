@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TimeTrack - {{ title }}</title>
+    <title>{{ title }} - TimeTrack</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -11,19 +11,48 @@
         <nav>
             <ul>
                 <li><a href="{{ url_for('home') }}">Home</a></li>
-                <li><a href="{{ url_for('history') }}">Complete History</a></li>
-                <li><a href="{{ url_for('config') }}" {% if title == 'Configuration' %}class="active"{% endif %}>Configuration</a></li>
-                <li><a href="{{ url_for('about') }}">About</a></li>
+                {% if g.user %}
+                    <li><a href="{{ url_for('history') }}">History</a></li>
+                    <li><a href="{{ url_for('config') }}">Config</a></li>
+                    <li><a href="{{ url_for('about') }}">About</a></li>
+                    <li><a href="{{ url_for('contact') }}">Contact</a></li>
+                    
+                    <!-- Add Admin dropdown menu here -->
+                    {% if g.user.is_admin %}
+                    <li class="dropdown">
+                        <a href="#" class="dropdown-toggle">Admin</a>
+                        <ul class="dropdown-menu">
+                            <li><a href="{{ url_for('admin_users') }}">User Management</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    
+                    <li><a href="{{ url_for('profile') }}">Profile</a></li>
+                    <li><a href="{{ url_for('logout') }}">Logout</a></li>
+                {% else %}
+                    <li><a href="{{ url_for('login') }}">Login</a></li>
+                    <li><a href="{{ url_for('register') }}">Register</a></li>
+                {% endif %}
             </ul>
         </nav>
     </header>
 
     <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
         {% block content %}{% endblock %}
     </main>
 
     <footer>
-        <p>&copy; 2025 TimeTrack</p>
+        <p>&copy; {{ current_year }} TimeTrack. All rights reserved.</p>
     </footer>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>

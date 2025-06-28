@@ -1,0 +1,88 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="admin-container">
+    <h1>User Management</h1>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <div class="admin-actions">
+        <a href="{{ url_for('create_user') }}" class="btn btn-success">Create New User</a>
+    </div>
+    
+    <div class="user-list">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{% if user.is_admin %}Admin{% else %}User{% endif %}</td>
+                    <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-sm btn-primary">Edit</a>
+                        {% if user.id != g.user.id %}
+                        <button class="btn btn-sm btn-danger" onclick="confirmDelete({{ user.id }}, '{{ user.username }}')">Delete</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Confirm Deletion</h2>
+            <p>Are you sure you want to delete user <span id="delete-username"></span>?</p>
+            <p>This action cannot be undone.</p>
+            <form id="delete-form" method="POST">
+                <button type="button" id="cancel-delete" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        function confirmDelete(userId, username) {
+            document.getElementById('delete-username').textContent = username;
+            document.getElementById('delete-form').action = "{{ url_for('delete_user', user_id=0) }}".replace('0', userId);
+            document.getElementById('delete-modal').style.display = 'block';
+        }
+        
+        // Close modal when clicking the X
+        document.querySelector('.close').addEventListener('click', function() {
+            document.getElementById('delete-modal').style.display = 'none';
+        });
+        
+        // Close modal when clicking Cancel
+        document.getElementById('cancel-delete').addEventListener('click', function() {
+            document.getElementById('delete-modal').style.display = 'none';
+        });
+        
+        // Close modal when clicking outside
+        window.addEventListener('click', function(event) {
+            if (event.target == document.getElementById('delete-modal')) {
+                document.getElementById('delete-modal').style.display = 'none';
+            }
+        });
+    </script>
+</div>
+{% endblock %}
