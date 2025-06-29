@@ -59,6 +59,15 @@ def init_system_settings():
 def initialize_app():
     init_system_settings()
 
+# Add this after initializing the app but before defining routes
+@app.context_processor
+def inject_globals():
+    """Make certain variables available to all templates."""
+    return {
+        'Role': Role,
+        'current_year': datetime.now().year
+    }
+
 # Authentication decorator
 def login_required(f):
     @wraps(f)
@@ -84,7 +93,7 @@ def role_required(min_role):
     Decorator to restrict access based on user role.
     min_role should be a Role enum value (e.g., Role.TEAM_LEADER)
     """
-    def decorator(f):
+    def role_decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if g.user is None:
@@ -107,8 +116,8 @@ def role_required(min_role):
                 return redirect(url_for('home'))
                 
             return f(*args, **kwargs)
-        return decorator
-    return decorator
+        return decorated_function
+    return role_decorator
 
 @app.before_request
 def load_logged_in_user():
@@ -127,14 +136,19 @@ def load_logged_in_user():
 @app.route('/')
 def home():
     if g.user:
-        today = datetime.now().date()
-        entries = TimeEntry.query.filter(
-            TimeEntry.user_id == g.user.id,
-            TimeEntry.arrival_time >= datetime.combine(today, time.min),
-            TimeEntry.arrival_time <= datetime.combine(today, time.max)
-        ).order_by(TimeEntry.arrival_time.desc()).all()
+        # Get active entry (no departure time)
+        active_entry = TimeEntry.query.filter_by(
+            user_id=g.user.id, 
+            departure_time=None
+        ).first()
         
-        return render_template('index.html', title='Home', entries=entries)
+        # Get recent completed entries for history (last 10 entries)
+        history = TimeEntry.query.filter(
+            TimeEntry.user_id == g.user.id,
+            TimeEntry.departure_time.isnot(None)
+        ).order_by(TimeEntry.arrival_time.desc()).limit(10).all()
+        
+        return render_template('index.html', title='Home', active_entry=active_entry, history=history)
     else:
         return render_template('index.html', title='Home')
 
@@ -281,10 +295,60 @@ def verify_email(token):
     
     return redirect(url_for('login'))
 
+@app.route('/dashboard')
+@role_required(Role.TEAM_LEADER)
+def dashboard():
+    # Get dashboard data based on user role
+    dashboard_data = {}
+    
+    if g.user.is_admin or g.user.role == Role.ADMIN:
+        # Admin sees everything
+        dashboard_data.update({
+            'total_users': User.query.count(),
+            'total_teams': Team.query.count(),
+            'blocked_users': User.query.filter_by(is_blocked=True).count(),
+            'unverified_users': User.query.filter_by(is_verified=False).count(),
+            'recent_registrations': User.query.order_by(User.id.desc()).limit(5).all()
+        })
+    
+    if g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] or g.user.is_admin:
+        # Team leaders and supervisors see team-related data
+        if g.user.team_id or g.user.is_admin:
+            if g.user.is_admin:
+                # Admin can see all teams
+                teams = Team.query.all()
+                team_members = User.query.filter(User.team_id.isnot(None)).all()
+            else:
+                # Team leaders/supervisors see their own team
+                teams = [Team.query.get(g.user.team_id)] if g.user.team_id else []
+                team_members = User.query.filter_by(team_id=g.user.team_id).all() if g.user.team_id else []
+            
+            dashboard_data.update({
+                'teams': teams,
+                'team_members': team_members,
+                'team_member_count': len(team_members)
+            })
+    
+    # Get recent time entries for the user's oversight
+    if g.user.is_admin:
+        # Admin sees all recent entries
+        recent_entries = TimeEntry.query.order_by(TimeEntry.arrival_time.desc()).limit(10).all()
+    elif g.user.team_id:
+        # Team leaders see their team's entries
+        team_user_ids = [user.id for user in User.query.filter_by(team_id=g.user.team_id).all()]
+        recent_entries = TimeEntry.query.filter(TimeEntry.user_id.in_(team_user_ids)).order_by(TimeEntry.arrival_time.desc()).limit(10).all()
+    else:
+        recent_entries = []
+    
+    dashboard_data['recent_entries'] = recent_entries
+    
+    return render_template('dashboard.html', title='Dashboard', **dashboard_data)
+
+# Redirect old admin dashboard URL to new dashboard
 @app.route('/admin/dashboard')
 @admin_required
 def admin_dashboard():
-    return render_template('admin_dashboard.html', title='Admin Dashboard')
+    return redirect(url_for('dashboard'))
 
 @app.route('/admin/users')
 @admin_required
@@ -677,6 +741,48 @@ def update_entry(entry_id):
         }
     })
 
+@app.route('/team/hours')
+@login_required
+@role_required(Role.TEAM_LEADER)  # Only team leaders and above can access
+def team_hours():
+    # Get the current user's team
+    team = Team.query.get(g.user.team_id)
+    
+    if not team:
+        flash('You are not assigned to any team.', 'error')
+        return redirect(url_for('home'))
+    
+    # Get date range from query parameters or use current week as default
+    today = datetime.now().date()
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    
+    start_date_str = request.args.get('start_date', start_of_week.strftime('%Y-%m-%d'))
+    end_date_str = request.args.get('end_date', end_of_week.strftime('%Y-%m-%d'))
+    
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Invalid date format. Using current week instead.', 'warning')
+        start_date = start_of_week
+        end_date = end_of_week
+    
+    # Generate a list of dates in the range for the table header
+    date_range = []
+    current_date = start_date
+    while current_date <= end_date:
+        date_range.append(current_date)
+        current_date += timedelta(days=1)
+    
+    return render_template(
+        'team_hours.html',
+        title=f'Team Hours',
+        start_date=start_date,
+        end_date=end_date,
+        date_range=date_range
+    )
+
 @app.route('/history')
 @login_required
 def history():
@@ -773,10 +879,6 @@ def internal_server_error(e):
 @app.route('/test')
 def test():
     return "App is working!"
-
-@app.context_processor
-def inject_current_year():
-    return {'current_year': datetime.now().year}
 
 @app.route('/admin/users/toggle-status/<int:user_id>')
 @admin_required
@@ -970,6 +1072,119 @@ def manage_team(team_id):
         team_members=team_members,
         available_users=available_users
     )
+
+@app.route('/api/team/hours_data', methods=['GET'])
+@login_required
+@role_required(Role.TEAM_LEADER)  # Only team leaders and above can access
+def team_hours_data():
+    # Get the current user's team
+    team = Team.query.get(g.user.team_id)
+    
+    if not team:
+        return jsonify({
+            'success': False,
+            'message': 'You are not assigned to any team.'
+        }), 400
+    
+    # Get date range from query parameters or use current week as default
+    today = datetime.now().date()
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    
+    start_date_str = request.args.get('start_date', start_of_week.strftime('%Y-%m-%d'))
+    end_date_str = request.args.get('end_date', end_of_week.strftime('%Y-%m-%d'))
+    include_self = request.args.get('include_self', 'false') == 'true'
+    
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({
+            'success': False,
+            'message': 'Invalid date format.'
+        }), 400
+    
+    # Get all team members
+    team_members = User.query.filter_by(team_id=team.id).all()
+    
+    # Prepare data structure for team members' hours
+    team_data = []
+    
+    for member in team_members:
+        # Skip if the member is the current user (team leader) and include_self is False
+        if member.id == g.user.id and not include_self:
+            continue
+            
+        # Get time entries for this member in the date range
+        entries = TimeEntry.query.filter(
+            TimeEntry.user_id == member.id,
+            TimeEntry.arrival_time >= datetime.combine(start_date, time.min),
+            TimeEntry.arrival_time <= datetime.combine(end_date, time.max)
+        ).order_by(TimeEntry.arrival_time).all()
+        
+        # Calculate daily and total hours
+        daily_hours = {}
+        total_seconds = 0
+        
+        for entry in entries:
+            if entry.duration:  # Only count completed entries
+                entry_date = entry.arrival_time.date()
+                date_str = entry_date.strftime('%Y-%m-%d')
+                
+                if date_str not in daily_hours:
+                    daily_hours[date_str] = 0
+                
+                daily_hours[date_str] += entry.duration
+                total_seconds += entry.duration
+        
+        # Convert seconds to hours for display
+        for date_str in daily_hours:
+            daily_hours[date_str] = round(daily_hours[date_str] / 3600, 2)  # Convert to hours
+        
+        total_hours = round(total_seconds / 3600, 2)  # Convert to hours
+        
+        # Format entries for JSON response
+        formatted_entries = []
+        for entry in entries:
+            formatted_entries.append({
+                'id': entry.id,
+                'arrival_time': entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'departure_time': entry.departure_time.strftime('%Y-%m-%d %H:%M:%S') if entry.departure_time else None,
+                'duration': entry.duration,
+                'total_break_duration': entry.total_break_duration
+            })
+        
+        # Add member data to team data
+        team_data.append({
+            'user': {
+                'id': member.id,
+                'username': member.username,
+                'email': member.email
+            },
+            'daily_hours': daily_hours,
+            'total_hours': total_hours,
+            'entries': formatted_entries
+        })
+    
+    # Generate a list of dates in the range for the table header
+    date_range = []
+    current_date = start_date
+    while current_date <= end_date:
+        date_range.append(current_date.strftime('%Y-%m-%d'))
+        current_date += timedelta(days=1)
+    
+    return jsonify({
+        'success': True,
+        'team': {
+            'id': team.id,
+            'name': team.name,
+            'description': team.description
+        },
+        'team_data': team_data,
+        'date_range': date_range,
+        'start_date': start_date.strftime('%Y-%m-%d'),
+        'end_date': end_date.strftime('%Y-%m-%d')
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)

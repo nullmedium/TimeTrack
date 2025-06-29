@@ -1,0 +1,309 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="admin-container">
+    <h1>
+        {% if g.user.is_admin or g.user.role == Role.ADMIN %}
+            Admin Dashboard
+        {% elif g.user.role == Role.SUPERVISOR %}
+            Supervisor Dashboard
+        {% elif g.user.role == Role.TEAM_LEADER %}
+            Team Leader Dashboard
+        {% else %}
+            Dashboard
+        {% endif %}
+    </h1>
+    
+    <!-- Admin-only sections -->
+    {% if g.user.is_admin or g.user.role == Role.ADMIN %}
+    <div class="stats-section">
+        <h2>System Overview</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>{{ total_users }}</h3>
+                <p>Total Users</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ total_teams }}</h3>
+                <p>Total Teams</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ blocked_users }}</h3>
+                <p>Blocked Users</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ unverified_users }}</h3>
+                <p>Unverified Users</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="admin-panel">
+        <div class="admin-card">
+            <h2>User Management</h2>
+            <p>Manage user accounts, permissions, and roles.</p>
+            <a href="{{ url_for('admin_users') }}" class="btn btn-primary">Manage Users</a>
+        </div>
+        
+        <div class="admin-card">
+            <h2>Team Management</h2>
+            <p>Configure teams and their members.</p>
+            <a href="{{ url_for('admin_teams') }}" class="btn btn-primary">Manage Teams</a>
+        </div>
+
+        <div class="admin-card">
+            <h2>System Settings</h2>
+            <p>Configure application-wide settings like registration and more.</p>
+            <a href="{{ url_for('admin_settings') }}" class="btn btn-primary">System Settings</a>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Team Leader and Supervisor sections -->
+    {% if g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] or g.user.is_admin %}
+    <div class="team-section">
+        <h2>Team Management</h2>
+        
+        {% if teams %}
+        <div class="team-stats">
+            <div class="stat-card">
+                <h3>{{ team_member_count }}</h3>
+                <p>Team Members</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ teams|length }}</h3>
+                <p>Teams Managed</p>
+            </div>
+        </div>
+        
+        <div class="admin-panel">
+            <div class="admin-card">
+                <h2>Team Hours</h2>
+                <p>View and monitor team member working hours.</p>
+                <a href="{{ url_for('team_hours') }}" class="btn btn-primary">View Team Hours</a>
+            </div>
+            
+            {% if g.user.is_admin %}
+            <div class="admin-card">
+                <h2>Team Configuration</h2>
+                <p>Create and manage team structures.</p>
+                <a href="{{ url_for('admin_teams') }}" class="btn btn-primary">Configure Teams</a>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="team-members">
+            <h3>Your Team Members</h3>
+            {% if team_members %}
+            <div class="members-grid">
+                {% for member in team_members %}
+                <div class="member-card">
+                    <h4>{{ member.username }}</h4>
+                    <p>{{ member.role.value if member.role else 'Team Member' }}</p>
+                    <p>{{ member.email }}</p>
+                    {% if member.is_blocked %}
+                        <span class="status blocked">Blocked</span>
+                    {% elif not member.is_verified %}
+                        <span class="status unverified">Unverified</span>
+                    {% else %}
+                        <span class="status active">Active</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p>No team members assigned yet.</p>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="no-team">
+            <p>You are not assigned to any team. Contact your administrator to be assigned to a team.</p>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Recent Activity section for all roles -->
+    {% if recent_entries %}
+    <div class="recent-activity">
+        <h2>Recent Time Entries</h2>
+        <div class="entries-table">
+            <table class="time-history">
+                <thead>
+                    <tr>
+                        {% if g.user.is_admin or g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
+                        <th>User</th>
+                        {% endif %}
+                        <th>Date</th>
+                        <th>Arrival</th>
+                        <th>Departure</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in recent_entries %}
+                    <tr>
+                        {% if g.user.is_admin or g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
+                        <td>{{ entry.user.username }}</td>
+                        {% endif %}
+                        <td>{{ entry.arrival_time.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ entry.arrival_time.strftime('%H:%M:%S') }}</td>
+                        <td>{{ entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active' }}</td>
+                        <td>
+                            {% if entry.duration %}
+                                {{ '%d:%02d:%02d'|format(entry.duration//3600, (entry.duration%3600)//60, entry.duration%60) }}
+                            {% else %}
+                                In progress
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not entry.departure_time %}
+                                <span class="status active">Active</span>
+                            {% else %}
+                                <span class="status completed">Completed</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Quick Actions section -->
+    <div class="quick-actions">
+        <h2>Quick Actions</h2>
+        <div class="admin-panel">
+            <div class="admin-card">
+                <h2>My Profile</h2>
+                <p>Update your personal information and password.</p>
+                <a href="{{ url_for('profile') }}" class="btn btn-secondary">Edit Profile</a>
+            </div>
+            
+            <div class="admin-card">
+                <h2>Configuration</h2>
+                <p>Configure work hours and break settings.</p>
+                <a href="{{ url_for('config') }}" class="btn btn-secondary">Work Config</a>
+            </div>
+            
+            <div class="admin-card">
+                <h2>Time History</h2>
+                <p>View your complete time tracking history.</p>
+                <a href="{{ url_for('history') }}" class="btn btn-secondary">View History</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.stats-section {
+    margin-bottom: 2rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.stat-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.stat-card h3 {
+    font-size: 2rem;
+    margin: 0 0 0.5rem 0;
+    color: #007bff;
+}
+
+.stat-card p {
+    margin: 0;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.team-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.members-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.member-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.member-card h4 {
+    margin: 0 0 0.5rem 0;
+    color: #333;
+}
+
+.member-card p {
+    margin: 0.25rem 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.status {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status.active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status.blocked {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status.unverified {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status.completed {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.no-team {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.entries-table {
+    overflow-x: auto;
+}
+
+.recent-activity, .team-section, .quick-actions {
+    margin-top: 2rem;
+}
+</style>
+{% endblock %}

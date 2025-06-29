@@ -15,19 +15,33 @@
                     <li><a href="{{ url_for('history') }}">History</a></li>
                     <li><a href="{{ url_for('about') }}">About</a></li>
                     
-                    <!-- Admin dropdown menu moved to the rightmost position -->
+                    <!-- Role-based dropdown menu -->
                     {% if g.user.is_admin %}
                     <li class="dropdown admin-dropdown">
                         <a href="#" class="dropdown-toggle">Admin</a>
                         <ul class="dropdown-menu">
                             <li><a href="{{ url_for('profile') }}">Profile</a></li>
                             <li><a href="{{ url_for('config') }}">Config</a></li>
-                            <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                            <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                            <li><a href="{{ url_for('logout') }}">Logout</a></li>
+                        </ul>
+                    </li>
+                    {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
+                    <!-- Team Leader/Supervisor dropdown menu -->
+                    <li class="dropdown admin-dropdown">
+                        <a href="#" class="dropdown-toggle">{{ g.user.username }}</a>
+                        <ul class="dropdown-menu">
+                            <li><a href="{{ url_for('profile') }}">Profile</a></li>
+                            <li><a href="{{ url_for('config') }}">Config</a></li>
+                            <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                            {% if g.user.team_id %}
+                            <li><a href="{{ url_for('team_hours') }}">Team Hours</a></li>
+                            {% endif %}
                             <li><a href="{{ url_for('logout') }}">Logout</a></li>
                         </ul>
                     </li>
                     {% else %}
-                    <!-- User dropdown menu for non-admin users -->
+                    <!-- Regular user dropdown menu -->
                     <li class="dropdown admin-dropdown">
                         <a href="#" class="dropdown-toggle">{{ g.user.username }}</a>
                         <ul class="dropdown-menu">
