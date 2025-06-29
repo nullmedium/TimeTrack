@@ -20,6 +20,9 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
             <div class="active-timer">
                 <h3>Currently Working</h3>
                 <p>Started at: {{ active_entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                {% if active_entry.project %}
+                <p class="project-info">Project: <strong>{{ active_entry.project.code }} - {{ active_entry.project.name }}</strong></p>
+                {% endif %}
                 <div id="timer"
                      data-start="{{ active_entry.arrival_time.timestamp() }}"
                      data-breaks="{{ active_entry.total_break_duration }}"
@@ -43,7 +46,22 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
         {% else %}
             <div class="inactive-timer">
                 <h3>Not Currently Working</h3>
-                <button id="arrive-btn" class="arrive-btn">Arrive</button>
+                <div class="start-work-form">
+                    <div class="form-group">
+                        <label for="project-select">Select Project (Optional):</label>
+                        <select id="project-select" name="project_id">
+                            <option value="">No specific project</option>
+                            {% for project in available_projects %}
+                            <option value="{{ project.id }}">{{ project.code }} - {{ project.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="work-notes">Notes (Optional):</label>
+                        <textarea id="work-notes" name="notes" rows="2" placeholder="What are you working on?"></textarea>
+                    </div>
+                    <button id="arrive-btn" class="arrive-btn">Arrive</button>
+                </div>
             </div>
         {% endif %}
     </div>
@@ -55,6 +73,7 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
                 <thead>
                     <tr>
                         <th>Date</th>
+                        <th>Project</th>
                         <th>Arrival</th>
                         <th>Departure</th>
                         <th>Work Duration</th>
@@ -66,6 +85,14 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
                     {% for entry in history %}
                     <tr data-entry-id="{{ entry.id }}">
                         <td>{{ entry.arrival_time.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            {% if entry.project %}
+                                <span class="project-tag">{{ entry.project.code }}</span>
+                                <small>{{ entry.project.name }}</small>
+                            {% else %}
+                                <em>No project</em>
+                            {% endif %}
+                        </td>
                         <td>{{ entry.arrival_time.strftime('%H:%M:%S') }}</td>
                         <td>{{ entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active' }}</td>
                         <td>{{ '%d:%02d:%02d'|format(entry.duration//3600, (entry.duration%3600)//60, entry.duration%60) if entry.duration is not none else 'In progress' }}</td>
@@ -309,5 +336,72 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
         });
     });
 </script>
+
+<style>
+.start-work-form {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.start-work-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.start-work-form label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.start-work-form select,
+.start-work-form textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+}
+
+.start-work-form select:focus,
+.start-work-form textarea:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.project-info {
+    color: #4CAF50;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.project-tag {
+    background: #4CAF50;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-right: 0.5rem;
+}
+
+.project-tag + small {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.time-history td {
+    vertical-align: middle;
+}
+
+.time-history .project-tag + small {
+    display: block;
+    margin-top: 0.25rem;
+}
+</style>
 
 {% endblock %}

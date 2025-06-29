@@ -1,0 +1,136 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="timetrack-container">
+    <h2>Create New Project</h2>
+    
+    <form method="POST" action="{{ url_for('create_project') }}" class="project-form">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="name">Project Name *</label>
+                <input type="text" id="name" name="name" required 
+                       value="{{ request.form.name if request.form.name else '' }}"
+                       placeholder="Enter project name">
+            </div>
+            
+            <div class="form-group">
+                <label for="code">Project Code *</label>
+                <input type="text" id="code" name="code" required 
+                       value="{{ request.form.code if request.form.code else '' }}"
+                       placeholder="e.g., PRJ001" maxlength="20" style="text-transform: uppercase;">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="3" 
+                      placeholder="Enter project description">{{ request.form.description if request.form.description else '' }}</textarea>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="team_id">Assigned Team</label>
+                <select id="team_id" name="team_id">
+                    <option value="">All Teams</option>
+                    {% for team in teams %}
+                    <option value="{{ team.id }}" 
+                            {% if request.form.team_id and request.form.team_id|int == team.id %}selected{% endif %}>
+                        {{ team.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="start_date">Start Date</label>
+                <input type="date" id="start_date" name="start_date" 
+                       value="{{ request.form.start_date if request.form.start_date else '' }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="end_date">End Date</label>
+                <input type="date" id="end_date" name="end_date" 
+                       value="{{ request.form.end_date if request.form.end_date else '' }}">
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn">Create Project</button>
+            <a href="{{ url_for('admin_projects') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<style>
+.project-form {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2rem;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+}
+
+#code {
+    text-transform: uppercase;
+}
+</style>
+
+<script>
+// Auto-uppercase project code
+document.getElementById('code').addEventListener('input', function(e) {
+    e.target.value = e.target.value.toUpperCase();
+});
+</script>
+{% endblock %}

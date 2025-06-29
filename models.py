@@ -26,6 +26,49 @@ class Team(db.Model):
     def __repr__(self):
         return f'<Team {self.name}>'
 
+class Project(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    code = db.Column(db.String(20), unique=True, nullable=False)  # Project code (e.g., PRJ001)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Foreign key to user who created the project (Admin/Supervisor)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Optional team assignment - if set, only team members can log time to this project
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
+    
+    # Project dates
+    start_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True)
+    
+    # Relationships
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='created_projects')
+    team = db.relationship('Team', backref='projects')
+    time_entries = db.relationship('TimeEntry', backref='project', lazy=True)
+    
+    def __repr__(self):
+        return f'<Project {self.code}: {self.name}>'
+    
+    def is_user_allowed(self, user):
+        """Check if a user is allowed to log time to this project"""
+        if not self.is_active:
+            return False
+        
+        # Admins and Supervisors can log time to any project
+        if user.role in [Role.ADMIN, Role.SUPERVISOR]:
+            return True
+        
+        # If project is team-specific, only team members can log time
+        if self.team_id:
+            return user.team_id == self.team_id
+        
+        # If no team restriction, any user can log time
+        return True
+
 # Update User model to include role and team relationship
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -126,9 +169,16 @@ class TimeEntry(db.Model):
     pause_start_time = db.Column(db.DateTime, nullable=True)
     total_break_duration = db.Column(db.Integer, default=0)  # Total break duration in seconds
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    
+    # Project association - nullable for backward compatibility
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+    
+    # Optional notes/description for the time entry
+    notes = db.Column(db.Text, nullable=True)
 
     def __repr__(self):
-        return f'<TimeEntry {self.id}: {self.arrival_time} - {self.departure_time}>'
+        project_info = f" (Project: {self.project.code})" if self.project else ""
+        return f'<TimeEntry {self.id}: {self.arrival_time} - {self.departure_time}{project_info}>'
 
 class WorkConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)

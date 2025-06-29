@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project
 import logging
 from datetime import datetime, time, timedelta
 import os
@@ -154,7 +154,17 @@ def home():
             TimeEntry.arrival_time <= datetime.combine(today, time.max)
         ).order_by(TimeEntry.arrival_time.desc()).all()
         
-        return render_template('index.html', title='Home', active_entry=active_entry, history=history)
+        # Get available projects for this user
+        available_projects = []
+        all_projects = Project.query.filter_by(is_active=True).all()
+        for project in all_projects:
+            if project.is_user_allowed(g.user):
+                available_projects.append(project)
+        
+        return render_template('index.html', title='Home', 
+                             active_entry=active_entry, 
+                             history=history,
+                             available_projects=available_projects)
     else:
         return render_template('index.html', title='Home')
 
@@ -683,14 +693,35 @@ def timetrack():
 @app.route('/api/arrive', methods=['POST'])
 @login_required
 def arrive():
+    # Get project and notes from request
+    project_id = request.json.get('project_id') if request.json else None
+    notes = request.json.get('notes') if request.json else None
+    
+    # Validate project access if project is specified
+    if project_id:
+        project = Project.query.get(project_id)
+        if not project or not project.is_user_allowed(g.user):
+            return jsonify({'error': 'Invalid or unauthorized project'}), 403
+    
     # Create a new time entry with arrival time for the current user
-    new_entry = TimeEntry(user_id=session['user_id'], arrival_time=datetime.now())
+    new_entry = TimeEntry(
+        user_id=g.user.id, 
+        arrival_time=datetime.now(),
+        project_id=int(project_id) if project_id else None,
+        notes=notes
+    )
     db.session.add(new_entry)
     db.session.commit()
 
     return jsonify({
         'id': new_entry.id,
-        'arrival_time': new_entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S')
+        'arrival_time': new_entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S'),
+        'project': {
+            'id': new_entry.project.id,
+            'code': new_entry.project.code,
+            'name': new_entry.project.name
+        } if new_entry.project else None,
+        'notes': new_entry.notes
     })
 
 @app.route('/api/leave/<int:entry_id>', methods=['POST'])
@@ -900,10 +931,38 @@ def team_hours():
 @app.route('/history')
 @login_required
 def history():
-    # Get all time entries for the current user, ordered by most recent first
-    all_entries = TimeEntry.query.filter_by(user_id=session['user_id']).order_by(TimeEntry.arrival_time.desc()).all()
+    # Get project filter from query parameters
+    project_filter = request.args.get('project_id')
+    
+    # Base query for user's time entries
+    query = TimeEntry.query.filter_by(user_id=g.user.id)
+    
+    # Apply project filter if specified
+    if project_filter:
+        if project_filter == 'none':
+            # Show entries with no project assigned
+            query = query.filter(TimeEntry.project_id.is_(None))
+        else:
+            # Show entries for specific project
+            try:
+                project_id = int(project_filter)
+                query = query.filter_by(project_id=project_id)
+            except ValueError:
+                # Invalid project ID, ignore filter
+                pass
+    
+    # Get filtered entries ordered by most recent first
+    all_entries = query.order_by(TimeEntry.arrival_time.desc()).all()
+    
+    # Get available projects for the filter dropdown
+    available_projects = []
+    all_projects = Project.query.filter_by(is_active=True).all()
+    for project in all_projects:
+        if project.is_user_allowed(g.user):
+            available_projects.append(project)
 
-    return render_template('history.html', title='Time Entry History', entries=all_entries)
+    return render_template('history.html', title='Time Entry History', 
+                         entries=all_entries, available_projects=available_projects)
 
 def calculate_work_duration(arrival_time, departure_time, total_break_duration):
     """
@@ -1187,6 +1246,149 @@ def manage_team(team_id):
         available_users=available_users
     )
 
+# Project Management Routes
+@app.route('/admin/projects')
+@role_required(Role.SUPERVISOR)  # Supervisors and Admins can manage projects
+def admin_projects():
+    projects = Project.query.order_by(Project.created_at.desc()).all()
+    return render_template('admin_projects.html', title='Project Management', projects=projects)
+
+@app.route('/admin/projects/create', methods=['GET', 'POST'])
+@role_required(Role.SUPERVISOR)
+def create_project():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        code = request.form.get('code')
+        team_id = request.form.get('team_id') or None
+        start_date_str = request.form.get('start_date')
+        end_date_str = request.form.get('end_date')
+        
+        # Validate input
+        error = None
+        if not name:
+            error = 'Project name is required'
+        elif not code:
+            error = 'Project code is required'
+        elif Project.query.filter_by(code=code).first():
+            error = 'Project code already exists'
+        
+        # Parse dates
+        start_date = None
+        end_date = None
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                error = 'Invalid start date format'
+        
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                error = 'Invalid end date format'
+        
+        if start_date and end_date and start_date > end_date:
+            error = 'Start date cannot be after end date'
+        
+        if error is None:
+            project = Project(
+                name=name,
+                description=description,
+                code=code.upper(),
+                team_id=int(team_id) if team_id else None,
+                start_date=start_date,
+                end_date=end_date,
+                created_by_id=g.user.id
+            )
+            db.session.add(project)
+            db.session.commit()
+            flash(f'Project "{name}" created successfully!', 'success')
+            return redirect(url_for('admin_projects'))
+        else:
+            flash(error, 'error')
+    
+    # Get available teams for the form
+    teams = Team.query.order_by(Team.name).all()
+    return render_template('create_project.html', title='Create Project', teams=teams)
+
+@app.route('/admin/projects/edit/<int:project_id>', methods=['GET', 'POST'])
+@role_required(Role.SUPERVISOR)
+def edit_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        code = request.form.get('code')
+        team_id = request.form.get('team_id') or None
+        is_active = request.form.get('is_active') == 'on'
+        start_date_str = request.form.get('start_date')
+        end_date_str = request.form.get('end_date')
+        
+        # Validate input
+        error = None
+        if not name:
+            error = 'Project name is required'
+        elif not code:
+            error = 'Project code is required'
+        elif code != project.code and Project.query.filter_by(code=code).first():
+            error = 'Project code already exists'
+        
+        # Parse dates
+        start_date = None
+        end_date = None
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                error = 'Invalid start date format'
+        
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                error = 'Invalid end date format'
+        
+        if start_date and end_date and start_date > end_date:
+            error = 'Start date cannot be after end date'
+        
+        if error is None:
+            project.name = name
+            project.description = description
+            project.code = code.upper()
+            project.team_id = int(team_id) if team_id else None
+            project.is_active = is_active
+            project.start_date = start_date
+            project.end_date = end_date
+            db.session.commit()
+            flash(f'Project "{name}" updated successfully!', 'success')
+            return redirect(url_for('admin_projects'))
+        else:
+            flash(error, 'error')
+    
+    # Get available teams for the form
+    teams = Team.query.order_by(Team.name).all()
+    return render_template('edit_project.html', title='Edit Project', project=project, teams=teams)
+
+@app.route('/admin/projects/delete/<int:project_id>', methods=['POST'])
+@role_required(Role.ADMIN)  # Only admins can delete projects
+def delete_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    
+    # Check if there are time entries associated with this project
+    time_entries_count = TimeEntry.query.filter_by(project_id=project_id).count()
+    
+    if time_entries_count > 0:
+        flash(f'Cannot delete project "{project.name}" - it has {time_entries_count} time entries associated with it. Deactivate the project instead.', 'error')
+    else:
+        project_name = project.name
+        db.session.delete(project)
+        db.session.commit()
+        flash(f'Project "{project_name}" deleted successfully!', 'success')
+    
+    return redirect(url_for('admin_projects'))
+
 @app.route('/api/team/hours_data', methods=['GET'])
 @login_required
 @role_required(Role.TEAM_LEADER)  # Only team leaders and above can access
@@ -1345,12 +1547,15 @@ def prepare_export_data(entries):
     for entry in entries:
         row = {
             'Date': entry.arrival_time.strftime('%Y-%m-%d'),
+            'Project Code': entry.project.code if entry.project else '',
+            'Project Name': entry.project.name if entry.project else '',
             'Arrival Time': entry.arrival_time.strftime('%H:%M:%S'),
             'Departure Time': entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active',
             'Work Duration (HH:MM:SS)': format_duration(entry.duration) if entry.duration is not None else 'In progress',
             'Break Duration (HH:MM:SS)': format_duration(entry.total_break_duration),
             'Work Duration (seconds)': entry.duration if entry.duration is not None else 0,
-            'Break Duration (seconds)': entry.total_break_duration if entry.total_break_duration is not None else 0
+            'Break Duration (seconds)': entry.total_break_duration if entry.total_break_duration is not None else 0,
+            'Notes': entry.notes if entry.notes else ''
         }
         data.append(row)
     return data

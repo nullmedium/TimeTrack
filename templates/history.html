@@ -7,16 +7,40 @@
         <a href="{{ url_for('export') }}" class="btn">Export Data</a>
     </div>
 
+    <!-- Project Filter -->
+    <div class="filter-section">
+        <form method="GET" action="{{ url_for('history') }}" class="filter-form">
+            <div class="form-group">
+                <label for="project-filter">Filter by Project:</label>
+                <select id="project-filter" name="project_id" onchange="this.form.submit()">
+                    <option value="">All Projects</option>
+                    {% for project in available_projects %}
+                    <option value="{{ project.id }}" 
+                            {% if request.args.get('project_id') and request.args.get('project_id')|int == project.id %}selected{% endif %}>
+                        {{ project.code }} - {{ project.name }}
+                    </option>
+                    {% endfor %}
+                    <option value="none" 
+                            {% if request.args.get('project_id') == 'none' %}selected{% endif %}>
+                        No Project Assigned
+                    </option>
+                </select>
+            </div>
+        </form>
+    </div>
+
     <div class="history-section">
         {% if entries %}
             <table class="time-history">
                 <thead>
                     <tr>
                         <th>Date</th>
+                        <th>Project</th>
                         <th>Arrival</th>
                         <th>Departure</th>
                         <th>Work Duration</th>
                         <th>Break Duration</th>
+                        <th>Notes</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -24,10 +48,25 @@
                     {% for entry in entries %}
                     <tr data-entry-id="{{ entry.id }}">
                         <td>{{ entry.arrival_time.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            {% if entry.project %}
+                                <span class="project-tag">{{ entry.project.code }}</span>
+                                <small>{{ entry.project.name }}</small>
+                            {% else %}
+                                <em>No project</em>
+                            {% endif %}
+                        </td>
                         <td>{{ entry.arrival_time.strftime('%H:%M:%S') }}</td>
                         <td>{{ entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active' }}</td>
                         <td>{{ '%d:%02d:%02d'|format(entry.duration//3600, (entry.duration%3600)//60, entry.duration%60) if entry.duration is not none else 'In progress' }}</td>
                         <td>{{ '%d:%02d:%02d'|format(entry.total_break_duration//3600, (entry.total_break_duration%3600)//60, entry.total_break_duration%60) if entry.total_break_duration is not none else '00:00:00' }}</td>
+                        <td>
+                            {% if entry.notes %}
+                                <span class="notes-preview" title="{{ entry.notes }}">{{ entry.notes[:50] }}{% if entry.notes|length > 50 %}...{% endif %}</span>
+                            {% else %}
+                                <em>-</em>
+                            {% endif %}
+                        </td>
                         <td>
                             <button class="edit-entry-btn" data-id="{{ entry.id }}">Edit</button>
                             <button class="delete-entry-btn" data-id="{{ entry.id }}">Delete</button>
@@ -234,4 +273,70 @@
         });
     });
 </script>
+<style>
+.filter-section {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.filter-form .form-group {
+    margin: 0;
+}
+
+.filter-form label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.filter-form select {
+    width: 100%;
+    max-width: 300px;
+    padding: 0.5rem;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+}
+
+.filter-form select:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.project-tag {
+    background: #4CAF50;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-right: 0.5rem;
+}
+
+.project-tag + small {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.notes-preview {
+    color: #666;
+    font-size: 0.9rem;
+    cursor: help;
+}
+
+.time-history td {
+    vertical-align: middle;
+}
+
+.time-history .project-tag + small {
+    display: block;
+    margin-top: 0.25rem;
+}
+</style>
+
 {% endblock %}
