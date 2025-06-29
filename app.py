@@ -1296,6 +1296,109 @@ def team_hours_data():
         'start_date': start_date.strftime('%Y-%m-%d'),
         'end_date': end_date.strftime('%Y-%m-%d')
     })
+=======
+@app.route('/export')
+def export():
+    return render_template('export.html', title='Export Data')
 
+@app.route('/download_export')
+def download_export():
+    # Get parameters
+    export_format = request.args.get('format', 'csv')
+    period = request.args.get('period')
+    
+    # Handle date range
+    if period:
+        # Quick export options
+        today = datetime.now().date()
+        if period == 'today':
+            start_date = today
+            end_date = today
+        elif period == 'week':
+            start_date = today - timedelta(days=today.weekday())
+            end_date = today
+        elif period == 'month':
+            start_date = today.replace(day=1)
+            end_date = today
+        elif period == 'all':
+            # Get the earliest entry date
+            earliest_entry = TimeEntry.query.order_by(TimeEntry.arrival_time).first()
+            start_date = earliest_entry.arrival_time.date() if earliest_entry else today
+            end_date = today
+    else:
+        # Custom date range
+        try:
+            start_date = datetime.strptime(request.args.get('start_date'), '%Y-%m-%d').date()
+            end_date = datetime.strptime(request.args.get('end_date'), '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            flash('Invalid date format. Please use YYYY-MM-DD format.')
+            return redirect(url_for('export'))
+    
+    # Query entries within the date range
+    start_datetime = datetime.combine(start_date, time.min)
+    end_datetime = datetime.combine(end_date, time.max)
+    
+    entries = TimeEntry.query.filter(
+        TimeEntry.arrival_time >= start_datetime,
+        TimeEntry.arrival_time <= end_datetime
+    ).order_by(TimeEntry.arrival_time).all()
+    
+    if not entries:
+        flash('No entries found for the selected date range.')
+        return redirect(url_for('export'))
+    
+    # Prepare data for export
+    data = []
+    for entry in entries:
+        row = {
+            'Date': entry.arrival_time.strftime('%Y-%m-%d'),
+            'Arrival Time': entry.arrival_time.strftime('%H:%M:%S'),
+            'Departure Time': entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active',
+            'Work Duration (HH:MM:SS)': f"{entry.duration//3600:d}:{(entry.duration%3600)//60:02d}:{entry.duration%60:02d}" if entry.duration is not None else 'In progress',
+            'Break Duration (HH:MM:SS)': f"{entry.total_break_duration//3600:d}:{(entry.total_break_duration%3600)//60:02d}:{entry.total_break_duration%60:02d}" if entry.total_break_duration is not None else '00:00:00',
+            'Work Duration (seconds)': entry.duration if entry.duration is not None else 0,
+            'Break Duration (seconds)': entry.total_break_duration if entry.total_break_duration is not None else 0
+        }
+        data.append(row)
+    
+    # Generate filename
+    filename = f"timetrack_export_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}"
+    
+    # Export based on format
+    if export_format == 'csv':
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=data[0].keys())
+        writer.writeheader()
+        writer.writerows(data)
+        
+        response = Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment;filename={filename}.csv'}
+        )
+        return response
+    
+    elif export_format == 'excel':
+        # Convert to DataFrame and export as Excel
+        df = pd.DataFrame(data)
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, sheet_name='TimeTrack Data', index=False)
+            
+            # Auto-adjust columns' width
+            worksheet = writer.sheets['TimeTrack Data']
+            for i, col in enumerate(df.columns):
+                column_width = max(df[col].astype(str).map(len).max(), len(col)) + 2
+                worksheet.set_column(i, i, column_width)
+        
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f"{filename}.xlsx"
+        )
+      
 if __name__ == '__main__':
     app.run(debug=True)

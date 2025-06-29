@@ -3,6 +3,9 @@
 {% block content %}
 <div class="timetrack-container">
     <h2>Complete Time Entry History</h2>
+    <div class="export-button-container">
+        <a href="{{ url_for('export') }}" class="btn">Export Data</a>
+    </div>
 
     <div class="history-section">
         {% if entries %}
