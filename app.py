@@ -1,8 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
 from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role
 import logging
 from datetime import datetime, time, timedelta
 import os
+import csv
+import io
+import pandas as pd
 from sqlalchemy import func
 from functools import wraps
 from flask_mail import Mail, Message
@@ -1296,43 +1299,196 @@ def team_hours_data():
         'start_date': start_date.strftime('%Y-%m-%d'),
         'end_date': end_date.strftime('%Y-%m-%d')
     })
-=======
+
 @app.route('/export')
 def export():
     return render_template('export.html', title='Export Data')
 
-@app.route('/download_export')
-def download_export():
-    # Get parameters
-    export_format = request.args.get('format', 'csv')
-    period = request.args.get('period')
+def get_date_range(period, start_date_str=None, end_date_str=None):
+    """Get start and end date based on period or custom date range."""
+    today = datetime.now().date()
     
-    # Handle date range
     if period:
-        # Quick export options
-        today = datetime.now().date()
         if period == 'today':
-            start_date = today
-            end_date = today
+            return today, today
         elif period == 'week':
             start_date = today - timedelta(days=today.weekday())
-            end_date = today
+            return start_date, today
         elif period == 'month':
             start_date = today.replace(day=1)
-            end_date = today
+            return start_date, today
         elif period == 'all':
-            # Get the earliest entry date
             earliest_entry = TimeEntry.query.order_by(TimeEntry.arrival_time).first()
             start_date = earliest_entry.arrival_time.date() if earliest_entry else today
-            end_date = today
+            return start_date, today
     else:
         # Custom date range
         try:
-            start_date = datetime.strptime(request.args.get('start_date'), '%Y-%m-%d').date()
-            end_date = datetime.strptime(request.args.get('end_date'), '%Y-%m-%d').date()
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            return start_date, end_date
         except (ValueError, TypeError):
-            flash('Invalid date format. Please use YYYY-MM-DD format.')
-            return redirect(url_for('export'))
+            raise ValueError('Invalid date format')
+
+def format_duration(seconds):
+    """Format duration in seconds to HH:MM:SS format."""
+    if seconds is None:
+        return '00:00:00'
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds = seconds % 60
+    return f"{hours:d}:{minutes:02d}:{seconds:02d}"
+
+def prepare_export_data(entries):
+    """Prepare time entries data for export."""
+    data = []
+    for entry in entries:
+        row = {
+            'Date': entry.arrival_time.strftime('%Y-%m-%d'),
+            'Arrival Time': entry.arrival_time.strftime('%H:%M:%S'),
+            'Departure Time': entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active',
+            'Work Duration (HH:MM:SS)': format_duration(entry.duration) if entry.duration is not None else 'In progress',
+            'Break Duration (HH:MM:SS)': format_duration(entry.total_break_duration),
+            'Work Duration (seconds)': entry.duration if entry.duration is not None else 0,
+            'Break Duration (seconds)': entry.total_break_duration if entry.total_break_duration is not None else 0
+        }
+        data.append(row)
+    return data
+
+def export_to_csv(data, filename):
+    """Export data to CSV format."""
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=data[0].keys())
+    writer.writeheader()
+    writer.writerows(data)
+    
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment;filename={filename}.csv'}
+    )
+
+def export_to_excel(data, filename):
+    """Export data to Excel format with formatting."""
+    df = pd.DataFrame(data)
+    output = io.BytesIO()
+    
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, sheet_name='TimeTrack Data', index=False)
+        
+        # Auto-adjust columns' width
+        worksheet = writer.sheets['TimeTrack Data']
+        for i, col in enumerate(df.columns):
+            column_width = max(df[col].astype(str).map(len).max(), len(col)) + 2
+            worksheet.set_column(i, i, column_width)
+    
+    output.seek(0)
+    
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f"{filename}.xlsx"
+    )
+
+def prepare_team_hours_export_data(team, team_data, date_range):
+    """Prepare team hours data for export."""
+    export_data = []
+    
+    for member_data in team_data:
+        user = member_data['user']
+        daily_hours = member_data['daily_hours']
+        
+        # Create base row with member info
+        row = {
+            'Team': team['name'],
+            'Member': user['username'],
+            'Email': user['email'],
+            'Total Hours': member_data['total_hours']
+        }
+        
+        # Add daily hours columns
+        for date_str in date_range:
+            formatted_date = datetime.strptime(date_str, '%Y-%m-%d').strftime('%m/%d/%Y')
+            row[formatted_date] = daily_hours.get(date_str, 0.0)
+        
+        export_data.append(row)
+    
+    return export_data
+
+def export_team_hours_to_csv(data, filename):
+    """Export team hours data to CSV format."""
+    if not data:
+        return None
+        
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=data[0].keys())
+    writer.writeheader()
+    writer.writerows(data)
+    
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment;filename={filename}.csv'}
+    )
+
+def export_team_hours_to_excel(data, filename, team_name):
+    """Export team hours data to Excel format with formatting."""
+    if not data:
+        return None
+        
+    df = pd.DataFrame(data)
+    output = io.BytesIO()
+    
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, sheet_name=f'{team_name} Hours', index=False)
+        
+        # Get the workbook and worksheet objects
+        workbook = writer.book
+        worksheet = writer.sheets[f'{team_name} Hours']
+        
+        # Create formats
+        header_format = workbook.add_format({
+            'bold': True,
+            'text_wrap': True,
+            'valign': 'top',
+            'fg_color': '#4CAF50',
+            'font_color': 'white',
+            'border': 1
+        })
+        
+        # Auto-adjust columns' width and apply formatting
+        for i, col in enumerate(df.columns):
+            column_width = max(df[col].astype(str).map(len).max(), len(col)) + 2
+            worksheet.set_column(i, i, column_width)
+            
+            # Apply header formatting
+            worksheet.write(0, i, col, header_format)
+    
+    output.seek(0)
+    
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f"{filename}.xlsx"
+    )
+
+@app.route('/download_export')
+def download_export():
+    """Handle export download requests."""
+    export_format = request.args.get('format', 'csv')
+    period = request.args.get('period')
+    
+    try:
+        start_date, end_date = get_date_range(
+            period, 
+            request.args.get('start_date'), 
+            request.args.get('end_date')
+        )
+    except ValueError:
+        flash('Invalid date format. Please use YYYY-MM-DD format.')
+        return redirect(url_for('export'))
     
     # Query entries within the date range
     start_datetime = datetime.combine(start_date, time.min)
@@ -1347,58 +1503,140 @@ def download_export():
         flash('No entries found for the selected date range.')
         return redirect(url_for('export'))
     
-    # Prepare data for export
-    data = []
-    for entry in entries:
-        row = {
-            'Date': entry.arrival_time.strftime('%Y-%m-%d'),
-            'Arrival Time': entry.arrival_time.strftime('%H:%M:%S'),
-            'Departure Time': entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active',
-            'Work Duration (HH:MM:SS)': f"{entry.duration//3600:d}:{(entry.duration%3600)//60:02d}:{entry.duration%60:02d}" if entry.duration is not None else 'In progress',
-            'Break Duration (HH:MM:SS)': f"{entry.total_break_duration//3600:d}:{(entry.total_break_duration%3600)//60:02d}:{entry.total_break_duration%60:02d}" if entry.total_break_duration is not None else '00:00:00',
-            'Work Duration (seconds)': entry.duration if entry.duration is not None else 0,
-            'Break Duration (seconds)': entry.total_break_duration if entry.total_break_duration is not None else 0
-        }
-        data.append(row)
-    
-    # Generate filename
+    # Prepare data and filename
+    data = prepare_export_data(entries)
     filename = f"timetrack_export_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}"
     
     # Export based on format
     if export_format == 'csv':
-        output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=data[0].keys())
-        writer.writeheader()
-        writer.writerows(data)
-        
-        response = Response(
-            output.getvalue(),
-            mimetype='text/csv',
-            headers={'Content-Disposition': f'attachment;filename={filename}.csv'}
-        )
-        return response
-    
+        return export_to_csv(data, filename)
     elif export_format == 'excel':
-        # Convert to DataFrame and export as Excel
-        df = pd.DataFrame(data)
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, sheet_name='TimeTrack Data', index=False)
+        return export_to_excel(data, filename)
+    else:
+        flash('Invalid export format.')
+        return redirect(url_for('export'))
+
+@app.route('/download_team_hours_export')
+@login_required
+@role_required(Role.TEAM_LEADER)
+def download_team_hours_export():
+    """Handle team hours export download requests."""
+    export_format = request.args.get('format', 'csv')
+    
+    # Get the current user's team
+    team = Team.query.get(g.user.team_id)
+    
+    if not team:
+        flash('You are not assigned to any team.')
+        return redirect(url_for('team_hours'))
+    
+    # Get date range from query parameters or use current week as default
+    today = datetime.now().date()
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    
+    start_date_str = request.args.get('start_date', start_of_week.strftime('%Y-%m-%d'))
+    end_date_str = request.args.get('end_date', end_of_week.strftime('%Y-%m-%d'))
+    include_self = request.args.get('include_self', 'false') == 'true'
+    
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Invalid date format.')
+        return redirect(url_for('team_hours'))
+    
+    # Get all team members
+    team_members = User.query.filter_by(team_id=team.id).all()
+    
+    # Prepare data structure for team members' hours
+    team_data = []
+    
+    for member in team_members:
+        # Skip if the member is the current user (team leader) and include_self is False
+        if member.id == g.user.id and not include_self:
+            continue
             
-            # Auto-adjust columns' width
-            worksheet = writer.sheets['TimeTrack Data']
-            for i, col in enumerate(df.columns):
-                column_width = max(df[col].astype(str).map(len).max(), len(col)) + 2
-                worksheet.set_column(i, i, column_width)
+        # Get time entries for this member in the date range
+        entries = TimeEntry.query.filter(
+            TimeEntry.user_id == member.id,
+            TimeEntry.arrival_time >= datetime.combine(start_date, time.min),
+            TimeEntry.arrival_time <= datetime.combine(end_date, time.max)
+        ).order_by(TimeEntry.arrival_time).all()
         
-        output.seek(0)
+        # Calculate daily and total hours
+        daily_hours = {}
+        total_seconds = 0
         
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f"{filename}.xlsx"
-        )
+        for entry in entries:
+            if entry.duration:  # Only count completed entries
+                entry_date = entry.arrival_time.date()
+                date_str = entry_date.strftime('%Y-%m-%d')
+                
+                if date_str not in daily_hours:
+                    daily_hours[date_str] = 0
+                
+                daily_hours[date_str] += entry.duration
+                total_seconds += entry.duration
+        
+        # Convert seconds to hours for display
+        for date_str in daily_hours:
+            daily_hours[date_str] = round(daily_hours[date_str] / 3600, 2)  # Convert to hours
+        
+        total_hours = round(total_seconds / 3600, 2)  # Convert to hours
+        
+        # Add member data to team data
+        team_data.append({
+            'user': {
+                'id': member.id,
+                'username': member.username,
+                'email': member.email
+            },
+            'daily_hours': daily_hours,
+            'total_hours': total_hours
+        })
+    
+    if not team_data:
+        flash('No team member data found for the selected date range.')
+        return redirect(url_for('team_hours'))
+    
+    # Generate a list of dates in the range
+    date_range = []
+    current_date = start_date
+    while current_date <= end_date:
+        date_range.append(current_date.strftime('%Y-%m-%d'))
+        current_date += timedelta(days=1)
+    
+    # Prepare data for export
+    team_info = {
+        'id': team.id,
+        'name': team.name,
+        'description': team.description
+    }
+    
+    export_data = prepare_team_hours_export_data(team_info, team_data, date_range)
+    
+    # Generate filename
+    filename = f"{team.name.replace(' ', '_')}_hours_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}"
+    
+    # Export based on format
+    if export_format == 'csv':
+        response = export_team_hours_to_csv(export_data, filename)
+        if response:
+            return response
+        else:
+            flash('Error generating CSV export.')
+            return redirect(url_for('team_hours'))
+    elif export_format == 'excel':
+        response = export_team_hours_to_excel(export_data, filename, team.name)
+        if response:
+            return response
+        else:
+            flash('Error generating Excel export.')
+            return redirect(url_for('team_hours'))
+    else:
+        flash('Invalid export format.')
+        return redirect(url_for('team_hours'))
       
 if __name__ == '__main__':
     app.run(debug=True)
