@@ -2,8 +2,230 @@
 
 {% block content %}
 <section class="about">
-    <h1>About Us</h1>
-    <p>This is a simple Flask web application created as a demonstration.</p>
-    <p>Learn more about our team and mission here.</p>
+    <h1>About TimeTrack</h1>
+    
+    <div class="about-content">
+        <div class="intro">
+            <h2>Professional Time Tracking Made Simple</h2>
+            <p>TimeTrack is a comprehensive time management solution designed to help organizations and individuals monitor work hours efficiently. Built with simplicity and accuracy in mind, our platform provides the tools you need to track, manage, and analyze time spent on work activities.</p>
+        </div>
+        
+        <div class="features-section">
+            <h2>Key Features</h2>
+            
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h3>🕐 Precise Time Tracking</h3>
+                    <p>Track your work hours with precision. Simply click "Arrive" when you start working and "Leave" when you're done. Our system automatically calculates your work duration.</p>
+                </div>
+                
+                <div class="feature-item">
+                    <h3>⏸️ Smart Break Management</h3>
+                    <p>Use the pause feature to track breaks accurately. The system automatically deducts break time from your total work hours and ensures compliance with mandatory break policies.</p>
+                </div>
+                
+                <div class="feature-item">
+                    <h3>👥 Team Management</h3>
+                    <p>Managers can organize users into teams, monitor team performance, and track collective working hours. Role-based access ensures appropriate permissions for different user levels.</p>
+                </div>
+                
+                <div class="feature-item">
+                    <h3>📊 Comprehensive Reporting</h3>
+                    <p>View detailed time entry history, team performance metrics, and individual productivity reports. Export data for payroll and project management purposes.</p>
+                </div>
+                
+                <div class="feature-item">
+                    <h3>🔧 Flexible Configuration</h3>
+                    <p>Customize work hour requirements, mandatory break durations, and threshold settings to match your organization's policies and labor regulations.</p>
+                </div>
+                
+                <div class="feature-item">
+                    <h3>🔐 Secure & Reliable</h3>
+                    <p>Built with security best practices, user authentication, email verification, and role-based access control to protect your organization's data.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="roles-section">
+            <h2>User Roles & Permissions</h2>
+            
+            <div class="role-cards">
+                <div class="role-card">
+                    <h3>👤 Team Member</h3>
+                    <p>Track personal work hours, manage breaks, view individual history, and update profile settings.</p>
+                </div>
+                
+                <div class="role-card">
+                    <h3>👨‍💼 Team Leader</h3>
+                    <p>All team member features plus monitor team hours, view team member performance, and access team management tools.</p>
+                </div>
+                
+                <div class="role-card">
+                    <h3>👩‍💼 Supervisor</h3>
+                    <p>Enhanced oversight capabilities with access to multiple teams and comprehensive reporting across supervised groups.</p>
+                </div>
+                
+                <div class="role-card">
+                    <h3>⚙️ Administrator</h3>
+                    <p>Full system access including user management, team configuration, system settings, and complete administrative control.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="benefits-section">
+            <h2>Why Choose TimeTrack?</h2>
+            
+            <div class="benefits-list">
+                <div class="benefit">
+                    <h3>✅ Compliance Ready</h3>
+                    <p>Automatically enforces break policies and work hour regulations to help your organization stay compliant with labor laws.</p>
+                </div>
+                
+                <div class="benefit">
+                    <h3>✅ Easy to Use</h3>
+                    <p>Intuitive interface requires minimal training. Start tracking time immediately without complicated setup procedures.</p>
+                </div>
+                
+                <div class="benefit">
+                    <h3>✅ Scalable Solution</h3>
+                    <p>Grows with your organization from small teams to large enterprises. Role-based architecture supports complex organizational structures.</p>
+                </div>
+                
+                <div class="benefit">
+                    <h3>✅ Data-Driven Insights</h3>
+                    <p>Generate meaningful reports and analytics to optimize productivity, identify trends, and make informed business decisions.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="technical-section">
+            <h2>Technical Information</h2>
+            <p>TimeTrack is built using modern web technologies including Flask (Python), SQLite database, and responsive HTML/CSS/JavaScript frontend. The application features a REST API architecture, secure session management, and email integration for user verification.</p>
+        </div>
+        
+        <div class="support-section">
+            <h2>Getting Started</h2>
+            <p>Ready to start tracking your time more effectively? <a href="{{ url_for('register') }}">Create an account</a> to begin, or <a href="{{ url_for('login') }}">log in</a> if you already have access. For questions or support, contact your system administrator.</p>
+        </div>
+    </div>
 </section>
+
+<style>
+.about-content {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.intro {
+    text-align: center;
+    margin: 2rem 0;
+    padding: 2rem;
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+}
+
+.intro h2 {
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+
+.features-section, .roles-section, .benefits-section, .technical-section, .support-section {
+    margin: 3rem 0;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.feature-item {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.feature-item h3 {
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+
+.role-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.role-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.role-card h3 {
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.benefits-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.benefit {
+    background: #e8f5e8;
+    border-left: 4px solid #28a745;
+    padding: 1.5rem;
+    border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.benefit h3 {
+    color: #155724;
+    margin-bottom: 0.5rem;
+}
+
+.technical-section {
+    background: #f8f9fa;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    border-left: 4px solid #6c757d;
+}
+
+.support-section {
+    text-align: center;
+    background: #007bff;
+    color: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+}
+
+.support-section a {
+    color: #fff;
+    text-decoration: underline;
+    font-weight: bold;
+}
+
+.support-section a:hover {
+    color: #cceeff;
+}
+
+@media (max-width: 768px) {
+    .feature-grid, .role-cards, .benefits-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .benefits-list .benefit {
+        min-width: auto;
+    }
+}
+</style>
 {% endblock %}
