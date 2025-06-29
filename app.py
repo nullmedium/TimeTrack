@@ -142,11 +142,14 @@ def home():
             departure_time=None
         ).first()
         
-        # Get recent completed entries for history (last 10 entries)
+        # Get today's completed entries for history
+        today = datetime.now().date()
         history = TimeEntry.query.filter(
             TimeEntry.user_id == g.user.id,
-            TimeEntry.departure_time.isnot(None)
-        ).order_by(TimeEntry.arrival_time.desc()).limit(10).all()
+            TimeEntry.departure_time.isnot(None),
+            TimeEntry.arrival_time >= datetime.combine(today, time.min),
+            TimeEntry.arrival_time <= datetime.combine(today, time.max)
+        ).order_by(TimeEntry.arrival_time.desc()).all()
         
         return render_template('index.html', title='Home', active_entry=active_entry, history=history)
     else:
