@@ -2,9 +2,8 @@
 
 {% block content %}
 <div class="admin-container">
-    <h1>User Management</h1>
-        
-    <div class="admin-actions">
+    <div class="admin-header">
+        <h1>User Management</h1>
         <a href="{{ url_for('create_user') }}" class="btn btn-success">Create New User</a>
     </div>
     
@@ -88,4 +87,5 @@
         });
     </script>
 </div>
+
 {% endblock %}
