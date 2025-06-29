@@ -1,0 +1,182 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="verify-2fa-container">
+    <div class="verification-card">
+        <h1>Two-Factor Authentication</h1>
+        <p class="instruction">Please enter the 6-digit code from your authenticator app to complete login.</p>
+        
+        <form method="POST" class="verification-form">
+            <div class="form-group">
+                <label for="totp_code">Verification Code:</label>
+                <input type="text" id="totp_code" name="totp_code" 
+                       placeholder="000000" maxlength="6" pattern="[0-9]{6}" 
+                       required autocomplete="off" autofocus>
+                <small>Enter the 6-digit code from your authenticator app</small>
+            </div>
+            
+            <div class="button-group">
+                <button type="submit" class="btn btn-primary">Verify & Login</button>
+            </div>
+        </form>
+        
+        <div class="help-section">
+            <p><small>Having trouble? Make sure your device's time is synchronized and try a new code.</small></p>
+            <p><small><a href="{{ url_for('login') }}">← Back to Login</a></small></p>
+        </div>
+    </div>
+</div>
+
+<style>
+.verify-2fa-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh;
+    padding: 2rem;
+}
+
+.verification-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.verification-card h1 {
+    text-align: center;
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+
+.instruction {
+    text-align: center;
+    color: #6c757d;
+    margin-bottom: 2rem;
+}
+
+.verification-form {
+    margin-bottom: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input[type="text"] {
+    width: 200px;
+    padding: 1rem;
+    border: 2px solid #dee2e6;
+    border-radius: 0.5rem;
+    font-size: 1.5rem;
+    text-align: center;
+    letter-spacing: 0.3em;
+    font-family: 'Courier New', monospace;
+    transition: border-color 0.2s;
+}
+
+.form-group input[type="text"]:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.form-group small {
+    display: block;
+    color: #6c757d;
+    margin-top: 0.5rem;
+}
+
+.button-group {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.btn {
+    padding: 0.75rem 2rem;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s;
+    width: 100%;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.help-section {
+    text-align: center;
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+}
+
+.help-section p {
+    margin: 0.5rem 0;
+}
+
+.help-section a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.help-section a:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+    .verify-2fa-container {
+        padding: 1rem;
+    }
+    
+    .verification-card {
+        padding: 1.5rem;
+    }
+    
+    .form-group input[type="text"] {
+        width: 100%;
+        max-width: 200px;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('totp_code');
+    
+    // Auto-format input to digits only
+    input.addEventListener('input', function(e) {
+        e.target.value = e.target.value.replace(/\D/g, '');
+    });
+    
+    // Auto-submit when 6 digits are entered
+    input.addEventListener('input', function(e) {
+        if (e.target.value.length === 6) {
+            // Small delay to let user see the complete code
+            setTimeout(function() {
+                document.querySelector('.verification-form').submit();
+            }, 1000);
+        }
+    });
+    
+    // Focus on input when page loads
+    input.focus();
+});
+</script>
+{% endblock %}

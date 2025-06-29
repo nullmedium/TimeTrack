@@ -4,14 +4,6 @@
 <div class="config-container">
     <h1>Work Configuration</h1>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-
     <form method="POST" action="{{ url_for('config') }}" class="config-form">
         <div class="form-group">
             <label for="work_hours_per_day">Work Hours Per Day:</label>

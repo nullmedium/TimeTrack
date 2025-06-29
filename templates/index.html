@@ -6,6 +6,12 @@
     <p>Track your work hours easily and efficiently</p>
 </div>
 
+{% if not g.user %}
+
+Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('register') }}">register</a> to access your dashboard.
+
+{% else %}
+
 <div class="timetrack-container">
     <h2>Time Tracking</h2>
 
@@ -80,6 +86,8 @@
         {% endif %}
     </div>
 </div>
+
+{% endif %}
 
 <div class="features">
     <div class="feature">

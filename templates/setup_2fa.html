@@ -1,0 +1,266 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="setup-2fa-container">
+    <h1>Setup Two-Factor Authentication</h1>
+    
+    <div class="setup-steps">
+        <div class="step">
+            <h2>Step 1: Install an Authenticator App</h2>
+            <p>Download and install an authenticator app on your mobile device:</p>
+            <ul>
+                <li><strong>Google Authenticator</strong> (iOS/Android)</li>
+                <li><strong>Microsoft Authenticator</strong> (iOS/Android)</li>
+                <li><strong>Authy</strong> (iOS/Android/Desktop)</li>
+                <li><strong>1Password</strong> (Premium feature)</li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h2>Step 2: Scan QR Code or Enter Secret</h2>
+            <div class="qr-section">
+                <div class="qr-code">
+                    <img src="data:image/png;base64,{{ qr_code }}" alt="2FA QR Code">
+                </div>
+                <div class="manual-entry">
+                    <h3>Can't scan? Enter this code manually:</h3>
+                    <div class="secret-code">{{ secret }}</div>
+                    <p><small>Account: {{ g.user.email }}<br>Issuer: TimeTrack</small></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="step">
+            <h2>Step 3: Verify Setup</h2>
+            <p>Enter the 6-digit code from your authenticator app to complete setup:</p>
+            
+            <form method="POST" class="verification-form">
+                <div class="form-group">
+                    <label for="totp_code">Verification Code:</label>
+                    <input type="text" id="totp_code" name="totp_code" 
+                           placeholder="000000" maxlength="6" pattern="[0-9]{6}" 
+                           required autocomplete="off" autofocus>
+                    <small>Enter the 6-digit code from your authenticator app</small>
+                </div>
+                
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">Enable Two-Factor Authentication</button>
+                    <a href="{{ url_for('profile') }}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="security-notice">
+        <h3>🔐 Security Notice</h3>
+        <p><strong>Important:</strong> Once enabled, you'll need your authenticator app to log in. Make sure to:</p>
+        <ul>
+            <li>Keep your authenticator app secure and backed up</li>
+            <li>Store the secret code in a safe place as a backup</li>
+            <li>Remember your password - you'll need both your password and 2FA code to log in</li>
+        </ul>
+    </div>
+</div>
+
+<style>
+.setup-2fa-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.setup-steps {
+    margin: 2rem 0;
+}
+
+.step {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.step h2 {
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+
+.step ul {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+}
+
+.step li {
+    margin: 0.5rem 0;
+}
+
+.qr-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: center;
+    margin: 1rem 0;
+}
+
+.qr-code {
+    text-align: center;
+}
+
+.qr-code img {
+    max-width: 200px;
+    height: auto;
+    border: 2px solid #007bff;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    background: white;
+}
+
+.manual-entry {
+    background: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #dee2e6;
+}
+
+.secret-code {
+    background: #f1f3f4;
+    padding: 0.75rem;
+    border-radius: 0.25rem;
+    font-family: 'Courier New', monospace;
+    font-size: 1.1rem;
+    word-break: break-all;
+    margin: 0.5rem 0;
+    border: 1px solid #dee2e6;
+}
+
+.verification-form {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid #dee2e6;
+    margin: 1rem 0;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input[type="text"] {
+    width: 200px;
+    padding: 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    font-size: 1.2rem;
+    text-align: center;
+    letter-spacing: 0.2em;
+    font-family: 'Courier New', monospace;
+}
+
+.form-group small {
+    display: block;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
+.button-group {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 0.25rem;
+    text-decoration: none;
+    display: inline-block;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.security-notice {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin: 2rem 0;
+}
+
+.security-notice h3 {
+    color: #856404;
+    margin-bottom: 1rem;
+}
+
+.security-notice ul {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+}
+
+.security-notice li {
+    margin: 0.5rem 0;
+    color: #856404;
+}
+
+@media (max-width: 768px) {
+    .qr-section {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+    
+    .button-group {
+        flex-direction: column;
+    }
+    
+    .setup-2fa-container {
+        padding: 1rem;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('totp_code');
+    
+    // Auto-format input to digits only
+    input.addEventListener('input', function(e) {
+        e.target.value = e.target.value.replace(/\D/g, '');
+    });
+    
+    // Auto-submit when 6 digits are entered
+    input.addEventListener('input', function(e) {
+        if (e.target.value.length === 6) {
+            // Small delay to let user see the complete code
+            setTimeout(function() {
+                document.querySelector('.verification-form').submit();
+            }, 500);
+        }
+    });
+});
+</script>
+{% endblock %}
