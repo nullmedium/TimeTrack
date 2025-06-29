@@ -191,14 +191,20 @@ def login():
                 if user.is_blocked:
                     flash('Your account has been disabled. Please contact an administrator.', 'error')
                     return render_template('login.html')
-                    
-                # Continue with normal login process
-                session['user_id'] = user.id
-                session['username'] = user.username
-                session['is_admin'] = user.is_admin
                 
-                flash('Login successful!', 'success')
-                return redirect(url_for('home'))
+                # Check if 2FA is enabled
+                if user.two_factor_enabled:
+                    # Store user ID for 2FA verification
+                    session['2fa_user_id'] = user.id
+                    return redirect(url_for('verify_2fa'))
+                else:
+                    # Continue with normal login process
+                    session['user_id'] = user.id
+                    session['username'] = user.username
+                    session['is_admin'] = user.is_admin
+                    
+                    flash('Login successful!', 'success')
+                    return redirect(url_for('home'))
         
         flash('Invalid username or password', 'error')
     
@@ -551,6 +557,108 @@ def profile():
         flash(error, 'error')
     
     return render_template('profile.html', title='My Profile', user=user)
+
+@app.route('/2fa/setup', methods=['GET', 'POST'])
+@login_required
+def setup_2fa():
+    if request.method == 'POST':
+        # Verify the TOTP code before enabling 2FA
+        totp_code = request.form.get('totp_code')
+        
+        if not totp_code:
+            flash('Please enter the verification code from your authenticator app.', 'error')
+            return redirect(url_for('setup_2fa'))
+        
+        try:
+            if g.user.verify_2fa_token(totp_code, allow_setup=True):
+                g.user.two_factor_enabled = True
+                db.session.commit()
+                flash('Two-factor authentication has been successfully enabled!', 'success')
+                return redirect(url_for('profile'))
+            else:
+                flash('Invalid verification code. Please make sure your device time is synchronized and try again.', 'error')
+                return redirect(url_for('setup_2fa'))
+        except Exception as e:
+            logger.error(f"2FA setup error: {str(e)}")
+            flash('An error occurred during 2FA setup. Please try again.', 'error')
+            return redirect(url_for('setup_2fa'))
+    
+    # GET request - show setup page
+    if g.user.two_factor_enabled:
+        flash('Two-factor authentication is already enabled.', 'info')
+        return redirect(url_for('profile'))
+    
+    # Generate secret if not exists
+    if not g.user.two_factor_secret:
+        g.user.generate_2fa_secret()
+        db.session.commit()
+    
+    # Generate QR code
+    import qrcode
+    import io
+    import base64
+    
+    qr_uri = g.user.get_2fa_uri()
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(qr_uri)
+    qr.make(fit=True)
+    
+    # Create QR code image
+    qr_img = qr.make_image(fill_color="black", back_color="white")
+    img_buffer = io.BytesIO()
+    qr_img.save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+    qr_code_b64 = base64.b64encode(img_buffer.getvalue()).decode()
+    
+    return render_template('setup_2fa.html', 
+                         title='Setup Two-Factor Authentication',
+                         secret=g.user.two_factor_secret,
+                         qr_code=qr_code_b64)
+
+@app.route('/2fa/disable', methods=['POST'])
+@login_required
+def disable_2fa():
+    password = request.form.get('password')
+    
+    if not password or not g.user.check_password(password):
+        flash('Please enter your correct password to disable 2FA.', 'error')
+        return redirect(url_for('profile'))
+    
+    g.user.two_factor_enabled = False
+    g.user.two_factor_secret = None
+    db.session.commit()
+    
+    flash('Two-factor authentication has been disabled.', 'success')
+    return redirect(url_for('profile'))
+
+@app.route('/2fa/verify', methods=['GET', 'POST'])
+def verify_2fa():
+    # Check if user is in 2FA verification state
+    user_id = session.get('2fa_user_id')
+    if not user_id:
+        return redirect(url_for('login'))
+    
+    user = User.query.get(user_id)
+    if not user or not user.two_factor_enabled:
+        session.pop('2fa_user_id', None)
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        totp_code = request.form.get('totp_code')
+        
+        if user.verify_2fa_token(totp_code):
+            # Complete login process
+            session.pop('2fa_user_id', None)
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['is_admin'] = user.is_admin
+            
+            flash('Login successful!', 'success')
+            return redirect(url_for('home'))
+        else:
+            flash('Invalid verification code. Please try again.', 'error')
+    
+    return render_template('verify_2fa.html', title='Two-Factor Authentication')
 
 @app.route('/about')
 @login_required

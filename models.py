@@ -47,6 +47,10 @@ class User(db.Model):
     role = db.Column(db.Enum(Role), default=Role.TEAM_MEMBER)
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
     
+    # Two-Factor Authentication fields
+    two_factor_enabled = db.Column(db.Boolean, default=False)
+    two_factor_secret = db.Column(db.String(32), nullable=True)  # Base32 encoded secret
+    
     # Relationships
     time_entries = db.relationship('TimeEntry', backref='user', lazy=True)
     work_config = db.relationship('WorkConfig', backref='user', lazy=True, uselist=False)
@@ -71,6 +75,34 @@ class User(db.Model):
             self.token_expiry = None
             return True
         return False
+    
+    def generate_2fa_secret(self):
+        """Generate a new 2FA secret"""
+        import pyotp
+        self.two_factor_secret = pyotp.random_base32()
+        return self.two_factor_secret
+    
+    def get_2fa_uri(self):
+        """Get the provisioning URI for QR code generation"""
+        if not self.two_factor_secret:
+            return None
+        import pyotp
+        totp = pyotp.TOTP(self.two_factor_secret)
+        return totp.provisioning_uri(
+            name=self.email,
+            issuer_name="TimeTrack"
+        )
+    
+    def verify_2fa_token(self, token, allow_setup=False):
+        """Verify a 2FA token"""
+        if not self.two_factor_secret:
+            return False
+        # During setup, allow verification even if 2FA isn't enabled yet
+        if not allow_setup and not self.two_factor_enabled:
+            return False
+        import pyotp
+        totp = pyotp.TOTP(self.two_factor_secret)
+        return totp.verify(token, valid_window=1)  # Allow 1 window tolerance
     
     def __repr__(self):
         return f'<User {self.username}>'

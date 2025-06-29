@@ -16,6 +16,13 @@
         <p><strong>Username:</strong> {{ user.username }}</p>
         <p><strong>Account Type:</strong> {% if user.is_admin %}Administrator{% else %}User{% endif %}</p>
         <p><strong>Member Since:</strong> {{ user.created_at.strftime('%Y-%m-%d') }}</p>
+        <p><strong>Two-Factor Authentication:</strong> 
+            {% if user.two_factor_enabled %}
+                <span class="status enabled">✅ Enabled</span>
+            {% else %}
+                <span class="status disabled">❌ Disabled</span>
+            {% endif %}
+        </p>
     </div>
     
     <h2>Update Profile</h2>
@@ -45,5 +52,107 @@
             <button type="submit" class="btn btn-primary">Update Profile</button>
         </div>
     </form>
+    
+    <div class="security-section">
+        <h2>Security Settings</h2>
+        
+        <div class="security-card">
+            <h3>Two-Factor Authentication</h3>
+            {% if user.two_factor_enabled %}
+                <p>Two-factor authentication is <strong>enabled</strong> for your account. This adds an extra layer of security by requiring a code from your authenticator app when logging in.</p>
+                
+                <form method="POST" action="{{ url_for('disable_2fa') }}" class="disable-2fa-form" onsubmit="return confirm('Are you sure you want to disable two-factor authentication? This will make your account less secure.');">
+                    <div class="form-group">
+                        <label for="password_disable">Enter your password to disable 2FA:</label>
+                        <input type="password" id="password_disable" name="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-danger">Disable Two-Factor Authentication</button>
+                </form>
+            {% else %}
+                <p>Two-factor authentication is <strong>not enabled</strong> for your account. We strongly recommend enabling it to protect your account.</p>
+                <p>With 2FA enabled, you'll need both your password and a code from your phone to log in.</p>
+                
+                <a href="{{ url_for('setup_2fa') }}" class="btn btn-success">Enable Two-Factor Authentication</a>
+            {% endif %}
+        </div>
+    </div>
 </div>
+
+<style>
+.status.enabled {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.status.disabled {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.security-section {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #dee2e6;
+}
+
+.security-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.security-card h3 {
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+
+.disable-2fa-form {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 0.25rem;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    margin: 0.5rem 0;
+    border: none;
+    border-radius: 0.25rem;
+    text-decoration: none;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #218838;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+</style>
 {% endblock %}

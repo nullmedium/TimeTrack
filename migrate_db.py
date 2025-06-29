@@ -1,7 +1,7 @@
 from app import app, db
 import sqlite3
 import os
-from models import User, TimeEntry, WorkConfig, SystemSettings
+from models import User, TimeEntry, WorkConfig, SystemSettings, Team, Role
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 
@@ -106,6 +106,38 @@ def migrate_database():
     if 'is_blocked' not in user_columns:
         print("Adding is_blocked column to user table...")
         cursor.execute("ALTER TABLE user ADD COLUMN is_blocked BOOLEAN DEFAULT 0")
+    
+    # Add role column to user table if it doesn't exist
+    if 'role' not in user_columns:
+        print("Adding role column to user table...")
+        cursor.execute("ALTER TABLE user ADD COLUMN role VARCHAR(50) DEFAULT 'Team Member'")
+    
+    # Add team_id column to user table if it doesn't exist
+    if 'team_id' not in user_columns:
+        print("Adding team_id column to user table...")
+        cursor.execute("ALTER TABLE user ADD COLUMN team_id INTEGER")
+    
+    # Add 2FA columns to user table if they don't exist
+    if 'two_factor_enabled' not in user_columns:
+        print("Adding two_factor_enabled column to user table...")
+        cursor.execute("ALTER TABLE user ADD COLUMN two_factor_enabled BOOLEAN DEFAULT 0")
+    
+    if 'two_factor_secret' not in user_columns:
+        print("Adding two_factor_secret column to user table...")
+        cursor.execute("ALTER TABLE user ADD COLUMN two_factor_secret VARCHAR(32)")
+
+    # Check if the team table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='team'")
+    if not cursor.fetchone():
+        print("Creating team table...")
+        cursor.execute("""
+        CREATE TABLE team (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) UNIQUE NOT NULL,
+            description VARCHAR(255),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
 
     # Check if the system_settings table exists
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='system_settings'")
@@ -140,7 +172,9 @@ def migrate_database():
                 username='admin',
                 email='admin@timetrack.local',
                 is_admin=True,
-                is_verified=True  # Admin is automatically verified
+                is_verified=True,  # Admin is automatically verified
+                role=Role.ADMIN,
+                two_factor_enabled=False
             )
             admin.set_password('admin')  # Default password, should be changed
             db.session.add(admin)
@@ -148,11 +182,15 @@ def migrate_database():
             print("Created admin user with username 'admin' and password 'admin'")
             print("Please change the admin password after first login!")
         else:
-            # Make sure existing admin user is verified
+            # Make sure existing admin user is verified and has correct role
             if not hasattr(admin, 'is_verified') or not admin.is_verified:
                 admin.is_verified = True
-                db.session.commit()
-                print("Marked existing admin user as verified")
+            if not hasattr(admin, 'role') or admin.role is None:
+                admin.role = Role.ADMIN
+            if not hasattr(admin, 'two_factor_enabled') or admin.two_factor_enabled is None:
+                admin.two_factor_enabled = False
+            db.session.commit()
+            print("Updated existing admin user with new fields")
         
         # Update existing time entries to associate with admin user
         orphan_entries = TimeEntry.query.filter_by(user_id=None).all()
@@ -168,11 +206,29 @@ def migrate_database():
         existing_users = User.query.filter_by(is_verified=None).all()
         for user in existing_users:
             user.is_verified = True
+        
+        # Update existing users with default role and 2FA settings
+        users_to_update = User.query.all()
+        updated_count = 0
+        for user in users_to_update:
+            updated = False
+            if not hasattr(user, 'role') or user.role is None:
+                if user.is_admin:
+                    user.role = Role.ADMIN
+                else:
+                    user.role = Role.TEAM_MEMBER
+                updated = True
+            if not hasattr(user, 'two_factor_enabled') or user.two_factor_enabled is None:
+                user.two_factor_enabled = False
+                updated = True
+            if updated:
+                updated_count += 1
             
         db.session.commit()
         print(f"Associated {len(orphan_entries)} existing time entries with admin user")
         print(f"Associated {len(orphan_configs)} existing work configs with admin user")
         print(f"Marked {len(existing_users)} existing users as verified")
+        print(f"Updated {updated_count} users with default role and 2FA settings")
 
 def init_system_settings():
     """Initialize system settings with default values if they don't exist"""
