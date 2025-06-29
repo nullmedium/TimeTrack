@@ -634,3 +634,76 @@ input[type="time"]::-webkit-datetime-edit {
 .data-table tr:hover {
     background-color: #f5f5f5;
 }
+
+/* Team Hours Page Styles */
+.date-filter {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f5f5f5;
+    border-radius: 5px;
+}
+
+.date-filter .form-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.team-hours-table {
+    margin-bottom: 30px;
+    overflow-x: auto;
+}
+
+.team-hours-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.team-hours-table th,
+.team-hours-table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-align: center;
+}
+
+.team-hours-table th {
+    background-color: #f0f0f0;
+}
+
+.team-hours-details {
+    margin-top: 30px;
+}
+
+.member-entries {
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.member-entries h4 {
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.member-entries table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.member-entries th,
+.member-entries td {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.member-entries th {
+    background-color: #f5f5f5;
+}
+
+.checkbox {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
