@@ -23,6 +23,14 @@
                             <li><a href="{{ url_for('profile') }}">Profile</a></li>
                             <li><a href="{{ url_for('config') }}">Config</a></li>
                             <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                            <li><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
+                            <li><a href="{{ url_for('admin_users') }}">Manage Users</a></li>
+                            <li><a href="{{ url_for('admin_teams') }}">Manage Teams</a></li>
+                            <li><a href="{{ url_for('admin_projects') }}">Manage Projects</a></li>
+                            <li><a href="{{ url_for('admin_settings') }}">System Settings</a></li>
+                            {% if g.user.team_id %}
+                            <li><a href="{{ url_for('team_hours') }}">Team Hours</a></li>
+                            {% endif %}
                             <li><a href="{{ url_for('logout') }}">Logout</a></li>
                         </ul>
                     </li>
@@ -34,6 +42,9 @@
                             <li><a href="{{ url_for('profile') }}">Profile</a></li>
                             <li><a href="{{ url_for('config') }}">Config</a></li>
                             <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                            {% if g.user.role == Role.SUPERVISOR %}
+                            <li><a href="{{ url_for('admin_projects') }}">Manage Projects</a></li>
+                            {% endif %}
                             {% if g.user.team_id %}
                             <li><a href="{{ url_for('team_hours') }}">Team Hours</a></li>
                             {% endif %}

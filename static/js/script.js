@@ -58,20 +58,43 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle arrive button click
     if (arriveBtn) {
         arriveBtn.addEventListener('click', function() {
+            // Get project and notes from the form
+            const projectSelect = document.getElementById('project-select');
+            const notesTextarea = document.getElementById('work-notes');
+            
+            const projectId = projectSelect ? projectSelect.value : null;
+            const notes = notesTextarea ? notesTextarea.value.trim() : null;
+            
+            const requestData = {};
+            if (projectId) {
+                requestData.project_id = projectId;
+            }
+            if (notes) {
+                requestData.notes = notes;
+            }
+            
             fetch('/api/arrive', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
+                body: JSON.stringify(requestData)
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || 'Failed to record arrival time');
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 // Reload the page to show the active timer
                 window.location.reload();
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Failed to record arrival time. Please try again.');
+                alert('Failed to record arrival time: ' + error.message);
             });
         });
     }

@@ -1,7 +1,7 @@
 from app import app, db
 import sqlite3
 import os
-from models import User, TimeEntry, WorkConfig, SystemSettings, Team, Role
+from models import User, TimeEntry, WorkConfig, SystemSettings, Team, Role, Project
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 
@@ -152,6 +152,40 @@ def migrate_database():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
+        
+    # Check if the project table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='project'")
+    if not cursor.fetchone():
+        print("Creating project table...")
+        cursor.execute("""
+        CREATE TABLE project (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) NOT NULL,
+            description TEXT,
+            code VARCHAR(20) NOT NULL UNIQUE,
+            is_active BOOLEAN DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_by_id INTEGER NOT NULL,
+            team_id INTEGER,
+            start_date DATE,
+            end_date DATE,
+            FOREIGN KEY (created_by_id) REFERENCES user (id),
+            FOREIGN KEY (team_id) REFERENCES team (id)
+        )
+        """)
+
+    # Add project-related columns to time_entry table
+    cursor.execute("PRAGMA table_info(time_entry)")
+    time_entry_columns = [column[1] for column in cursor.fetchall()]
+    
+    if 'project_id' not in time_entry_columns:
+        print("Adding project_id column to time_entry...")
+        cursor.execute("ALTER TABLE time_entry ADD COLUMN project_id INTEGER")
+        
+    if 'notes' not in time_entry_columns:
+        print("Adding notes column to time_entry...")
+        cursor.execute("ALTER TABLE time_entry ADD COLUMN notes TEXT")
 
     # Commit changes and close connection
     conn.commit()
@@ -229,6 +263,44 @@ def migrate_database():
         print(f"Associated {len(orphan_configs)} existing work configs with admin user")
         print(f"Marked {len(existing_users)} existing users as verified")
         print(f"Updated {updated_count} users with default role and 2FA settings")
+        
+        # Create sample projects if none exist
+        existing_projects = Project.query.count()
+        if existing_projects == 0 and admin:
+            sample_projects = [
+                {
+                    'name': 'General Administration',
+                    'code': 'ADMIN001',
+                    'description': 'General administrative tasks and meetings',
+                    'team_id': None,
+                },
+                {
+                    'name': 'Development Project',
+                    'code': 'DEV001',
+                    'description': 'Software development and maintenance tasks',
+                    'team_id': None,
+                },
+                {
+                    'name': 'Customer Support',
+                    'code': 'SUPPORT001',
+                    'description': 'Customer service and technical support activities',
+                    'team_id': None,
+                }
+            ]
+            
+            for proj_data in sample_projects:
+                project = Project(
+                    name=proj_data['name'],
+                    code=proj_data['code'],
+                    description=proj_data['description'],
+                    team_id=proj_data['team_id'],
+                    created_by_id=admin.id,
+                    is_active=True
+                )
+                db.session.add(project)
+            
+            db.session.commit()
+            print(f"Created {len(sample_projects)} sample projects")
 
 def init_system_settings():
     """Initialize system settings with default values if they don't exist"""
