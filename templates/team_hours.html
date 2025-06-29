@@ -23,6 +23,15 @@
         </form>
     </div>
     
+    <!-- Export Buttons -->
+    <div class="export-button-container" id="export-buttons" style="display: none;">
+        <h4>Export Team Hours</h4>
+        <div class="quick-export-buttons">
+            <button class="btn" onclick="exportTeamHours('csv')">Export as CSV</button>
+            <button class="btn" onclick="exportTeamHours('excel')">Export as Excel</button>
+        </div>
+    </div>
+    
     <div class="team-hours-container">
         <div id="loading">Loading team data...</div>
         <div id="team-info" style="display: none;">
@@ -171,6 +180,7 @@
             
             // Populate detailed entries
             document.getElementById('team-hours-table').style.display = 'block';
+            document.getElementById('export-buttons').style.display = 'block';
             document.getElementById('loading').style.display = 'none';
         }
         
@@ -179,6 +189,49 @@
             document.getElementById('error-message').style.display = 'block';
             document.getElementById('loading').style.display = 'none';
         }
+        
     });
+    
+    // Export function (global scope)
+    function exportTeamHours(format) {
+        console.log('Export function called with format:', format);
+        
+        try {
+            // Get current filter values
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const includeSelf = document.getElementById('include-self').checked;
+            
+            console.log('Filter values:', { startDate, endDate, includeSelf });
+            
+            // Validate required fields
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates before exporting.');
+                return;
+            }
+            
+            // Build export URL with query parameters
+            const exportUrl = `/download_team_hours_export?format=${format}&start_date=${startDate}&end_date=${endDate}&include_self=${includeSelf}`;
+            
+            console.log('Export URL:', exportUrl);
+            
+            // Show loading indicator
+            const exportButtons = document.getElementById('export-buttons');
+            const originalHTML = exportButtons.innerHTML;
+            exportButtons.innerHTML = '<h4>Generating export...</h4><p>Please wait...</p>';
+            
+            // Trigger download
+            window.location.href = exportUrl;
+            
+            // Restore buttons after a short delay
+            setTimeout(() => {
+                exportButtons.innerHTML = originalHTML;
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Error in exportTeamHours:', error);
+            alert('An error occurred while trying to export. Please try again.');
+        }
+    }
 </script>
 {% endblock %}
