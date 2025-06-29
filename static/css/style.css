@@ -184,6 +184,11 @@ button {
     color: white;
 }
 
+.btn-success {
+    background-color: #4CAF50;
+    color: white;
+}
+
 .btn:hover {
     background-color: #45a049;
 }
@@ -487,6 +492,13 @@ input[type="time"]::-webkit-datetime-edit {
     background-color: white;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 2rem;
 }
 

@@ -367,10 +367,6 @@ def dashboard():
     return render_template('dashboard.html', title='Dashboard', **dashboard_data)
 
 # Redirect old admin dashboard URL to new dashboard
-@app.route('/admin/dashboard')
-@admin_required
-def admin_dashboard():
-    return redirect(url_for('dashboard'))
 
 @app.route('/admin/users')
 @admin_required
@@ -1844,4 +1840,4 @@ def download_team_hours_export():
         return redirect(url_for('team_hours'))
       
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5050)
