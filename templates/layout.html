@@ -7,69 +7,79 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <header>
-        <nav>
+    <!-- Mobile header -->
+    <header class="mobile-header">
+        <div class="mobile-nav-brand">
+            <a href="{{ url_for('home') }}">TimeTrack</a>
+        </div>
+        <button class="mobile-nav-toggle" id="mobile-nav-toggle">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </header>
+
+    <!-- Sidebar navigation -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2><a href="{{ url_for('home') }}">TimeTrack</a></h2>
+            <button class="sidebar-toggle" id="sidebar-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+        <nav class="sidebar-nav">
             <ul>
-                <li><a href="{{ url_for('home') }}">Home</a></li>
+                <li><a href="{{ url_for('home') }}" data-tooltip="Home"><i class="nav-icon">🏠</i><span class="nav-text">Home</span></a></li>
                 {% if g.user %}
-                    <li><a href="{{ url_for('history') }}">History</a></li>
-                    <li><a href="{{ url_for('about') }}">About</a></li>
+                    <li><a href="{{ url_for('history') }}" data-tooltip="History"><i class="nav-icon">📊</i><span class="nav-text">History</span></a></li>
+                    <li><a href="{{ url_for('about') }}" data-tooltip="About"><i class="nav-icon">ℹ️</i><span class="nav-text">About</span></a></li>
                     
-                    <!-- Role-based dropdown menu -->
+                    <!-- Role-based menu items -->
                     {% if g.user.is_admin %}
-                    <li class="dropdown admin-dropdown">
-                        <a href="#" class="dropdown-toggle">Admin</a>
-                        <ul class="dropdown-menu">
-                            <li><a href="{{ url_for('profile') }}">Profile</a></li>
-                            <li><a href="{{ url_for('config') }}">Config</a></li>
-                            <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                            <li><a href="{{ url_for('admin_users') }}">Manage Users</a></li>
-                            <li><a href="{{ url_for('admin_teams') }}">Manage Teams</a></li>
-                            <li><a href="{{ url_for('admin_projects') }}">Manage Projects</a></li>
-                            <li><a href="{{ url_for('admin_settings') }}">System Settings</a></li>
-                            {% if g.user.team_id %}
-                            <li><a href="{{ url_for('team_hours') }}">Team Hours</a></li>
-                            {% endif %}
-                            <li><a href="{{ url_for('logout') }}">Logout</a></li>
-                        </ul>
-                    </li>
-                    {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
-                    <!-- Team Leader/Supervisor dropdown menu -->
-                    <li class="dropdown admin-dropdown">
-                        <a href="#" class="dropdown-toggle">{{ g.user.username }}</a>
-                        <ul class="dropdown-menu">
-                            <li><a href="{{ url_for('profile') }}">Profile</a></li>
-                            <li><a href="{{ url_for('config') }}">Config</a></li>
-                            <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                            {% if g.user.role == Role.SUPERVISOR %}
-                            <li><a href="{{ url_for('admin_projects') }}">Manage Projects</a></li>
-                            {% endif %}
-                            {% if g.user.team_id %}
-                            <li><a href="{{ url_for('team_hours') }}">Team Hours</a></li>
-                            {% endif %}
-                            <li><a href="{{ url_for('logout') }}">Logout</a></li>
-                        </ul>
-                    </li>
-                    {% else %}
-                    <!-- Regular user dropdown menu -->
-                    <li class="dropdown admin-dropdown">
-                        <a href="#" class="dropdown-toggle">{{ g.user.username }}</a>
-                        <ul class="dropdown-menu">
-                            <li><a href="{{ url_for('profile') }}">Profile</a></li>
-                            <li><a href="{{ url_for('config') }}">Config</a></li>
-                            <li><a href="{{ url_for('logout') }}">Logout</a></li>
-                        </ul>
-                    </li>
+                    <li class="nav-divider">Admin</li>
+                    <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
+                    <li><a href="{{ url_for('config') }}" data-tooltip="Config"><i class="nav-icon">⚙️</i><span class="nav-text">Config</span></a></li>
+                    <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📈</i><span class="nav-text">Dashboard</span></a></li>
+                    <li><a href="{{ url_for('admin_users') }}" data-tooltip="Manage Users"><i class="nav-icon">👥</i><span class="nav-text">Manage Users</span></a></li>
+                    <li><a href="{{ url_for('admin_teams') }}" data-tooltip="Manage Teams"><i class="nav-icon">🏢</i><span class="nav-text">Manage Teams</span></a></li>
+                    <li><a href="{{ url_for('admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
+                    <li><a href="{{ url_for('admin_settings') }}" data-tooltip="System Settings"><i class="nav-icon">🔧</i><span class="nav-text">System Settings</span></a></li>
+                    {% if g.user.team_id %}
+                    <li><a href="{{ url_for('team_hours') }}" data-tooltip="Team Hours"><i class="nav-icon">⏰</i><span class="nav-text">Team Hours</span></a></li>
                     {% endif %}
+                    {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
+                    <li class="nav-divider">{{ g.user.username }}</li>
+                    <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
+                    <li><a href="{{ url_for('config') }}" data-tooltip="Config"><i class="nav-icon">⚙️</i><span class="nav-text">Config</span></a></li>
+                    <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📈</i><span class="nav-text">Dashboard</span></a></li>
+                    {% if g.user.role == Role.SUPERVISOR %}
+                    <li><a href="{{ url_for('admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
+                    {% endif %}
+                    {% if g.user.team_id %}
+                    <li><a href="{{ url_for('team_hours') }}" data-tooltip="Team Hours"><i class="nav-icon">⏰</i><span class="nav-text">Team Hours</span></a></li>
+                    {% endif %}
+                    {% else %}
+                    <li class="nav-divider">{{ g.user.username }}</li>
+                    <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
+                    <li><a href="{{ url_for('config') }}" data-tooltip="Config"><i class="nav-icon">⚙️</i><span class="nav-text">Config</span></a></li>
+                    {% endif %}
+                    
+                    <li class="nav-divider"></li>
+                    <li><a href="{{ url_for('logout') }}" data-tooltip="Logout"><i class="nav-icon">🚪</i><span class="nav-text">Logout</span></a></li>
                 {% else %}
-                    <li><a href="{{ url_for('login') }}">Login</a></li>
-                    <li><a href="{{ url_for('register') }}">Register</a></li>
+                    <li><a href="{{ url_for('login') }}" data-tooltip="Login"><i class="nav-icon">🔑</i><span class="nav-text">Login</span></a></li>
+                    <li><a href="{{ url_for('register') }}" data-tooltip="Register"><i class="nav-icon">📝</i><span class="nav-text">Register</span></a></li>
                 {% endif %}
             </ul>
         </nav>
-    </header>
+    </aside>
 
-    <main>
+    <!-- Mobile overlay -->
+    <div class="mobile-overlay" id="mobile-overlay"></div>
+
+    <main class="main-content">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="flash-messages">
@@ -88,5 +98,6 @@
     </footer>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
 </body>
 </html>
