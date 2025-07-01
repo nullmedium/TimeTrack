@@ -20,7 +20,17 @@
                 </p>
             </div>
             
-            <!-- You can add more settings here in the future -->
+            <div class="form-group">
+                <label class="checkbox-container">
+                    <input type="checkbox" name="email_verification_required" 
+                           {% if settings.email_verification_required %}checked{% endif %}>
+                    <span class="checkmark"></span>
+                    Require Email Verification
+                </label>
+                <p class="setting-description">
+                    When enabled, new users must verify their email address before accessing the application. When disabled, new users can log in immediately after registration.
+                </p>
+            </div>
         </div>
         
         <div class="form-actions">

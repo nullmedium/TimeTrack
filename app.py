@@ -235,6 +235,16 @@ def init_system_settings():
         )
         db.session.add(reg_setting)
         db.session.commit()
+    
+    if not SystemSettings.query.filter_by(key='email_verification_required').first():
+        print("Adding email_verification_required system setting...")
+        email_setting = SystemSettings(
+            key='email_verification_required',
+            value='true',
+            description='Controls whether email verification is required for new user accounts'
+        )
+        db.session.add(email_setting)
+        db.session.commit()
 
 def migrate_data():
     """Handle data migrations and setup"""
@@ -349,6 +359,11 @@ def admin_required(f):
             return redirect(url_for('home'))
         return f(*args, **kwargs)
     return decorated_function
+
+def get_system_setting(key, default='false'):
+    """Helper function to get system setting value"""
+    setting = SystemSettings.query.filter_by(key=key).first()
+    return setting.value if setting else default
 
 # Add this decorator function after your existing decorators
 def role_required(min_role):
@@ -492,8 +507,7 @@ def logout():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     # Check if registration is enabled
-    reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
-    registration_enabled = reg_setting and reg_setting.value == 'true'
+    registration_enabled = get_system_setting('registration_enabled', 'true') == 'true'
 
     if not registration_enabled:
         flash('Registration is currently disabled by the administrator.', 'error')
@@ -524,6 +538,9 @@ def register():
             try:
                 # Check if this is the first user account
                 is_first_user = User.query.count() == 0
+                
+                # Check if email verification is required
+                email_verification_required = get_system_setting('email_verification_required', 'true') == 'true'
 
                 new_user = User(username=username, email=email, is_verified=False)
                 new_user.set_password(password)
@@ -533,8 +550,11 @@ def register():
                     new_user.is_admin = True
                     new_user.role = Role.ADMIN
                     new_user.is_verified = True  # Auto-verify first user
+                elif not email_verification_required:
+                    # If email verification is disabled, auto-verify new users
+                    new_user.is_verified = True
 
-                # Generate verification token
+                # Generate verification token (even if not needed, for consistency)
                 token = new_user.generate_verification_token()
 
                 db.session.add(new_user)
@@ -544,8 +564,12 @@ def register():
                     # First user gets admin privileges and is auto-verified
                     logger.info(f"First user account created: {username} with admin privileges")
                     flash('Welcome! You are the first user and have been granted administrator privileges. You can now log in.', 'success')
+                elif not email_verification_required:
+                    # Email verification is disabled, user can log in immediately
+                    logger.info(f"User account created with auto-verification: {username}")
+                    flash('Registration successful! You can now log in.', 'success')
                 else:
-                    # Send verification email for regular users
+                    # Send verification email for regular users when verification is required
                     verification_url = url_for('verify_email', token=token, _external=True)
                     msg = Message('Verify your TimeTrack account', recipients=[email])
                     msg.body = f'''Hello {username},
@@ -1333,18 +1357,26 @@ def admin_settings():
     if request.method == 'POST':
         # Update registration setting
         registration_enabled = 'registration_enabled' in request.form
-
         reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
         if reg_setting:
             reg_setting.value = 'true' if registration_enabled else 'false'
-            db.session.commit()
-            flash('System settings updated successfully!', 'success')
+        
+        # Update email verification setting
+        email_verification_required = 'email_verification_required' in request.form
+        email_setting = SystemSettings.query.filter_by(key='email_verification_required').first()
+        if email_setting:
+            email_setting.value = 'true' if email_verification_required else 'false'
+        
+        db.session.commit()
+        flash('System settings updated successfully!', 'success')
 
     # Get current settings
     settings = {}
     for setting in SystemSettings.query.all():
         if setting.key == 'registration_enabled':
             settings['registration_enabled'] = setting.value == 'true'
+        elif setting.key == 'email_verification_required':
+            settings['email_verification_required'] = setting.value == 'true'
 
     return render_template('admin_settings.html', title='System Settings', settings=settings)
 

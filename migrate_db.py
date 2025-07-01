@@ -316,6 +316,19 @@ def init_system_settings():
         db.session.add(reg_setting)
         db.session.commit()
         print("Registration setting initialized to enabled")
+    
+    # Check if email_verification_required setting exists
+    email_verification_setting = SystemSettings.query.filter_by(key='email_verification_required').first()
+    if not email_verification_setting:
+        print("Adding email_verification_required system setting...")
+        email_verification_setting = SystemSettings(
+            key='email_verification_required',
+            value='true',  # Default to enabled for security
+            description='Controls whether email verification is required for new user accounts'
+        )
+        db.session.add(email_verification_setting)
+        db.session.commit()
+        print("Email verification setting initialized to enabled")
 
 if __name__ == "__main__":
     migrate_database()
