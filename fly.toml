@@ -17,11 +17,11 @@ primary_region = 'fra'
   processes = ['app']
 
 [env]
-MAIL_SERVER = "smtp.ionos.de"
-MAIL_PORT = 587
-MAIL_USE_TLS = 1
-MAIL_USERNAME = jens@luedicke.cloud
-MAIL_DEFAULT_SENDER = "jens@luedicke.cloud"
+  MAIL_SERVER         = "smtp.ionos.de"
+  MAIL_PORT           = 587
+  MAIL_USE_TLS        = 1
+  MAIL_USERNAME       = "jens@luedicke.cloud"
+  MAIL_DEFAULT_SENDER = "jens@luedicke.cloud"
 
 [[vm]]
   cpu_kind = 'shared'
