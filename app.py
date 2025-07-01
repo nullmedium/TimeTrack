@@ -883,41 +883,6 @@ def update_entry(entry_id):
     })
 
 
-@app.route('/history')
-@login_required
-def history():
-    # Get project filter from query parameters
-    project_filter = request.args.get('project_id')
-    
-    # Base query for user's time entries
-    query = TimeEntry.query.filter_by(user_id=g.user.id)
-    
-    # Apply project filter if specified
-    if project_filter:
-        if project_filter == 'none':
-            # Show entries with no project assigned
-            query = query.filter(TimeEntry.project_id.is_(None))
-        else:
-            # Show entries for specific project
-            try:
-                project_id = int(project_filter)
-                query = query.filter_by(project_id=project_id)
-            except ValueError:
-                # Invalid project ID, ignore filter
-                pass
-    
-    # Get filtered entries ordered by most recent first
-    all_entries = query.order_by(TimeEntry.arrival_time.desc()).all()
-    
-    # Get available projects for the filter dropdown
-    available_projects = []
-    all_projects = Project.query.filter_by(is_active=True).all()
-    for project in all_projects:
-        if project.is_user_allowed(g.user):
-            available_projects.append(project)
-
-    return render_template('history.html', title='Time Entry History', 
-                         entries=all_entries, available_projects=available_projects)
 
 def calculate_work_duration(arrival_time, departure_time, total_break_duration):
     """
