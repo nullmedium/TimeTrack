@@ -262,8 +262,17 @@ def register():
             
         if error is None:
             try:
+                # Check if this is the first user account
+                is_first_user = User.query.count() == 0
+                
                 new_user = User(username=username, email=email, is_verified=False)
                 new_user.set_password(password)
+                
+                # Make first user an admin with full privileges
+                if is_first_user:
+                    new_user.is_admin = True
+                    new_user.role = Role.ADMIN
+                    new_user.is_verified = True  # Auto-verify first user
                 
                 # Generate verification token
                 token = new_user.generate_verification_token()
@@ -271,10 +280,15 @@ def register():
                 db.session.add(new_user)
                 db.session.commit()
                 
-                # Send verification email
-                verification_url = url_for('verify_email', token=token, _external=True)
-                msg = Message('Verify your TimeTrack account', recipients=[email])
-                msg.body = f'''Hello {username},
+                if is_first_user:
+                    # First user gets admin privileges and is auto-verified
+                    logger.info(f"First user account created: {username} with admin privileges")
+                    flash('Welcome! You are the first user and have been granted administrator privileges. You can now log in.', 'success')
+                else:
+                    # Send verification email for regular users
+                    verification_url = url_for('verify_email', token=token, _external=True)
+                    msg = Message('Verify your TimeTrack account', recipients=[email])
+                    msg.body = f'''Hello {username},
 
 Thank you for registering with TimeTrack. To complete your registration, please click on the link below:
 
@@ -287,10 +301,10 @@ If you did not register for TimeTrack, please ignore this email.
 Best regards,
 The TimeTrack Team
 '''
-                mail.send(msg)
-                logger.info(f"Verification email sent to {email}")
+                    mail.send(msg)
+                    logger.info(f"Verification email sent to {email}")
+                    flash('Registration initiated! Please check your email to verify your account.', 'success')
                 
-                flash('Registration initiated! Please check your email to verify your account.', 'success')
                 return redirect(url_for('login'))
             except Exception as e:
                 db.session.rollback()
