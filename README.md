@@ -145,11 +145,11 @@ The application provides various endpoints for different user roles:
 
 ## File Structure
 
-- `app.py`: Main Flask application
+- `app.py`: Main Flask application with integrated migration system
 - `models.py`: Database models and relationships
 - `templates/`: HTML templates for all pages
 - `static/`: CSS and JavaScript files
-- `migrate_*.py`: Database migration scripts
+- `migrate_*.py`: Legacy migration scripts (no longer needed)
 
 ## Contributing
 

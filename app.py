@@ -56,8 +56,9 @@ def run_migrations():
     # Check if database exists
     if not os.path.exists(db_path):
         print("Database doesn't exist. Creating new database.")
-        db.create_all()
-        init_system_settings()
+        with app.app_context():
+            db.create_all()
+            init_system_settings()
         return
 
     print("Running database migrations...")
@@ -67,6 +68,17 @@ def run_migrations():
     cursor = conn.cursor()
 
     try:
+        # Check if time_entry table exists first
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='time_entry'")
+        if not cursor.fetchone():
+            print("time_entry table doesn't exist. Creating all tables...")
+            with app.app_context():
+                db.create_all()
+                init_system_settings()
+            conn.commit()
+            conn.close()
+            return
+        
         # Migrate time_entry table
         cursor.execute("PRAGMA table_info(time_entry)")
         time_entry_columns = [column[1] for column in cursor.fetchall()]
