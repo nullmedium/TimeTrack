@@ -65,31 +65,37 @@ pipenv install
 # Activate the virtual environment
 pipenv shell
 
-# Initialize the database and run migrations
-python migrate_db.py
-python migrate_roles_teams.py  # Add role and team support
-python migrate_projects.py     # Add project management
-
-# Run the application
+# Run the application (migrations run automatically on first startup)
 python app.py
 ```
 
 ### First-Time Setup
 
-1. **Admin Account**: Create the first admin user through the registration page
-2. **System Configuration**: Access Admin Dashboard to configure system settings
-3. **Team Setup**: Create teams and assign team leaders
-4. **Project Creation**: Set up projects with codes and team assignments
-5. **User Management**: Add users and assign appropriate roles
+1. **Start the Application**: The database is automatically created and initialized on first startup
+2. **Admin Account**: An initial admin user is created automatically with username `admin` and password `admin`
+3. **Change Default Password**: **IMPORTANT**: Change the default admin password immediately after first login
+4. **System Configuration**: Access Admin Dashboard to configure system settings
+5. **Team Setup**: Create teams and assign team leaders
+6. **Project Creation**: Set up projects with codes and team assignments
+7. **User Management**: Add users and assign appropriate roles
 
 ### Database Migrations
 
-The application includes several migration scripts to upgrade existing installations:
+**Automatic Migration System**: All database migrations now run automatically when the application starts. No manual migration scripts need to be run.
 
-- `migrate_db.py`: Core database initialization
-- `migrate_roles_teams.py`: Add role-based access control and team management
-- `migrate_projects.py`: Add project management capabilities
-- `repair_roles.py`: Fix role assignments if needed
+The integrated migration system handles:
+- Database schema creation for new installations
+- Automatic schema updates for existing databases
+- User table enhancements (verification, roles, teams, 2FA)
+- Project and team management table creation
+- Sample data initialization
+- Data integrity maintenance during upgrades
+
+**Legacy Migration Files**: The following files are maintained for reference but are no longer needed:
+- `migrate_db.py`: Legacy core database migration (now integrated)
+- `migrate_roles_teams.py`: Legacy role and team migration (now integrated)
+- `migrate_projects.py`: Legacy project migration (now integrated)
+- `repair_roles.py`: Legacy role repair utility (functionality now integrated)
 
 ### Configuration
 

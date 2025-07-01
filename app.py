@@ -45,22 +45,270 @@ mail = Mail(app)
 # Initialize the database with the app
 db.init_app(app)
 
-# Add this function to initialize system settings
+# Integrated migration and initialization function
+def run_migrations():
+    """Run all database migrations and initialize system settings."""
+    import sqlite3
+    
+    # Determine database path based on environment
+    db_path = '/data/timetrack.db' if os.path.exists('/data') else 'timetrack.db'
+    
+    # Check if database exists
+    if not os.path.exists(db_path):
+        print("Database doesn't exist. Creating new database.")
+        db.create_all()
+        init_system_settings()
+        return
+
+    print("Running database migrations...")
+
+    # Connect to the database for raw SQL operations
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        # Migrate time_entry table
+        cursor.execute("PRAGMA table_info(time_entry)")
+        time_entry_columns = [column[1] for column in cursor.fetchall()]
+
+        migrations = [
+            ('is_paused', "ALTER TABLE time_entry ADD COLUMN is_paused BOOLEAN DEFAULT 0"),
+            ('pause_start_time', "ALTER TABLE time_entry ADD COLUMN pause_start_time TIMESTAMP"),
+            ('total_break_duration', "ALTER TABLE time_entry ADD COLUMN total_break_duration INTEGER DEFAULT 0"),
+            ('user_id', "ALTER TABLE time_entry ADD COLUMN user_id INTEGER"),
+            ('project_id', "ALTER TABLE time_entry ADD COLUMN project_id INTEGER"),
+            ('notes', "ALTER TABLE time_entry ADD COLUMN notes TEXT")
+        ]
+
+        for column_name, sql_command in migrations:
+            if column_name not in time_entry_columns:
+                print(f"Adding {column_name} column to time_entry...")
+                cursor.execute(sql_command)
+
+        # Create work_config table if it doesn't exist
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='work_config'")
+        if not cursor.fetchone():
+            print("Creating work_config table...")
+            cursor.execute("""
+            CREATE TABLE work_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                work_hours_per_day FLOAT DEFAULT 8.0,
+                mandatory_break_minutes INTEGER DEFAULT 30,
+                break_threshold_hours FLOAT DEFAULT 6.0,
+                additional_break_minutes INTEGER DEFAULT 15,
+                additional_break_threshold_hours FLOAT DEFAULT 9.0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER
+            )
+            """)
+            cursor.execute("""
+            INSERT INTO work_config (work_hours_per_day, mandatory_break_minutes, break_threshold_hours)
+            VALUES (8.0, 30, 6.0)
+            """)
+        else:
+            # Check and add missing columns to work_config
+            cursor.execute("PRAGMA table_info(work_config)")
+            work_config_columns = [column[1] for column in cursor.fetchall()]
+            
+            work_config_migrations = [
+                ('additional_break_minutes', "ALTER TABLE work_config ADD COLUMN additional_break_minutes INTEGER DEFAULT 15"),
+                ('additional_break_threshold_hours', "ALTER TABLE work_config ADD COLUMN additional_break_threshold_hours FLOAT DEFAULT 9.0"),
+                ('user_id', "ALTER TABLE work_config ADD COLUMN user_id INTEGER")
+            ]
+            
+            for column_name, sql_command in work_config_migrations:
+                if column_name not in work_config_columns:
+                    print(f"Adding {column_name} column to work_config...")
+                    cursor.execute(sql_command)
+
+        # Migrate user table
+        cursor.execute("PRAGMA table_info(user)")
+        user_columns = [column[1] for column in cursor.fetchall()]
+
+        user_migrations = [
+            ('is_verified', "ALTER TABLE user ADD COLUMN is_verified BOOLEAN DEFAULT 0"),
+            ('verification_token', "ALTER TABLE user ADD COLUMN verification_token VARCHAR(100)"),
+            ('token_expiry', "ALTER TABLE user ADD COLUMN token_expiry TIMESTAMP"),
+            ('is_blocked', "ALTER TABLE user ADD COLUMN is_blocked BOOLEAN DEFAULT 0"),
+            ('role', "ALTER TABLE user ADD COLUMN role VARCHAR(50) DEFAULT 'Team Member'"),
+            ('team_id', "ALTER TABLE user ADD COLUMN team_id INTEGER"),
+            ('two_factor_enabled', "ALTER TABLE user ADD COLUMN two_factor_enabled BOOLEAN DEFAULT 0"),
+            ('two_factor_secret', "ALTER TABLE user ADD COLUMN two_factor_secret VARCHAR(32)")
+        ]
+
+        for column_name, sql_command in user_migrations:
+            if column_name not in user_columns:
+                print(f"Adding {column_name} column to user...")
+                cursor.execute(sql_command)
+
+        # Create team table if it doesn't exist
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='team'")
+        if not cursor.fetchone():
+            print("Creating team table...")
+            cursor.execute("""
+            CREATE TABLE team (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(100) UNIQUE NOT NULL,
+                description VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+
+        # Create system_settings table if it doesn't exist
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='system_settings'")
+        if not cursor.fetchone():
+            print("Creating system_settings table...")
+            cursor.execute("""
+            CREATE TABLE system_settings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                key VARCHAR(50) UNIQUE NOT NULL,
+                value VARCHAR(255) NOT NULL,
+                description VARCHAR(255),
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+
+        # Create project table if it doesn't exist
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='project'")
+        if not cursor.fetchone():
+            print("Creating project table...")
+            cursor.execute("""
+            CREATE TABLE project (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                code VARCHAR(20) NOT NULL UNIQUE,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by_id INTEGER NOT NULL,
+                team_id INTEGER,
+                start_date DATE,
+                end_date DATE,
+                FOREIGN KEY (created_by_id) REFERENCES user (id),
+                FOREIGN KEY (team_id) REFERENCES team (id)
+            )
+            """)
+
+        # Commit all schema changes
+        conn.commit()
+        
+    except Exception as e:
+        print(f"Error during database migration: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    # Now use SQLAlchemy for data migrations
+    db.create_all()  # This will create any remaining tables defined in models
+    
+    # Initialize system settings
+    init_system_settings()
+    
+    # Handle admin user and data migrations
+    migrate_data()
+    
+    print("Database migrations completed successfully!")
+
 def init_system_settings():
-    # Check if registration_enabled setting exists, if not create it
+    """Initialize system settings with default values if they don't exist"""
     if not SystemSettings.query.filter_by(key='registration_enabled').first():
-        registration_setting = SystemSettings(
+        print("Adding registration_enabled system setting...")
+        reg_setting = SystemSettings(
             key='registration_enabled',
             value='true',
             description='Controls whether new user registration is allowed'
         )
-        db.session.add(registration_setting)
+        db.session.add(reg_setting)
         db.session.commit()
 
-# Call this function during app initialization (add it where you initialize the app)
+def migrate_data():
+    """Handle data migrations and setup"""
+    # Check if admin user exists
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        # Create admin user
+        admin = User(
+            username='admin',
+            email='admin@timetrack.local',
+            is_admin=True,
+            is_verified=True,
+            role=Role.ADMIN,
+            two_factor_enabled=False
+        )
+        admin.set_password('admin')
+        db.session.add(admin)
+        db.session.commit()
+        print("Created admin user with username 'admin' and password 'admin'")
+        print("IMPORTANT: Change the admin password after first login!")
+    else:
+        # Update existing admin user with new fields
+        admin.is_verified = True
+        if not admin.role:
+            admin.role = Role.ADMIN
+        if admin.two_factor_enabled is None:
+            admin.two_factor_enabled = False
+        db.session.commit()
+
+    # Update orphaned records
+    orphan_entries = TimeEntry.query.filter_by(user_id=None).all()
+    for entry in orphan_entries:
+        entry.user_id = admin.id
+
+    orphan_configs = WorkConfig.query.filter_by(user_id=None).all()
+    for config in orphan_configs:
+        config.user_id = admin.id
+
+    # Update existing users
+    users_to_update = User.query.all()
+    for user in users_to_update:
+        if user.is_verified is None:
+            user.is_verified = True
+        if not user.role:
+            user.role = Role.ADMIN if user.is_admin else Role.TEAM_MEMBER
+        if user.two_factor_enabled is None:
+            user.two_factor_enabled = False
+
+    # Create sample projects if none exist
+    if Project.query.count() == 0:
+        sample_projects = [
+            {
+                'name': 'General Administration',
+                'code': 'ADMIN001',
+                'description': 'General administrative tasks and meetings'
+            },
+            {
+                'name': 'Development Project',
+                'code': 'DEV001',
+                'description': 'Software development and maintenance tasks'
+            },
+            {
+                'name': 'Customer Support',
+                'code': 'SUPPORT001',
+                'description': 'Customer service and technical support activities'
+            }
+        ]
+        
+        for proj_data in sample_projects:
+            project = Project(
+                name=proj_data['name'],
+                code=proj_data['code'],
+                description=proj_data['description'],
+                created_by_id=admin.id,
+                is_active=True
+            )
+            db.session.add(project)
+        
+        print(f"Created {len(sample_projects)} sample projects")
+
+    db.session.commit()
+
+# Call this function during app initialization
 @app.before_first_request
 def initialize_app():
-    init_system_settings()
+    run_migrations()
 
 # Add this after initializing the app but before defining routes
 @app.context_processor
@@ -829,24 +1077,6 @@ def config():
 
     return render_template('config.html', title='Configuration', config=config)
 
-# Create the database tables before first request
-@app.before_first_request
-def create_tables():
-    # This will only create tables that don't exist yet
-    db.create_all()
-
-    # Check if we need to add new columns
-    from sqlalchemy import inspect
-    inspector = inspect(db.engine)
-
-    # Check if user table exists
-    if 'user' in inspector.get_table_names():
-        columns = [column['name'] for column in inspector.get_columns('user')]
-
-        # Check for verification columns
-        if 'is_verified' not in columns or 'verification_token' not in columns or 'token_expiry' not in columns:
-            logger.warning("Database schema is outdated. Please run migrate_db.py to update it.")
-            print("WARNING: Database schema is outdated. Please run migrate_db.py to update it.")
 
 @app.route('/api/delete/<int:entry_id>', methods=['DELETE'])
 @login_required
