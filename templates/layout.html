@@ -31,10 +31,9 @@
         </div>
         <nav class="sidebar-nav">
             <ul>
-                <li><a href="{{ url_for('home') }}" data-tooltip="Home"><i class="nav-icon">🏠</i><span class="nav-text">Home</span></a></li>
                 {% if g.user %}
+                    <li><a href="{{ url_for('home') }}" data-tooltip="Home"><i class="nav-icon">🏠</i><span class="nav-text">Home</span></a></li>
                     <li><a href="{{ url_for('history') }}" data-tooltip="History"><i class="nav-icon">📊</i><span class="nav-text">History</span></a></li>
-                    <li><a href="{{ url_for('about') }}" data-tooltip="About"><i class="nav-icon">ℹ️</i><span class="nav-text">About</span></a></li>
                     
                     <!-- Role-based menu items -->
                     {% if g.user.is_admin %}
@@ -69,6 +68,7 @@
                     <li class="nav-divider"></li>
                     <li><a href="{{ url_for('logout') }}" data-tooltip="Logout"><i class="nav-icon">🚪</i><span class="nav-text">Logout</span></a></li>
                 {% else %}
+                    <li><a href="{{ url_for('about') }}" data-tooltip="About"><i class="nav-icon">ℹ️</i><span class="nav-text">About</span></a></li>
                     <li><a href="{{ url_for('login') }}" data-tooltip="Login"><i class="nav-icon">🔑</i><span class="nav-text">Login</span></a></li>
                     <li><a href="{{ url_for('register') }}" data-tooltip="Register"><i class="nav-icon">📝</i><span class="nav-text">Register</span></a></li>
                 {% endif %}
