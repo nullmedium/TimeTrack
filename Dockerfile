@@ -27,6 +27,7 @@ COPY . .
 RUN mkdir -p /app/instance && chmod 777 /app/instance
 
 VOLUME /data
+RUN mkdir /data && chmod 777 /data
 
 # Expose the port the app runs on
 EXPOSE 5000
