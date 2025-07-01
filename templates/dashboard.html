@@ -13,7 +13,7 @@
             Dashboard
         {% endif %}
     </h1>
-    
+
     <!-- Quick Actions section -->
     <div class="quick-actions">
         <h2>Quick Actions</h2>
@@ -23,13 +23,13 @@
                 <p>Update your personal information and password.</p>
                 <a href="{{ url_for('profile') }}" class="btn btn-secondary">Edit Profile</a>
             </div>
-            
+
             <div class="admin-card">
                 <h2>Configuration</h2>
                 <p>Configure work hours and break settings.</p>
                 <a href="{{ url_for('config') }}" class="btn btn-secondary">Work Config</a>
             </div>
-            
+
             <div class="admin-card">
                 <h2>Time History</h2>
                 <p>View your complete time tracking history.</p>
@@ -61,14 +61,14 @@
             </div>
         </div>
     </div>
-    
+
     <div class="admin-panel">
         <div class="admin-card">
             <h2>User Management</h2>
             <p>Manage user accounts, permissions, and roles.</p>
             <a href="{{ url_for('admin_users') }}" class="btn btn-primary">Manage Users</a>
         </div>
-        
+
         <div class="admin-card">
             <h2>Project Management</h2>
             <p>Manage projects, assign teams, and track project status.</p>
@@ -88,12 +88,12 @@
         </div>
     </div>
     {% endif %}
-    
+
     <!-- Team Leader and Supervisor sections -->
     {% if g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] or g.user.is_admin %}
     <div class="team-section">
         <h2>Team Management</h2>
-        
+
         {% if teams %}
         <div class="team-stats">
             <div class="stat-card">
@@ -105,14 +105,9 @@
                 <p>Teams Managed</p>
             </div>
         </div>
-        
+
         <div class="admin-panel">
-            <div class="admin-card">
-                <h2>Team Hours</h2>
-                <p>View and monitor team member working hours.</p>
-                <a href="{{ url_for('team_hours') }}" class="btn btn-primary">View Team Hours</a>
-            </div>
-            
+
             {% if g.user.is_admin %}
             <div class="admin-card">
                 <h2>Team Configuration</h2>
@@ -121,7 +116,7 @@
             </div>
             {% endif %}
         </div>
-        
+
         <div class="team-members">
             <h3>Your Team Members</h3>
             {% if team_members %}
@@ -152,7 +147,7 @@
         {% endif %}
     </div>
     {% endif %}
-    
+
     <!-- Recent Activity section for all roles -->
     {% if recent_entries %}
     <div class="recent-activity">

@@ -33,7 +33,7 @@
             <ul>
                 {% if g.user %}
                     <li><a href="{{ url_for('home') }}" data-tooltip="Home"><i class="nav-icon">🏠</i><span class="nav-text">Home</span></a></li>
-                    <li><a href="{{ url_for('history') }}" data-tooltip="History"><i class="nav-icon">📊</i><span class="nav-text">History</span></a></li>
+                    <li><a href="{{ url_for('analytics') }}" data-tooltip="Time Analytics"><i class="nav-icon">📊</i><span class="nav-text">Analytics</span></a></li>
                     
                     <!-- Role-based menu items -->
                     {% if g.user.is_admin %}
@@ -45,9 +45,6 @@
                     <li><a href="{{ url_for('admin_teams') }}" data-tooltip="Manage Teams"><i class="nav-icon">🏢</i><span class="nav-text">Manage Teams</span></a></li>
                     <li><a href="{{ url_for('admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
                     <li><a href="{{ url_for('admin_settings') }}" data-tooltip="System Settings"><i class="nav-icon">🔧</i><span class="nav-text">System Settings</span></a></li>
-                    {% if g.user.team_id %}
-                    <li><a href="{{ url_for('team_hours') }}" data-tooltip="Team Hours"><i class="nav-icon">⏰</i><span class="nav-text">Team Hours</span></a></li>
-                    {% endif %}
                     {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
                     <li class="nav-divider">{{ g.user.username }}</li>
                     <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
@@ -55,9 +52,6 @@
                     <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📈</i><span class="nav-text">Dashboard</span></a></li>
                     {% if g.user.role == Role.SUPERVISOR %}
                     <li><a href="{{ url_for('admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
-                    {% endif %}
-                    {% if g.user.team_id %}
-                    <li><a href="{{ url_for('team_hours') }}" data-tooltip="Team Hours"><i class="nav-icon">⏰</i><span class="nav-text">Team Hours</span></a></li>
                     {% endif %}
                     {% else %}
                     <li class="nav-divider">{{ g.user.username }}</li>

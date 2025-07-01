@@ -882,47 +882,6 @@ def update_entry(entry_id):
         }
     })
 
-@app.route('/team/hours')
-@login_required
-@role_required(Role.TEAM_LEADER)  # Only team leaders and above can access
-def team_hours():
-    # Get the current user's team
-    team = Team.query.get(g.user.team_id)
-    
-    if not team:
-        flash('You are not assigned to any team.', 'error')
-        return redirect(url_for('home'))
-    
-    # Get date range from query parameters or use current week as default
-    today = datetime.now().date()
-    start_of_week = today - timedelta(days=today.weekday())
-    end_of_week = start_of_week + timedelta(days=6)
-    
-    start_date_str = request.args.get('start_date', start_of_week.strftime('%Y-%m-%d'))
-    end_date_str = request.args.get('end_date', end_of_week.strftime('%Y-%m-%d'))
-    
-    try:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-    except ValueError:
-        flash('Invalid date format. Using current week instead.', 'warning')
-        start_date = start_of_week
-        end_date = end_of_week
-    
-    # Generate a list of dates in the range for the table header
-    date_range = []
-    current_date = start_date
-    while current_date <= end_date:
-        date_range.append(current_date)
-        current_date += timedelta(days=1)
-    
-    return render_template(
-        'team_hours.html',
-        title=f'Team Hours',
-        start_date=start_date,
-        end_date=end_date,
-        date_range=date_range
-    )
 
 @app.route('/history')
 @login_required
@@ -1717,127 +1676,403 @@ def download_export():
         flash('Invalid export format.')
         return redirect(url_for('export'))
 
-@app.route('/download_team_hours_export')
+
+@app.route('/analytics')
+@app.route('/analytics/<mode>')
 @login_required
-@role_required(Role.TEAM_LEADER)
-def download_team_hours_export():
-    """Handle team hours export download requests."""
-    export_format = request.args.get('format', 'csv')
+def analytics(mode='personal'):
+    """Unified analytics view combining history, team hours, and graphs"""
+    # Validate mode parameter
+    if mode not in ['personal', 'team']:
+        mode = 'personal'
     
-    # Get the current user's team
-    team = Team.query.get(g.user.team_id)
+    # Check team access for team mode
+    if mode == 'team':
+        if not g.user.team_id:
+            flash('You must be assigned to a team to view team analytics.', 'warning')
+            return redirect(url_for('analytics', mode='personal'))
+        
+        if g.user.role not in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN]:
+            flash('You do not have permission to view team analytics.', 'error')
+            return redirect(url_for('analytics', mode='personal'))
     
-    if not team:
-        flash('You are not assigned to any team.')
-        return redirect(url_for('team_hours'))
+    # Get available projects for filtering
+    available_projects = []
+    all_projects = Project.query.filter_by(is_active=True).all()
+    for project in all_projects:
+        if project.is_user_allowed(g.user):
+            available_projects.append(project)
     
-    # Get date range from query parameters or use current week as default
+    # Get team members if in team mode
+    team_members = []
+    if mode == 'team' and g.user.team_id:
+        team_members = User.query.filter_by(team_id=g.user.team_id).all()
+    
+    # Default date range (current week)
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday())
     end_of_week = start_of_week + timedelta(days=6)
     
-    start_date_str = request.args.get('start_date', start_of_week.strftime('%Y-%m-%d'))
-    end_date_str = request.args.get('end_date', end_of_week.strftime('%Y-%m-%d'))
-    include_self = request.args.get('include_self', 'false') == 'true'
+    return render_template('analytics.html',
+                         title='Time Analytics',
+                         mode=mode,
+                         available_projects=available_projects,
+                         team_members=team_members,
+                         default_start_date=start_of_week.strftime('%Y-%m-%d'),
+                         default_end_date=end_of_week.strftime('%Y-%m-%d'))
+
+@app.route('/api/analytics/data')
+@login_required
+def analytics_data():
+    """API endpoint for analytics data"""
+    mode = request.args.get('mode', 'personal')
+    view_type = request.args.get('view', 'table')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    project_filter = request.args.get('project_id')
+    granularity = request.args.get('granularity', 'daily')
+    
+    # Validate mode
+    if mode not in ['personal', 'team']:
+        return jsonify({'error': 'Invalid mode'}), 400
+    
+    # Check permissions for team mode
+    if mode == 'team':
+        if not g.user.team_id:
+            return jsonify({'error': 'No team assigned'}), 403
+        if g.user.role not in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN]:
+            return jsonify({'error': 'Insufficient permissions'}), 403
     
     try:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-    except ValueError:
-        flash('Invalid date format.')
-        return redirect(url_for('team_hours'))
+        # Parse dates
+        if start_date:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+        if end_date:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        
+        # Get filtered data
+        data = get_filtered_analytics_data(g.user, mode, start_date, end_date, project_filter)
+        
+        # Format data based on view type
+        if view_type == 'graph':
+            formatted_data = format_graph_data(data, granularity)
+        elif view_type == 'team':
+            formatted_data = format_team_data(data, granularity)
+        else:
+            formatted_data = format_table_data(data)
+        
+        return jsonify(formatted_data)
     
-    # Get all team members
-    team_members = User.query.filter_by(team_id=team.id).all()
+    except Exception as e:
+        logger.error(f"Error in analytics_data: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+def get_filtered_analytics_data(user, mode, start_date=None, end_date=None, project_filter=None):
+    """Get filtered time entry data for analytics"""
+    # Base query
+    query = TimeEntry.query
     
-    # Prepare data structure for team members' hours
-    team_data = []
+    # Apply user/team filter
+    if mode == 'personal':
+        query = query.filter(TimeEntry.user_id == user.id)
+    elif mode == 'team' and user.team_id:
+        team_user_ids = [u.id for u in User.query.filter_by(team_id=user.team_id).all()]
+        query = query.filter(TimeEntry.user_id.in_(team_user_ids))
     
-    for member in team_members:
-        # Skip if the member is the current user (team leader) and include_self is False
-        if member.id == g.user.id and not include_self:
-            continue
+    # Apply date filters
+    if start_date:
+        query = query.filter(func.date(TimeEntry.arrival_time) >= start_date)
+    if end_date:
+        query = query.filter(func.date(TimeEntry.arrival_time) <= end_date)
+    
+    # Apply project filter
+    if project_filter:
+        if project_filter == 'none':
+            query = query.filter(TimeEntry.project_id.is_(None))
+        else:
+            try:
+                project_id = int(project_filter)
+                query = query.filter(TimeEntry.project_id == project_id)
+            except ValueError:
+                pass
+    
+    return query.order_by(TimeEntry.arrival_time.desc()).all()
+
+def format_table_data(entries):
+    """Format data for table view"""
+    formatted_entries = []
+    for entry in entries:
+        formatted_entry = {
+            'id': entry.id,
+            'date': entry.arrival_time.strftime('%Y-%m-%d'),
+            'arrival_time': entry.arrival_time.strftime('%H:%M:%S'),
+            'departure_time': entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active',
+            'duration': format_duration(entry.duration) if entry.duration else 'In progress',
+            'break_duration': format_duration(entry.total_break_duration),
+            'project_code': entry.project.code if entry.project else None,
+            'project_name': entry.project.name if entry.project else 'No Project',
+            'notes': entry.notes or '',
+            'user_name': entry.user.username
+        }
+        formatted_entries.append(formatted_entry)
+    
+    return {'entries': formatted_entries}
+
+def format_graph_data(entries, granularity='daily'):
+    """Format data for graph visualization"""
+    from collections import defaultdict
+    
+    # Group data by date
+    daily_data = defaultdict(lambda: {'total_hours': 0, 'projects': defaultdict(int)})
+    project_totals = defaultdict(int)
+    
+    for entry in entries:
+        if entry.departure_time and entry.duration:
+            date_key = entry.arrival_time.strftime('%Y-%m-%d')
+            hours = entry.duration / 3600  # Convert seconds to hours
             
-        # Get time entries for this member in the date range
-        entries = TimeEntry.query.filter(
-            TimeEntry.user_id == member.id,
-            TimeEntry.arrival_time >= datetime.combine(start_date, time.min),
-            TimeEntry.arrival_time <= datetime.combine(end_date, time.max)
-        ).order_by(TimeEntry.arrival_time).all()
-        
-        # Calculate daily and total hours
-        daily_hours = {}
-        total_seconds = 0
-        
-        for entry in entries:
-            if entry.duration:  # Only count completed entries
-                entry_date = entry.arrival_time.date()
-                date_str = entry_date.strftime('%Y-%m-%d')
-                
-                if date_str not in daily_hours:
-                    daily_hours[date_str] = 0
-                
-                daily_hours[date_str] += entry.duration
-                total_seconds += entry.duration
-        
-        # Convert seconds to hours for display
-        for date_str in daily_hours:
-            daily_hours[date_str] = round(daily_hours[date_str] / 3600, 2)  # Convert to hours
-        
-        total_hours = round(total_seconds / 3600, 2)  # Convert to hours
-        
-        # Add member data to team data
-        team_data.append({
-            'user': {
-                'id': member.id,
-                'username': member.username,
-                'email': member.email
-            },
-            'daily_hours': daily_hours,
-            'total_hours': total_hours
+            daily_data[date_key]['total_hours'] += hours
+            project_name = entry.project.name if entry.project else 'No Project'
+            daily_data[date_key]['projects'][project_name] += hours
+            project_totals[project_name] += hours
+    
+    # Format time series data
+    time_series = []
+    for date, data in sorted(daily_data.items()):
+        time_series.append({
+            'date': date,
+            'hours': round(data['total_hours'], 2)
         })
     
-    if not team_data:
-        flash('No team member data found for the selected date range.')
-        return redirect(url_for('team_hours'))
+    # Format project distribution
+    project_distribution = [
+        {'project': project, 'hours': round(hours, 2)}
+        for project, hours in project_totals.items()
+    ]
     
-    # Generate a list of dates in the range
-    date_range = []
-    current_date = start_date
-    while current_date <= end_date:
-        date_range.append(current_date.strftime('%Y-%m-%d'))
-        current_date += timedelta(days=1)
-    
-    # Prepare data for export
-    team_info = {
-        'id': team.id,
-        'name': team.name,
-        'description': team.description
+    return {
+        'timeSeries': time_series,
+        'projectDistribution': project_distribution,
+        'totalHours': sum(project_totals.values()),
+        'totalDays': len(daily_data)
     }
+
+def format_team_data(entries, granularity='daily'):
+    """Format data for team view"""
+    from collections import defaultdict
     
-    export_data = prepare_team_hours_export_data(team_info, team_data, date_range)
+    # Group by user and date
+    user_data = defaultdict(lambda: {'daily_hours': defaultdict(float), 'total_hours': 0})
     
-    # Generate filename
-    filename = f"{team.name.replace(' ', '_')}_hours_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}"
+    for entry in entries:
+        if entry.departure_time and entry.duration:
+            date_key = entry.arrival_time.strftime('%Y-%m-%d')
+            hours = entry.duration / 3600
+            
+            user_data[entry.user.username]['daily_hours'][date_key] += hours
+            user_data[entry.user.username]['total_hours'] += hours
     
-    # Export based on format
-    if export_format == 'csv':
-        response = export_team_hours_to_csv(export_data, filename)
-        if response:
-            return response
+    # Format for frontend
+    team_data = []
+    for username, data in user_data.items():
+        team_data.append({
+            'username': username,
+            'daily_hours': dict(data['daily_hours']),
+            'total_hours': round(data['total_hours'], 2)
+        })
+    
+    return {'team_data': team_data}
+
+def format_duration(seconds):
+    """Format duration in seconds to HH:MM:SS"""
+    if not seconds:
+        return "00:00:00"
+    
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds = seconds % 60
+    
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+@app.route('/api/analytics/export')
+@login_required
+def analytics_export():
+    """Export analytics data in various formats"""
+    export_format = request.args.get('format', 'csv')
+    view_type = request.args.get('view', 'table')
+    mode = request.args.get('mode', 'personal')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    project_filter = request.args.get('project_id')
+    
+    # Validate permissions
+    if mode == 'team':
+        if not g.user.team_id:
+            flash('No team assigned', 'error')
+            return redirect(url_for('analytics'))
+        if g.user.role not in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN]:
+            flash('Insufficient permissions', 'error')
+            return redirect(url_for('analytics'))
+    
+    try:
+        # Parse dates
+        if start_date:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+        if end_date:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        
+        # Get data
+        data = get_filtered_analytics_data(g.user, mode, start_date, end_date, project_filter)
+        
+        if export_format == 'csv':
+            return export_analytics_csv(data, view_type, mode)
+        elif export_format == 'excel':
+            return export_analytics_excel(data, view_type, mode)
         else:
-            flash('Error generating CSV export.')
-            return redirect(url_for('team_hours'))
-    elif export_format == 'excel':
-        response = export_team_hours_to_excel(export_data, filename, team.name)
-        if response:
-            return response
-        else:
-            flash('Error generating Excel export.')
-            return redirect(url_for('team_hours'))
+            flash('Invalid export format', 'error')
+            return redirect(url_for('analytics'))
+            
+    except Exception as e:
+        logger.error(f"Error in analytics export: {str(e)}")
+        flash('Error generating export', 'error')
+        return redirect(url_for('analytics'))
+
+def export_analytics_csv(entries, view_type, mode):
+    """Export analytics data as CSV"""
+    output = io.StringIO()
+    
+    if view_type == 'team':
+        # Team summary CSV
+        writer = csv.writer(output)
+        writer.writerow(['Team Member', 'Total Hours', 'Total Entries'])
+        
+        # Group by user
+        user_data = {}
+        for entry in entries:
+            if entry.departure_time and entry.duration:
+                username = entry.user.username
+                if username not in user_data:
+                    user_data[username] = {'hours': 0, 'entries': 0}
+                user_data[username]['hours'] += entry.duration / 3600
+                user_data[username]['entries'] += 1
+        
+        for username, data in user_data.items():
+            writer.writerow([username, f"{data['hours']:.2f}", data['entries']])
     else:
-        flash('Invalid export format.')
-        return redirect(url_for('team_hours'))
+        # Detailed entries CSV
+        writer = csv.writer(output)
+        headers = ['Date', 'Arrival Time', 'Departure Time', 'Duration', 'Break Duration', 'Project Code', 'Project Name', 'Notes']
+        if mode == 'team':
+            headers.insert(1, 'User')
+        writer.writerow(headers)
+        
+        for entry in entries:
+            row = [
+                entry.arrival_time.strftime('%Y-%m-%d'),
+                entry.arrival_time.strftime('%H:%M:%S'),
+                entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active',
+                format_duration(entry.duration) if entry.duration else 'In progress',
+                format_duration(entry.total_break_duration),
+                entry.project.code if entry.project else '',
+                entry.project.name if entry.project else 'No Project',
+                entry.notes or ''
+            ]
+            if mode == 'team':
+                row.insert(1, entry.user.username)
+            writer.writerow(row)
+    
+    output.seek(0)
+    filename = f"analytics_{view_type}_{mode}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
+
+def export_analytics_excel(entries, view_type, mode):
+    """Export analytics data as Excel"""
+    try:
+        output = io.BytesIO()
+        
+        if view_type == 'team':
+            # Team summary Excel
+            user_data = {}
+            for entry in entries:
+                if entry.departure_time and entry.duration:
+                    username = entry.user.username
+                    if username not in user_data:
+                        user_data[username] = {'hours': 0, 'entries': 0}
+                    user_data[username]['hours'] += entry.duration / 3600
+                    user_data[username]['entries'] += 1
+            
+            df = pd.DataFrame([
+                {
+                    'Team Member': username,
+                    'Total Hours': f"{data['hours']:.2f}",
+                    'Total Entries': data['entries']
+                }
+                for username, data in user_data.items()
+            ])
+        else:
+            # Detailed entries Excel
+            data_list = []
+            for entry in entries:
+                row_data = {
+                    'Date': entry.arrival_time.strftime('%Y-%m-%d'),
+                    'Arrival Time': entry.arrival_time.strftime('%H:%M:%S'),
+                    'Departure Time': entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active',
+                    'Duration': format_duration(entry.duration) if entry.duration else 'In progress',
+                    'Break Duration': format_duration(entry.total_break_duration),
+                    'Project Code': entry.project.code if entry.project else '',
+                    'Project Name': entry.project.name if entry.project else 'No Project',
+                    'Notes': entry.notes or ''
+                }
+                if mode == 'team':
+                    row_data['User'] = entry.user.username
+                data_list.append(row_data)
+            
+            df = pd.DataFrame(data_list)
+        
+        # Write to Excel with formatting
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, sheet_name='Analytics Data', index=False)
+            
+            # Get workbook and worksheet
+            workbook = writer.book
+            worksheet = writer.sheets['Analytics Data']
+            
+            # Add formatting
+            header_format = workbook.add_format({
+                'bold': True,
+                'text_wrap': True,
+                'valign': 'top',
+                'fg_color': '#D7E4BD',
+                'border': 1
+            })
+            
+            # Write headers with formatting
+            for col_num, value in enumerate(df.columns.values):
+                worksheet.write(0, col_num, value, header_format)
+            
+            # Auto-adjust column widths
+            for i, col in enumerate(df.columns):
+                max_len = max(df[col].astype(str).apply(len).max(), len(col)) + 2
+                worksheet.set_column(i, i, min(max_len, 50))
+        
+        output.seek(0)
+        filename = f"analytics_{view_type}_{mode}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        return Response(
+            output.getvalue(),
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+        
+    except Exception as e:
+        logger.error(f"Error creating Excel export: {str(e)}")
+        flash('Error generating Excel export.')
+        return redirect(url_for('analytics'))
       
 if __name__ == '__main__':
     app.run(debug=True, port=5050)
