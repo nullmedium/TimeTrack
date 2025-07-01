@@ -217,6 +217,8 @@
 
 <!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- jsPDF for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
 // Global analytics state and controller
@@ -547,19 +549,41 @@ function exportChart(format) {
     if (!chart) return;
 
     const canvas = chart.canvas;
-    const link = document.createElement('a');
     
     if (format === 'png') {
+        const link = document.createElement('a');
         link.download = 'analytics-chart.png';
         link.href = canvas.toDataURL('image/png');
+        link.click();
     } else if (format === 'pdf') {
-        // For PDF export, we'd need a library like jsPDF
-        // For now, just export as PNG
-        link.download = 'analytics-chart.png';
-        link.href = canvas.toDataURL('image/png');
+        // Get chart title for PDF
+        const chartType = document.getElementById('chart-type').value;
+        const title = chartType === 'timeSeries' ? 'Daily Hours Worked' : 'Time Distribution by Project';
+        
+        // Create PDF using jsPDF
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('landscape', 'mm', 'a4');
+        
+        // Add title
+        pdf.setFontSize(16);
+        pdf.text(title, 20, 20);
+        
+        // Add chart image to PDF
+        const imgData = canvas.toDataURL('image/png');
+        const imgWidth = 250;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        pdf.addImage(imgData, 'PNG', 20, 35, imgWidth, imgHeight);
+        
+        // Add export info
+        pdf.setFontSize(10);
+        const dateRange = `${analyticsController.state.dateRange.start} to ${analyticsController.state.dateRange.end}`;
+        pdf.text(`Date Range: ${dateRange}`, 20, imgHeight + 50);
+        pdf.text(`Generated: ${new Date().toLocaleString()}`, 20, imgHeight + 60);
+        
+        // Save PDF
+        pdf.save('analytics-chart.pdf');
     }
-    
-    link.click();
 }
 
 // Entry management functions (personal mode only)
