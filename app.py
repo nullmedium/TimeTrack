@@ -1,5 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
 from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project
+from data_formatting import (
+    format_duration, prepare_export_data, prepare_team_hours_export_data,
+    format_table_data, format_graph_data, format_team_data
+)
+from data_export import (
+    export_to_csv, export_to_excel, export_team_hours_to_csv, export_team_hours_to_excel,
+    export_analytics_csv, export_analytics_excel
+)
 import logging
 from datetime import datetime, time, timedelta
 import os
@@ -101,11 +109,11 @@ def role_required(min_role):
         def decorated_function(*args, **kwargs):
             if g.user is None:
                 return redirect(url_for('login', next=request.url))
-            
+
             # Admin always has access
             if g.user.is_admin:
                 return f(*args, **kwargs)
-            
+
             # Check role hierarchy
             role_hierarchy = {
                 Role.TEAM_MEMBER: 1,
@@ -113,11 +121,11 @@ def role_required(min_role):
                 Role.SUPERVISOR: 3,
                 Role.ADMIN: 4
             }
-            
+
             if role_hierarchy.get(g.user.role, 0) < role_hierarchy.get(min_role, 0):
                 flash('You do not have sufficient permissions to access this page.', 'error')
                 return redirect(url_for('home'))
-                
+
             return f(*args, **kwargs)
         return decorated_function
     return role_decorator
@@ -141,10 +149,10 @@ def home():
     if g.user:
         # Get active entry (no departure time)
         active_entry = TimeEntry.query.filter_by(
-            user_id=g.user.id, 
+            user_id=g.user.id,
             departure_time=None
         ).first()
-        
+
         # Get today's completed entries for history
         today = datetime.now().date()
         history = TimeEntry.query.filter(
@@ -153,16 +161,16 @@ def home():
             TimeEntry.arrival_time >= datetime.combine(today, time.min),
             TimeEntry.arrival_time <= datetime.combine(today, time.max)
         ).order_by(TimeEntry.arrival_time.desc()).all()
-        
+
         # Get available projects for this user
         available_projects = []
         all_projects = Project.query.filter_by(is_active=True).all()
         for project in all_projects:
             if project.is_user_allowed(g.user):
                 available_projects.append(project)
-        
-        return render_template('index.html', title='Home', 
-                             active_entry=active_entry, 
+
+        return render_template('index.html', title='Home',
+                             active_entry=active_entry,
                              history=history,
                              available_projects=available_projects)
     else:
@@ -173,9 +181,9 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
+
         user = User.query.filter_by(username=username).first()
-        
+
         if user:
             # Fix role if it's a string or None
             if isinstance(user.role, str) or user.role is None:
@@ -190,21 +198,21 @@ def login():
                     'Administrator': Role.ADMIN,
                     'ADMIN': Role.ADMIN
                 }
-                
+
                 if isinstance(user.role, str):
                     user.role = role_mapping.get(user.role, Role.TEAM_MEMBER)
                 else:
                     user.role = Role.ADMIN if user.is_admin else Role.TEAM_MEMBER
-                
+
                 db.session.commit()
-            
+
             # Now proceed with password check
             if user.check_password(password):
                 # Check if user is blocked
                 if user.is_blocked:
                     flash('Your account has been disabled. Please contact an administrator.', 'error')
                     return render_template('login.html')
-                
+
                 # Check if 2FA is enabled
                 if user.two_factor_enabled:
                     # Store user ID for 2FA verification
@@ -215,12 +223,12 @@ def login():
                     session['user_id'] = user.id
                     session['username'] = user.username
                     session['is_admin'] = user.is_admin
-                    
+
                     flash('Login successful!', 'success')
                     return redirect(url_for('home'))
-        
+
         flash('Invalid username or password', 'error')
-    
+
     return render_template('login.html', title='Login')
 
 @app.route('/logout')
@@ -234,17 +242,17 @@ def register():
     # Check if registration is enabled
     reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
     registration_enabled = reg_setting and reg_setting.value == 'true'
-    
+
     if not registration_enabled:
         flash('Registration is currently disabled by the administrator.', 'error')
         return redirect(url_for('login'))
-    
+
     if request.method == 'POST':
         username = request.form.get('username')
         email = request.form.get('email')
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
-        
+
         # Validate input
         error = None
         if not username:
@@ -259,18 +267,18 @@ def register():
             error = 'Username already exists'
         elif User.query.filter_by(email=email).first():
             error = 'Email already registered'
-            
+
         if error is None:
             try:
                 new_user = User(username=username, email=email, is_verified=False)
                 new_user.set_password(password)
-                
+
                 # Generate verification token
                 token = new_user.generate_verification_token()
-                
+
                 db.session.add(new_user)
                 db.session.commit()
-                
+
                 # Send verification email
                 verification_url = url_for('verify_email', token=token, _external=True)
                 msg = Message('Verify your TimeTrack account', recipients=[email])
@@ -289,32 +297,32 @@ The TimeTrack Team
 '''
                 mail.send(msg)
                 logger.info(f"Verification email sent to {email}")
-                
+
                 flash('Registration initiated! Please check your email to verify your account.', 'success')
                 return redirect(url_for('login'))
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Error during registration: {str(e)}")
                 error = f"An error occurred during registration: {str(e)}"
-        
+
         flash(error, 'error')
-    
+
     return render_template('register.html', title='Register')
 
 @app.route('/verify_email/<token>')
 def verify_email(token):
     user = User.query.filter_by(verification_token=token).first()
-    
+
     if not user:
         flash('Invalid or expired verification link.', 'error')
         return redirect(url_for('login'))
-    
+
     if user.verify_token(token):
         db.session.commit()
         flash('Email verified successfully! You can now log in.', 'success')
     else:
         flash('Invalid or expired verification link.', 'error')
-    
+
     return redirect(url_for('login'))
 
 @app.route('/dashboard')
@@ -322,7 +330,7 @@ def verify_email(token):
 def dashboard():
     # Get dashboard data based on user role
     dashboard_data = {}
-    
+
     if g.user.is_admin or g.user.role == Role.ADMIN:
         # Admin sees everything
         dashboard_data.update({
@@ -332,7 +340,7 @@ def dashboard():
             'unverified_users': User.query.filter_by(is_verified=False).count(),
             'recent_registrations': User.query.order_by(User.id.desc()).limit(5).all()
         })
-    
+
     if g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] or g.user.is_admin:
         # Team leaders and supervisors see team-related data
         if g.user.team_id or g.user.is_admin:
@@ -344,13 +352,13 @@ def dashboard():
                 # Team leaders/supervisors see their own team
                 teams = [Team.query.get(g.user.team_id)] if g.user.team_id else []
                 team_members = User.query.filter_by(team_id=g.user.team_id).all() if g.user.team_id else []
-            
+
             dashboard_data.update({
                 'teams': teams,
                 'team_members': team_members,
                 'team_member_count': len(team_members)
             })
-    
+
     # Get recent time entries for the user's oversight
     if g.user.is_admin:
         # Admin sees all recent entries
@@ -361,9 +369,9 @@ def dashboard():
         recent_entries = TimeEntry.query.filter(TimeEntry.user_id.in_(team_user_ids)).order_by(TimeEntry.arrival_time.desc()).limit(10).all()
     else:
         recent_entries = []
-    
+
     dashboard_data['recent_entries'] = recent_entries
-    
+
     return render_template('dashboard.html', title='Dashboard', **dashboard_data)
 
 # Redirect old admin dashboard URL to new dashboard
@@ -383,11 +391,11 @@ def create_user():
         password = request.form.get('password')
         is_admin = 'is_admin' in request.form
         auto_verify = 'auto_verify' in request.form
-        
+
         # Get role and team
         role_name = request.form.get('role')
         team_id = request.form.get('team_id')
-        
+
         # Validate input
         error = None
         if not username:
@@ -400,25 +408,25 @@ def create_user():
             error = 'Username already exists'
         elif User.query.filter_by(email=email).first():
             error = 'Email already registered'
-            
+
         if error is None:
             # Convert role string to enum
             try:
                 role = Role[role_name] if role_name else Role.TEAM_MEMBER
             except KeyError:
                 role = Role.TEAM_MEMBER
-            
+
             # Create new user with role and team
             new_user = User(
-                username=username, 
-                email=email, 
-                is_admin=is_admin, 
+                username=username,
+                email=email,
+                is_admin=is_admin,
                 is_verified=auto_verify,
                 role=role,
                 team_id=team_id if team_id else None
             )
             new_user.set_password(password)
-            
+
             if not auto_verify:
                 # Generate verification token and send email
                 token = new_user.generate_verification_token()
@@ -436,39 +444,39 @@ Best regards,
 The TimeTrack Team
 '''
                 mail.send(msg)
-            
+
             db.session.add(new_user)
             db.session.commit()
-            
+
             if auto_verify:
                 flash(f'User {username} created and automatically verified!', 'success')
             else:
                 flash(f'User {username} created! Verification email sent.', 'success')
             return redirect(url_for('admin_users'))
-        
+
         flash(error, 'error')
-    
+
     # Get all teams for the form
     teams = Team.query.all()
     roles = [role for role in Role]
-    
+
     return render_template('create_user.html', title='Create User', teams=teams, roles=roles)
 
 @app.route('/admin/users/edit/<int:user_id>', methods=['GET', 'POST'])
 @admin_required
 def edit_user(user_id):
     user = User.query.get_or_404(user_id)
-    
+
     if request.method == 'POST':
         username = request.form.get('username')
         email = request.form.get('email')
         password = request.form.get('password')
         is_admin = 'is_admin' in request.form
-        
+
         # Get role and team
         role_name = request.form.get('role')
         team_id = request.form.get('team_id')
-        
+
         # Validate input
         error = None
         if not username:
@@ -479,50 +487,50 @@ def edit_user(user_id):
             error = 'Username already exists'
         elif email != user.email and User.query.filter_by(email=email).first():
             error = 'Email already registered'
-            
+
         if error is None:
             user.username = username
             user.email = email
             user.is_admin = is_admin
-            
+
             # Convert role string to enum
             try:
                 user.role = Role[role_name] if role_name else Role.TEAM_MEMBER
             except KeyError:
                 user.role = Role.TEAM_MEMBER
-            
+
             user.team_id = team_id if team_id else None
-            
+
             if password:
                 user.set_password(password)
-            
+
             db.session.commit()
-            
+
             flash(f'User {username} updated successfully!', 'success')
             return redirect(url_for('admin_users'))
-        
+
         flash(error, 'error')
-    
+
     # Get all teams for the form
     teams = Team.query.all()
     roles = [role for role in Role]
-    
+
     return render_template('edit_user.html', title='Edit User', user=user, teams=teams, roles=roles)
 
 @app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
 @admin_required
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
-    
+
     # Prevent deleting yourself
     if user.id == session.get('user_id'):
         flash('You cannot delete your own account', 'error')
         return redirect(url_for('admin_users'))
-    
+
     username = user.username
     db.session.delete(user)
     db.session.commit()
-    
+
     flash(f'User {username} deleted successfully', 'success')
     return redirect(url_for('admin_users'))
 
@@ -530,20 +538,20 @@ def delete_user(user_id):
 @login_required
 def profile():
     user = User.query.get(session['user_id'])
-    
+
     if request.method == 'POST':
         email = request.form.get('email')
         current_password = request.form.get('current_password')
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
-        
+
         # Validate input
         error = None
         if not email:
             error = 'Email is required'
         elif email != user.email and User.query.filter_by(email=email).first():
             error = 'Email already registered'
-        
+
         # Password change validation
         if new_password:
             if not current_password:
@@ -552,19 +560,19 @@ def profile():
                 error = 'Current password is incorrect'
             elif new_password != confirm_password:
                 error = 'New passwords do not match'
-        
+
         if error is None:
             user.email = email
-            
+
             if new_password:
                 user.set_password(new_password)
-            
+
             db.session.commit()
             flash('Profile updated successfully!', 'success')
             return redirect(url_for('profile'))
-        
+
         flash(error, 'error')
-    
+
     return render_template('profile.html', title='My Profile', user=user)
 
 @app.route('/2fa/setup', methods=['GET', 'POST'])
@@ -573,11 +581,11 @@ def setup_2fa():
     if request.method == 'POST':
         # Verify the TOTP code before enabling 2FA
         totp_code = request.form.get('totp_code')
-        
+
         if not totp_code:
             flash('Please enter the verification code from your authenticator app.', 'error')
             return redirect(url_for('setup_2fa'))
-        
+
         try:
             if g.user.verify_2fa_token(totp_code, allow_setup=True):
                 g.user.two_factor_enabled = True
@@ -591,35 +599,35 @@ def setup_2fa():
             logger.error(f"2FA setup error: {str(e)}")
             flash('An error occurred during 2FA setup. Please try again.', 'error')
             return redirect(url_for('setup_2fa'))
-    
+
     # GET request - show setup page
     if g.user.two_factor_enabled:
         flash('Two-factor authentication is already enabled.', 'info')
         return redirect(url_for('profile'))
-    
+
     # Generate secret if not exists
     if not g.user.two_factor_secret:
         g.user.generate_2fa_secret()
         db.session.commit()
-    
+
     # Generate QR code
     import qrcode
     import io
     import base64
-    
+
     qr_uri = g.user.get_2fa_uri()
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
     qr.add_data(qr_uri)
     qr.make(fit=True)
-    
+
     # Create QR code image
     qr_img = qr.make_image(fill_color="black", back_color="white")
     img_buffer = io.BytesIO()
     qr_img.save(img_buffer, format='PNG')
     img_buffer.seek(0)
     qr_code_b64 = base64.b64encode(img_buffer.getvalue()).decode()
-    
-    return render_template('setup_2fa.html', 
+
+    return render_template('setup_2fa.html',
                          title='Setup Two-Factor Authentication',
                          secret=g.user.two_factor_secret,
                          qr_code=qr_code_b64)
@@ -628,15 +636,15 @@ def setup_2fa():
 @login_required
 def disable_2fa():
     password = request.form.get('password')
-    
+
     if not password or not g.user.check_password(password):
         flash('Please enter your correct password to disable 2FA.', 'error')
         return redirect(url_for('profile'))
-    
+
     g.user.two_factor_enabled = False
     g.user.two_factor_secret = None
     db.session.commit()
-    
+
     flash('Two-factor authentication has been disabled.', 'success')
     return redirect(url_for('profile'))
 
@@ -646,27 +654,27 @@ def verify_2fa():
     user_id = session.get('2fa_user_id')
     if not user_id:
         return redirect(url_for('login'))
-    
+
     user = User.query.get(user_id)
     if not user or not user.two_factor_enabled:
         session.pop('2fa_user_id', None)
         return redirect(url_for('login'))
-    
+
     if request.method == 'POST':
         totp_code = request.form.get('totp_code')
-        
+
         if user.verify_2fa_token(totp_code):
             # Complete login process
             session.pop('2fa_user_id', None)
             session['user_id'] = user.id
             session['username'] = user.username
             session['is_admin'] = user.is_admin
-            
+
             flash('Login successful!', 'success')
             return redirect(url_for('home'))
         else:
             flash('Invalid verification code. Please try again.', 'error')
-    
+
     return render_template('verify_2fa.html', title='Two-Factor Authentication')
 
 @app.route('/about')
@@ -692,16 +700,16 @@ def arrive():
     # Get project and notes from request
     project_id = request.json.get('project_id') if request.json else None
     notes = request.json.get('notes') if request.json else None
-    
+
     # Validate project access if project is specified
     if project_id:
         project = Project.query.get(project_id)
         if not project or not project.is_user_allowed(g.user):
             return jsonify({'error': 'Invalid or unauthorized project'}), 403
-    
+
     # Create a new time entry with arrival time for the current user
     new_entry = TimeEntry(
-        user_id=g.user.id, 
+        user_id=g.user.id,
         arrival_time=datetime.now(),
         project_id=int(project_id) if project_id else None,
         notes=notes
@@ -824,11 +832,11 @@ def create_tables():
     # Check if we need to add new columns
     from sqlalchemy import inspect
     inspector = inspect(db.engine)
-    
+
     # Check if user table exists
     if 'user' in inspector.get_table_names():
         columns = [column['name'] for column in inspector.get_columns('user')]
-        
+
         # Check for verification columns
         if 'is_verified' not in columns or 'verification_token' not in columns or 'token_expiry' not in columns:
             logger.warning("Database schema is outdated. Please run migrate_db.py to update it.")
@@ -977,21 +985,21 @@ def test():
 @admin_required
 def toggle_user_status(user_id):
     user = User.query.get_or_404(user_id)
-    
+
     # Prevent blocking yourself
     if user.id == session.get('user_id'):
         flash('You cannot block your own account', 'error')
         return redirect(url_for('admin_users'))
-    
+
     # Toggle the blocked status
     user.is_blocked = not user.is_blocked
     db.session.commit()
-    
+
     if user.is_blocked:
         flash(f'User {user.username} has been blocked', 'success')
     else:
         flash(f'User {user.username} has been unblocked', 'success')
-    
+
     return redirect(url_for('admin_users'))
 
 # Add this route to manage system settings
@@ -1001,19 +1009,19 @@ def admin_settings():
     if request.method == 'POST':
         # Update registration setting
         registration_enabled = 'registration_enabled' in request.form
-        
+
         reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
         if reg_setting:
             reg_setting.value = 'true' if registration_enabled else 'false'
             db.session.commit()
             flash('System settings updated successfully!', 'success')
-        
+
     # Get current settings
     settings = {}
     for setting in SystemSettings.query.all():
         if setting.key == 'registration_enabled':
             settings['registration_enabled'] = setting.value == 'true'
-    
+
     return render_template('admin_settings.html', title='System Settings', settings=settings)
 
 # Add these routes for team management
@@ -1029,68 +1037,68 @@ def create_team():
     if request.method == 'POST':
         name = request.form.get('name')
         description = request.form.get('description')
-        
+
         # Validate input
         error = None
         if not name:
             error = 'Team name is required'
         elif Team.query.filter_by(name=name).first():
             error = 'Team name already exists'
-            
+
         if error is None:
             new_team = Team(name=name, description=description)
             db.session.add(new_team)
             db.session.commit()
-            
+
             flash(f'Team "{name}" created successfully!', 'success')
             return redirect(url_for('admin_teams'))
-        
+
         flash(error, 'error')
-    
+
     return render_template('create_team.html', title='Create Team')
 
 @app.route('/admin/teams/edit/<int:team_id>', methods=['GET', 'POST'])
 @admin_required
 def edit_team(team_id):
     team = Team.query.get_or_404(team_id)
-    
+
     if request.method == 'POST':
         name = request.form.get('name')
         description = request.form.get('description')
-        
+
         # Validate input
         error = None
         if not name:
             error = 'Team name is required'
         elif name != team.name and Team.query.filter_by(name=name).first():
             error = 'Team name already exists'
-            
+
         if error is None:
             team.name = name
             team.description = description
             db.session.commit()
-            
+
             flash(f'Team "{name}" updated successfully!', 'success')
             return redirect(url_for('admin_teams'))
-        
+
         flash(error, 'error')
-    
+
     return render_template('edit_team.html', title='Edit Team', team=team)
 
 @app.route('/admin/teams/delete/<int:team_id>', methods=['POST'])
 @admin_required
 def delete_team(team_id):
     team = Team.query.get_or_404(team_id)
-    
+
     # Check if team has members
     if team.users:
         flash('Cannot delete team with members. Remove all members first.', 'error')
         return redirect(url_for('admin_teams'))
-    
+
     team_name = team.name
     db.session.delete(team)
     db.session.commit()
-    
+
     flash(f'Team "{team_name}" deleted successfully!', 'success')
     return redirect(url_for('admin_teams'))
 
@@ -1098,22 +1106,22 @@ def delete_team(team_id):
 @admin_required
 def manage_team(team_id):
     team = Team.query.get_or_404(team_id)
-    
+
     if request.method == 'POST':
         action = request.form.get('action')
-        
+
         if action == 'update_team':
             # Update team details
             name = request.form.get('name')
             description = request.form.get('description')
-            
+
             # Validate input
             error = None
             if not name:
                 error = 'Team name is required'
             elif name != team.name and Team.query.filter_by(name=name).first():
                 error = 'Team name already exists'
-                
+
             if error is None:
                 team.name = name
                 team.description = description
@@ -1121,7 +1129,7 @@ def manage_team(team_id):
                 flash(f'Team "{name}" updated successfully!', 'success')
             else:
                 flash(error, 'error')
-                
+
         elif action == 'add_member':
             # Add user to team
             user_id = request.form.get('user_id')
@@ -1135,7 +1143,7 @@ def manage_team(team_id):
                     flash('User not found', 'error')
             else:
                 flash('No user selected', 'error')
-                
+
         elif action == 'remove_member':
             # Remove user from team
             user_id = request.form.get('user_id')
@@ -1149,19 +1157,19 @@ def manage_team(team_id):
                     flash('User not found or not in this team', 'error')
             else:
                 flash('No user selected', 'error')
-    
+
     # Get team members
     team_members = User.query.filter_by(team_id=team.id).all()
-    
+
     # Get users not in this team for the add member form
     available_users = User.query.filter(
         (User.team_id != team.id) | (User.team_id == None)
     ).all()
-    
+
     return render_template(
-        'manage_team.html', 
-        title=f'Manage Team: {team.name}', 
-        team=team, 
+        'manage_team.html',
+        title=f'Manage Team: {team.name}',
+        team=team,
         team_members=team_members,
         available_users=available_users
     )
@@ -1183,7 +1191,7 @@ def create_project():
         team_id = request.form.get('team_id') or None
         start_date_str = request.form.get('start_date')
         end_date_str = request.form.get('end_date')
-        
+
         # Validate input
         error = None
         if not name:
@@ -1192,7 +1200,7 @@ def create_project():
             error = 'Project code is required'
         elif Project.query.filter_by(code=code).first():
             error = 'Project code already exists'
-        
+
         # Parse dates
         start_date = None
         end_date = None
@@ -1201,16 +1209,16 @@ def create_project():
                 start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
             except ValueError:
                 error = 'Invalid start date format'
-        
+
         if end_date_str:
             try:
                 end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
             except ValueError:
                 error = 'Invalid end date format'
-        
+
         if start_date and end_date and start_date > end_date:
             error = 'Start date cannot be after end date'
-        
+
         if error is None:
             project = Project(
                 name=name,
@@ -1227,7 +1235,7 @@ def create_project():
             return redirect(url_for('admin_projects'))
         else:
             flash(error, 'error')
-    
+
     # Get available teams for the form
     teams = Team.query.order_by(Team.name).all()
     return render_template('create_project.html', title='Create Project', teams=teams)
@@ -1236,7 +1244,7 @@ def create_project():
 @role_required(Role.SUPERVISOR)
 def edit_project(project_id):
     project = Project.query.get_or_404(project_id)
-    
+
     if request.method == 'POST':
         name = request.form.get('name')
         description = request.form.get('description')
@@ -1245,7 +1253,7 @@ def edit_project(project_id):
         is_active = request.form.get('is_active') == 'on'
         start_date_str = request.form.get('start_date')
         end_date_str = request.form.get('end_date')
-        
+
         # Validate input
         error = None
         if not name:
@@ -1254,7 +1262,7 @@ def edit_project(project_id):
             error = 'Project code is required'
         elif code != project.code and Project.query.filter_by(code=code).first():
             error = 'Project code already exists'
-        
+
         # Parse dates
         start_date = None
         end_date = None
@@ -1263,16 +1271,16 @@ def edit_project(project_id):
                 start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
             except ValueError:
                 error = 'Invalid start date format'
-        
+
         if end_date_str:
             try:
                 end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
             except ValueError:
                 error = 'Invalid end date format'
-        
+
         if start_date and end_date and start_date > end_date:
             error = 'Start date cannot be after end date'
-        
+
         if error is None:
             project.name = name
             project.description = description
@@ -1286,7 +1294,7 @@ def edit_project(project_id):
             return redirect(url_for('admin_projects'))
         else:
             flash(error, 'error')
-    
+
     # Get available teams for the form
     teams = Team.query.order_by(Team.name).all()
     return render_template('edit_project.html', title='Edit Project', project=project, teams=teams)
@@ -1295,10 +1303,10 @@ def edit_project(project_id):
 @role_required(Role.ADMIN)  # Only admins can delete projects
 def delete_project(project_id):
     project = Project.query.get_or_404(project_id)
-    
+
     # Check if there are time entries associated with this project
     time_entries_count = TimeEntry.query.filter_by(project_id=project_id).count()
-    
+
     if time_entries_count > 0:
         flash(f'Cannot delete project "{project.name}" - it has {time_entries_count} time entries associated with it. Deactivate the project instead.', 'error')
     else:
@@ -1306,7 +1314,7 @@ def delete_project(project_id):
         db.session.delete(project)
         db.session.commit()
         flash(f'Project "{project_name}" deleted successfully!', 'success')
-    
+
     return redirect(url_for('admin_projects'))
 
 @app.route('/api/team/hours_data', methods=['GET'])
@@ -1315,22 +1323,22 @@ def delete_project(project_id):
 def team_hours_data():
     # Get the current user's team
     team = Team.query.get(g.user.team_id)
-    
+
     if not team:
         return jsonify({
             'success': False,
             'message': 'You are not assigned to any team.'
         }), 400
-    
+
     # Get date range from query parameters or use current week as default
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday())
     end_of_week = start_of_week + timedelta(days=6)
-    
+
     start_date_str = request.args.get('start_date', start_of_week.strftime('%Y-%m-%d'))
     end_date_str = request.args.get('end_date', end_of_week.strftime('%Y-%m-%d'))
     include_self = request.args.get('include_self', 'false') == 'true'
-    
+
     try:
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
@@ -1339,46 +1347,46 @@ def team_hours_data():
             'success': False,
             'message': 'Invalid date format.'
         }), 400
-    
+
     # Get all team members
     team_members = User.query.filter_by(team_id=team.id).all()
-    
+
     # Prepare data structure for team members' hours
     team_data = []
-    
+
     for member in team_members:
         # Skip if the member is the current user (team leader) and include_self is False
         if member.id == g.user.id and not include_self:
             continue
-            
+
         # Get time entries for this member in the date range
         entries = TimeEntry.query.filter(
             TimeEntry.user_id == member.id,
             TimeEntry.arrival_time >= datetime.combine(start_date, time.min),
             TimeEntry.arrival_time <= datetime.combine(end_date, time.max)
         ).order_by(TimeEntry.arrival_time).all()
-        
+
         # Calculate daily and total hours
         daily_hours = {}
         total_seconds = 0
-        
+
         for entry in entries:
             if entry.duration:  # Only count completed entries
                 entry_date = entry.arrival_time.date()
                 date_str = entry_date.strftime('%Y-%m-%d')
-                
+
                 if date_str not in daily_hours:
                     daily_hours[date_str] = 0
-                
+
                 daily_hours[date_str] += entry.duration
                 total_seconds += entry.duration
-        
+
         # Convert seconds to hours for display
         for date_str in daily_hours:
             daily_hours[date_str] = round(daily_hours[date_str] / 3600, 2)  # Convert to hours
-        
+
         total_hours = round(total_seconds / 3600, 2)  # Convert to hours
-        
+
         # Format entries for JSON response
         formatted_entries = []
         for entry in entries:
@@ -1389,7 +1397,7 @@ def team_hours_data():
                 'duration': entry.duration,
                 'total_break_duration': entry.total_break_duration
             })
-        
+
         # Add member data to team data
         team_data.append({
             'user': {
@@ -1401,14 +1409,14 @@ def team_hours_data():
             'total_hours': total_hours,
             'entries': formatted_entries
         })
-    
+
     # Generate a list of dates in the range for the table header
     date_range = []
     current_date = start_date
     while current_date <= end_date:
         date_range.append(current_date.strftime('%Y-%m-%d'))
         current_date += timedelta(days=1)
-    
+
     return jsonify({
         'success': True,
         'team': {
@@ -1429,7 +1437,7 @@ def export():
 def get_date_range(period, start_date_str=None, end_date_str=None):
     """Get start and end date based on period or custom date range."""
     today = datetime.now().date()
-    
+
     if period:
         if period == 'today':
             return today, today
@@ -1452,186 +1460,40 @@ def get_date_range(period, start_date_str=None, end_date_str=None):
         except (ValueError, TypeError):
             raise ValueError('Invalid date format')
 
-def format_duration(seconds):
-    """Format duration in seconds to HH:MM:SS format."""
-    if seconds is None:
-        return '00:00:00'
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    seconds = seconds % 60
-    return f"{hours:d}:{minutes:02d}:{seconds:02d}"
-
-def prepare_export_data(entries):
-    """Prepare time entries data for export."""
-    data = []
-    for entry in entries:
-        row = {
-            'Date': entry.arrival_time.strftime('%Y-%m-%d'),
-            'Project Code': entry.project.code if entry.project else '',
-            'Project Name': entry.project.name if entry.project else '',
-            'Arrival Time': entry.arrival_time.strftime('%H:%M:%S'),
-            'Departure Time': entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active',
-            'Work Duration (HH:MM:SS)': format_duration(entry.duration) if entry.duration is not None else 'In progress',
-            'Break Duration (HH:MM:SS)': format_duration(entry.total_break_duration),
-            'Work Duration (seconds)': entry.duration if entry.duration is not None else 0,
-            'Break Duration (seconds)': entry.total_break_duration if entry.total_break_duration is not None else 0,
-            'Notes': entry.notes if entry.notes else ''
-        }
-        data.append(row)
-    return data
-
-def export_to_csv(data, filename):
-    """Export data to CSV format."""
-    output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=data[0].keys())
-    writer.writeheader()
-    writer.writerows(data)
-    
-    return Response(
-        output.getvalue(),
-        mimetype='text/csv',
-        headers={'Content-Disposition': f'attachment;filename={filename}.csv'}
-    )
-
-def export_to_excel(data, filename):
-    """Export data to Excel format with formatting."""
-    df = pd.DataFrame(data)
-    output = io.BytesIO()
-    
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, sheet_name='TimeTrack Data', index=False)
-        
-        # Auto-adjust columns' width
-        worksheet = writer.sheets['TimeTrack Data']
-        for i, col in enumerate(df.columns):
-            column_width = max(df[col].astype(str).map(len).max(), len(col)) + 2
-            worksheet.set_column(i, i, column_width)
-    
-    output.seek(0)
-    
-    return send_file(
-        output,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        as_attachment=True,
-        download_name=f"{filename}.xlsx"
-    )
-
-def prepare_team_hours_export_data(team, team_data, date_range):
-    """Prepare team hours data for export."""
-    export_data = []
-    
-    for member_data in team_data:
-        user = member_data['user']
-        daily_hours = member_data['daily_hours']
-        
-        # Create base row with member info
-        row = {
-            'Team': team['name'],
-            'Member': user['username'],
-            'Email': user['email'],
-            'Total Hours': member_data['total_hours']
-        }
-        
-        # Add daily hours columns
-        for date_str in date_range:
-            formatted_date = datetime.strptime(date_str, '%Y-%m-%d').strftime('%m/%d/%Y')
-            row[formatted_date] = daily_hours.get(date_str, 0.0)
-        
-        export_data.append(row)
-    
-    return export_data
-
-def export_team_hours_to_csv(data, filename):
-    """Export team hours data to CSV format."""
-    if not data:
-        return None
-        
-    output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=data[0].keys())
-    writer.writeheader()
-    writer.writerows(data)
-    
-    return Response(
-        output.getvalue(),
-        mimetype='text/csv',
-        headers={'Content-Disposition': f'attachment;filename={filename}.csv'}
-    )
-
-def export_team_hours_to_excel(data, filename, team_name):
-    """Export team hours data to Excel format with formatting."""
-    if not data:
-        return None
-        
-    df = pd.DataFrame(data)
-    output = io.BytesIO()
-    
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, sheet_name=f'{team_name} Hours', index=False)
-        
-        # Get the workbook and worksheet objects
-        workbook = writer.book
-        worksheet = writer.sheets[f'{team_name} Hours']
-        
-        # Create formats
-        header_format = workbook.add_format({
-            'bold': True,
-            'text_wrap': True,
-            'valign': 'top',
-            'fg_color': '#4CAF50',
-            'font_color': 'white',
-            'border': 1
-        })
-        
-        # Auto-adjust columns' width and apply formatting
-        for i, col in enumerate(df.columns):
-            column_width = max(df[col].astype(str).map(len).max(), len(col)) + 2
-            worksheet.set_column(i, i, column_width)
-            
-            # Apply header formatting
-            worksheet.write(0, i, col, header_format)
-    
-    output.seek(0)
-    
-    return send_file(
-        output,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        as_attachment=True,
-        download_name=f"{filename}.xlsx"
-    )
 
 @app.route('/download_export')
 def download_export():
     """Handle export download requests."""
     export_format = request.args.get('format', 'csv')
     period = request.args.get('period')
-    
+
     try:
         start_date, end_date = get_date_range(
-            period, 
-            request.args.get('start_date'), 
+            period,
+            request.args.get('start_date'),
             request.args.get('end_date')
         )
     except ValueError:
         flash('Invalid date format. Please use YYYY-MM-DD format.')
         return redirect(url_for('export'))
-    
+
     # Query entries within the date range
     start_datetime = datetime.combine(start_date, time.min)
     end_datetime = datetime.combine(end_date, time.max)
-    
+
     entries = TimeEntry.query.filter(
         TimeEntry.arrival_time >= start_datetime,
         TimeEntry.arrival_time <= end_datetime
     ).order_by(TimeEntry.arrival_time).all()
-    
+
     if not entries:
         flash('No entries found for the selected date range.')
         return redirect(url_for('export'))
-    
+
     # Prepare data and filename
     data = prepare_export_data(entries)
     filename = f"timetrack_export_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}"
-    
+
     # Export based on format
     if export_format == 'csv':
         return export_to_csv(data, filename)
@@ -1650,34 +1512,34 @@ def analytics(mode='personal'):
     # Validate mode parameter
     if mode not in ['personal', 'team']:
         mode = 'personal'
-    
+
     # Check team access for team mode
     if mode == 'team':
         if not g.user.team_id:
             flash('You must be assigned to a team to view team analytics.', 'warning')
             return redirect(url_for('analytics', mode='personal'))
-        
+
         if g.user.role not in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN]:
             flash('You do not have permission to view team analytics.', 'error')
             return redirect(url_for('analytics', mode='personal'))
-    
+
     # Get available projects for filtering
     available_projects = []
     all_projects = Project.query.filter_by(is_active=True).all()
     for project in all_projects:
         if project.is_user_allowed(g.user):
             available_projects.append(project)
-    
+
     # Get team members if in team mode
     team_members = []
     if mode == 'team' and g.user.team_id:
         team_members = User.query.filter_by(team_id=g.user.team_id).all()
-    
+
     # Default date range (current week)
     today = datetime.now().date()
     start_of_week = today - timedelta(days=today.weekday())
     end_of_week = start_of_week + timedelta(days=6)
-    
+
     return render_template('analytics.html',
                          title='Time Analytics',
                          mode=mode,
@@ -1696,28 +1558,28 @@ def analytics_data():
     end_date = request.args.get('end_date')
     project_filter = request.args.get('project_id')
     granularity = request.args.get('granularity', 'daily')
-    
+
     # Validate mode
     if mode not in ['personal', 'team']:
         return jsonify({'error': 'Invalid mode'}), 400
-    
+
     # Check permissions for team mode
     if mode == 'team':
         if not g.user.team_id:
             return jsonify({'error': 'No team assigned'}), 403
         if g.user.role not in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN]:
             return jsonify({'error': 'Insufficient permissions'}), 403
-    
+
     try:
         # Parse dates
         if start_date:
             start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
         if end_date:
             end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-        
+
         # Get filtered data
         data = get_filtered_analytics_data(g.user, mode, start_date, end_date, project_filter)
-        
+
         # Format data based on view type
         if view_type == 'graph':
             formatted_data = format_graph_data(data, granularity)
@@ -1725,9 +1587,9 @@ def analytics_data():
             formatted_data = format_team_data(data, granularity)
         else:
             formatted_data = format_table_data(data)
-        
+
         return jsonify(formatted_data)
-    
+
     except Exception as e:
         logger.error(f"Error in analytics_data: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1736,20 +1598,20 @@ def get_filtered_analytics_data(user, mode, start_date=None, end_date=None, proj
     """Get filtered time entry data for analytics"""
     # Base query
     query = TimeEntry.query
-    
+
     # Apply user/team filter
     if mode == 'personal':
         query = query.filter(TimeEntry.user_id == user.id)
     elif mode == 'team' and user.team_id:
         team_user_ids = [u.id for u in User.query.filter_by(team_id=user.team_id).all()]
         query = query.filter(TimeEntry.user_id.in_(team_user_ids))
-    
+
     # Apply date filters
     if start_date:
         query = query.filter(func.date(TimeEntry.arrival_time) >= start_date)
     if end_date:
         query = query.filter(func.date(TimeEntry.arrival_time) <= end_date)
-    
+
     # Apply project filter
     if project_filter:
         if project_filter == 'none':
@@ -1760,104 +1622,9 @@ def get_filtered_analytics_data(user, mode, start_date=None, end_date=None, proj
                 query = query.filter(TimeEntry.project_id == project_id)
             except ValueError:
                 pass
-    
+
     return query.order_by(TimeEntry.arrival_time.desc()).all()
 
-def format_table_data(entries):
-    """Format data for table view"""
-    formatted_entries = []
-    for entry in entries:
-        formatted_entry = {
-            'id': entry.id,
-            'date': entry.arrival_time.strftime('%Y-%m-%d'),
-            'arrival_time': entry.arrival_time.strftime('%H:%M:%S'),
-            'departure_time': entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active',
-            'duration': format_duration(entry.duration) if entry.duration else 'In progress',
-            'break_duration': format_duration(entry.total_break_duration),
-            'project_code': entry.project.code if entry.project else None,
-            'project_name': entry.project.name if entry.project else 'No Project',
-            'notes': entry.notes or '',
-            'user_name': entry.user.username
-        }
-        formatted_entries.append(formatted_entry)
-    
-    return {'entries': formatted_entries}
-
-def format_graph_data(entries, granularity='daily'):
-    """Format data for graph visualization"""
-    from collections import defaultdict
-    
-    # Group data by date
-    daily_data = defaultdict(lambda: {'total_hours': 0, 'projects': defaultdict(int)})
-    project_totals = defaultdict(int)
-    
-    for entry in entries:
-        if entry.departure_time and entry.duration:
-            date_key = entry.arrival_time.strftime('%Y-%m-%d')
-            hours = entry.duration / 3600  # Convert seconds to hours
-            
-            daily_data[date_key]['total_hours'] += hours
-            project_name = entry.project.name if entry.project else 'No Project'
-            daily_data[date_key]['projects'][project_name] += hours
-            project_totals[project_name] += hours
-    
-    # Format time series data
-    time_series = []
-    for date, data in sorted(daily_data.items()):
-        time_series.append({
-            'date': date,
-            'hours': round(data['total_hours'], 2)
-        })
-    
-    # Format project distribution
-    project_distribution = [
-        {'project': project, 'hours': round(hours, 2)}
-        for project, hours in project_totals.items()
-    ]
-    
-    return {
-        'timeSeries': time_series,
-        'projectDistribution': project_distribution,
-        'totalHours': sum(project_totals.values()),
-        'totalDays': len(daily_data)
-    }
-
-def format_team_data(entries, granularity='daily'):
-    """Format data for team view"""
-    from collections import defaultdict
-    
-    # Group by user and date
-    user_data = defaultdict(lambda: {'daily_hours': defaultdict(float), 'total_hours': 0})
-    
-    for entry in entries:
-        if entry.departure_time and entry.duration:
-            date_key = entry.arrival_time.strftime('%Y-%m-%d')
-            hours = entry.duration / 3600
-            
-            user_data[entry.user.username]['daily_hours'][date_key] += hours
-            user_data[entry.user.username]['total_hours'] += hours
-    
-    # Format for frontend
-    team_data = []
-    for username, data in user_data.items():
-        team_data.append({
-            'username': username,
-            'daily_hours': dict(data['daily_hours']),
-            'total_hours': round(data['total_hours'], 2)
-        })
-    
-    return {'team_data': team_data}
-
-def format_duration(seconds):
-    """Format duration in seconds to HH:MM:SS"""
-    if not seconds:
-        return "00:00:00"
-    
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    seconds = seconds % 60
-    
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 @app.route('/api/analytics/export')
 @login_required
@@ -1869,7 +1636,7 @@ def analytics_export():
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     project_filter = request.args.get('project_id')
-    
+
     # Validate permissions
     if mode == 'team':
         if not g.user.team_id:
@@ -1878,17 +1645,17 @@ def analytics_export():
         if g.user.role not in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN]:
             flash('Insufficient permissions', 'error')
             return redirect(url_for('analytics'))
-    
+
     try:
         # Parse dates
         if start_date:
             start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
         if end_date:
             end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-        
+
         # Get data
         data = get_filtered_analytics_data(g.user, mode, start_date, end_date, project_filter)
-        
+
         if export_format == 'csv':
             return export_analytics_csv(data, view_type, mode)
         elif export_format == 'excel':
@@ -1896,148 +1663,12 @@ def analytics_export():
         else:
             flash('Invalid export format', 'error')
             return redirect(url_for('analytics'))
-            
+
     except Exception as e:
         logger.error(f"Error in analytics export: {str(e)}")
         flash('Error generating export', 'error')
         return redirect(url_for('analytics'))
 
-def export_analytics_csv(entries, view_type, mode):
-    """Export analytics data as CSV"""
-    output = io.StringIO()
-    
-    if view_type == 'team':
-        # Team summary CSV
-        writer = csv.writer(output)
-        writer.writerow(['Team Member', 'Total Hours', 'Total Entries'])
-        
-        # Group by user
-        user_data = {}
-        for entry in entries:
-            if entry.departure_time and entry.duration:
-                username = entry.user.username
-                if username not in user_data:
-                    user_data[username] = {'hours': 0, 'entries': 0}
-                user_data[username]['hours'] += entry.duration / 3600
-                user_data[username]['entries'] += 1
-        
-        for username, data in user_data.items():
-            writer.writerow([username, f"{data['hours']:.2f}", data['entries']])
-    else:
-        # Detailed entries CSV
-        writer = csv.writer(output)
-        headers = ['Date', 'Arrival Time', 'Departure Time', 'Duration', 'Break Duration', 'Project Code', 'Project Name', 'Notes']
-        if mode == 'team':
-            headers.insert(1, 'User')
-        writer.writerow(headers)
-        
-        for entry in entries:
-            row = [
-                entry.arrival_time.strftime('%Y-%m-%d'),
-                entry.arrival_time.strftime('%H:%M:%S'),
-                entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active',
-                format_duration(entry.duration) if entry.duration else 'In progress',
-                format_duration(entry.total_break_duration),
-                entry.project.code if entry.project else '',
-                entry.project.name if entry.project else 'No Project',
-                entry.notes or ''
-            ]
-            if mode == 'team':
-                row.insert(1, entry.user.username)
-            writer.writerow(row)
-    
-    output.seek(0)
-    filename = f"analytics_{view_type}_{mode}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    
-    return Response(
-        output.getvalue(),
-        mimetype='text/csv',
-        headers={'Content-Disposition': f'attachment; filename={filename}'}
-    )
 
-def export_analytics_excel(entries, view_type, mode):
-    """Export analytics data as Excel"""
-    try:
-        output = io.BytesIO()
-        
-        if view_type == 'team':
-            # Team summary Excel
-            user_data = {}
-            for entry in entries:
-                if entry.departure_time and entry.duration:
-                    username = entry.user.username
-                    if username not in user_data:
-                        user_data[username] = {'hours': 0, 'entries': 0}
-                    user_data[username]['hours'] += entry.duration / 3600
-                    user_data[username]['entries'] += 1
-            
-            df = pd.DataFrame([
-                {
-                    'Team Member': username,
-                    'Total Hours': f"{data['hours']:.2f}",
-                    'Total Entries': data['entries']
-                }
-                for username, data in user_data.items()
-            ])
-        else:
-            # Detailed entries Excel
-            data_list = []
-            for entry in entries:
-                row_data = {
-                    'Date': entry.arrival_time.strftime('%Y-%m-%d'),
-                    'Arrival Time': entry.arrival_time.strftime('%H:%M:%S'),
-                    'Departure Time': entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active',
-                    'Duration': format_duration(entry.duration) if entry.duration else 'In progress',
-                    'Break Duration': format_duration(entry.total_break_duration),
-                    'Project Code': entry.project.code if entry.project else '',
-                    'Project Name': entry.project.name if entry.project else 'No Project',
-                    'Notes': entry.notes or ''
-                }
-                if mode == 'team':
-                    row_data['User'] = entry.user.username
-                data_list.append(row_data)
-            
-            df = pd.DataFrame(data_list)
-        
-        # Write to Excel with formatting
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, sheet_name='Analytics Data', index=False)
-            
-            # Get workbook and worksheet
-            workbook = writer.book
-            worksheet = writer.sheets['Analytics Data']
-            
-            # Add formatting
-            header_format = workbook.add_format({
-                'bold': True,
-                'text_wrap': True,
-                'valign': 'top',
-                'fg_color': '#D7E4BD',
-                'border': 1
-            })
-            
-            # Write headers with formatting
-            for col_num, value in enumerate(df.columns.values):
-                worksheet.write(0, col_num, value, header_format)
-            
-            # Auto-adjust column widths
-            for i, col in enumerate(df.columns):
-                max_len = max(df[col].astype(str).apply(len).max(), len(col)) + 2
-                worksheet.set_column(i, i, min(max_len, 50))
-        
-        output.seek(0)
-        filename = f"analytics_{view_type}_{mode}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
-        return Response(
-            output.getvalue(),
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            headers={'Content-Disposition': f'attachment; filename={filename}'}
-        )
-        
-    except Exception as e:
-        logger.error(f"Error creating Excel export: {str(e)}")
-        flash('Error generating Excel export.')
-        return redirect(url_for('analytics'))
-      
 if __name__ == '__main__':
     app.run(debug=True, port=5050)
