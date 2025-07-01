@@ -23,6 +23,11 @@ primary_region = 'fra'
   MAIL_USERNAME       = "jens@luedicke.cloud"
   MAIL_DEFAULT_SENDER = "jens@luedicke.cloud"
 
+
+[mounts]
+  source = "timetrack_data"
+  destination = "/data"
+
 [[vm]]
   cpu_kind = 'shared'
   cpus = 1
