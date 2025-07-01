@@ -32,8 +32,7 @@ RUN chmod 777 /data
 # Expose the port the app runs on
 EXPOSE 5000
 
-# Run database migrations on startup
-RUN python -c "from app import app, db; app.app_context().push(); db.create_all()"
+# Database will be created at runtime when /data volume is mounted
 
 # Command to run the application
 CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
