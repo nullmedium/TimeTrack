@@ -3,6 +3,7 @@
 {% block content %}
 <div class="auth-container">
     <h1>Register for TimeTrack</h1>
+    <p class="text-muted">Join your company team</p>
     
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -11,6 +12,14 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
+    
+    <div class="registration-options mb-4">
+        <div class="alert alert-info">
+            <h5>Registration Options:</h5>
+            <p><strong>Company Employee:</strong> You're on the right page! Enter your company code below.</p>
+            <p><strong>Freelancer/Independent:</strong> <a href="{{ url_for('register_freelancer') }}" class="btn btn-outline-primary btn-sm">Register as Freelancer</a></p>
+        </div>
+    </div>
     
     <form method="POST" action="{{ url_for('register') }}" class="auth-form">
         <div class="form-group">

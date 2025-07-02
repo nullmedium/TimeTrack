@@ -1,7 +1,7 @@
 from app import app, db
 import sqlite3
 import os
-from models import User, TimeEntry, WorkConfig, SystemSettings, Team, Role, Project
+from models import User, TimeEntry, WorkConfig, SystemSettings, Team, Role, Project, Company, AccountType
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 
@@ -117,6 +117,21 @@ def migrate_database():
         print("Adding team_id column to user table...")
         cursor.execute("ALTER TABLE user ADD COLUMN team_id INTEGER")
     
+    # Add freelancer support columns to user table
+    if 'account_type' not in user_columns:
+        print("Adding account_type column to user table...")
+        cursor.execute("ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'Company User'")
+        
+    if 'business_name' not in user_columns:
+        print("Adding business_name column to user table...")
+        cursor.execute("ALTER TABLE user ADD COLUMN business_name VARCHAR(100)")
+    
+    # Add company_id to user table for multi-tenancy
+    if 'company_id' not in user_columns:
+        print("Adding company_id column to user table...")
+        # Note: We can't add NOT NULL constraint to existing table, so allow NULL initially
+        cursor.execute("ALTER TABLE user ADD COLUMN company_id INTEGER")
+    
     # Add 2FA columns to user table if they don't exist
     if 'two_factor_enabled' not in user_columns:
         print("Adding two_factor_enabled column to user table...")
@@ -174,6 +189,31 @@ def migrate_database():
             FOREIGN KEY (team_id) REFERENCES team (id)
         )
         """)
+
+    # Check if the company table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='company'")
+    if not cursor.fetchone():
+        print("Creating company table...")
+        cursor.execute("""
+        CREATE TABLE company (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) UNIQUE NOT NULL,
+            slug VARCHAR(50) UNIQUE NOT NULL,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_personal BOOLEAN DEFAULT 0,
+            is_active BOOLEAN DEFAULT 1,
+            max_users INTEGER DEFAULT 100
+        )
+        """)
+    else:
+        # Check if company table has freelancer columns
+        cursor.execute("PRAGMA table_info(company)")
+        company_columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'is_personal' not in company_columns:
+            print("Adding is_personal column to company table...")
+            cursor.execute("ALTER TABLE company ADD COLUMN is_personal BOOLEAN DEFAULT 0")
 
     # Add project-related columns to time_entry table
     cursor.execute("PRAGMA table_info(time_entry)")

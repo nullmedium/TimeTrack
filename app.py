@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data
@@ -159,7 +159,9 @@ def run_migrations():
             ('role', "ALTER TABLE user ADD COLUMN role VARCHAR(50) DEFAULT 'Team Member'"),
             ('team_id', "ALTER TABLE user ADD COLUMN team_id INTEGER"),
             ('two_factor_enabled', "ALTER TABLE user ADD COLUMN two_factor_enabled BOOLEAN DEFAULT 0"),
-            ('two_factor_secret', "ALTER TABLE user ADD COLUMN two_factor_secret VARCHAR(32)")
+            ('two_factor_secret', "ALTER TABLE user ADD COLUMN two_factor_secret VARCHAR(32)"),
+            ('account_type', "ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'Company User'"),
+            ('business_name', "ALTER TABLE user ADD COLUMN business_name VARCHAR(100)")
         ]
 
         for column_name, sql_command in user_migrations:
@@ -193,7 +195,10 @@ def run_migrations():
                 role VARCHAR(50) DEFAULT 'Team Member',
                 team_id INTEGER,
                 two_factor_enabled BOOLEAN DEFAULT 0,
-                two_factor_secret VARCHAR(32)
+                two_factor_secret VARCHAR(32),
+                account_type VARCHAR(20) DEFAULT 'Company User',
+                business_name VARCHAR(100),
+                company_id INTEGER
             )
             """)
 
@@ -201,10 +206,13 @@ def run_migrations():
             cursor.execute("""
             INSERT INTO user_new (id, username, email, password_hash, created_at, is_verified,
                                 verification_token, token_expiry, is_blocked, role, team_id,
-                                two_factor_enabled, two_factor_secret)
+                                two_factor_enabled, two_factor_secret, account_type, business_name, company_id)
             SELECT id, username, email, password_hash, created_at, is_verified,
                    verification_token, token_expiry, is_blocked, role, team_id,
-                   two_factor_enabled, two_factor_secret
+                   two_factor_enabled, two_factor_secret, 
+                   COALESCE(account_type, 'Company User'),
+                   business_name,
+                   company_id
             FROM user
             """)
 
@@ -276,10 +284,24 @@ def run_migrations():
                 slug VARCHAR(50) UNIQUE NOT NULL,
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_personal BOOLEAN DEFAULT 0,
                 is_active BOOLEAN DEFAULT 1,
                 max_users INTEGER DEFAULT 100
             )
             """)
+        else:
+            # Check and add missing columns to existing company table
+            cursor.execute("PRAGMA table_info(company)")
+            company_columns = [column[1] for column in cursor.fetchall()]
+            
+            company_migrations = [
+                ('is_personal', "ALTER TABLE company ADD COLUMN is_personal BOOLEAN DEFAULT 0")
+            ]
+            
+            for column_name, sql_command in company_migrations:
+                if column_name not in company_columns:
+                    print(f"Adding {column_name} column to company...")
+                    cursor.execute(sql_command)
 
         # Create company_work_config table if it doesn't exist
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='company_work_config'")
@@ -962,6 +984,100 @@ The TimeTrack Team
         flash(error, 'error')
 
     return render_template('register.html', title='Register')
+
+@app.route('/register/freelancer', methods=['GET', 'POST'])
+def register_freelancer():
+    """Freelancer registration route - creates user without company token"""
+    # Check if registration is enabled
+    registration_enabled = get_system_setting('registration_enabled', 'true') == 'true'
+
+    if not registration_enabled:
+        flash('Registration is currently disabled by the administrator.', 'error')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        business_name = request.form.get('business_name', '').strip()
+
+        # Validate input
+        error = None
+        if not username:
+            error = 'Username is required'
+        elif not email:
+            error = 'Email is required'
+        elif not password:
+            error = 'Password is required'
+        elif password != confirm_password:
+            error = 'Passwords do not match'
+
+        # Check for existing users globally (freelancers get unique usernames/emails)
+        if not error:
+            if User.query.filter_by(username=username).first():
+                error = 'Username already exists'
+            elif User.query.filter_by(email=email).first():
+                error = 'Email already registered'
+
+        if error is None:
+            try:
+                # Create personal company for freelancer
+                company_name = business_name if business_name else f"{username}'s Workspace"
+                
+                # Generate unique company slug
+                import re
+                slug = re.sub(r'[^\w\s-]', '', company_name.lower())
+                slug = re.sub(r'[-\s]+', '-', slug).strip('-')
+                
+                # Ensure slug uniqueness
+                base_slug = slug
+                counter = 1
+                while Company.query.filter_by(slug=slug).first():
+                    slug = f"{base_slug}-{counter}"
+                    counter += 1
+
+                # Create personal company
+                personal_company = Company(
+                    name=company_name,
+                    slug=slug,
+                    description=f"Personal workspace for {username}",
+                    is_personal=True,
+                    max_users=1  # Limit to single user
+                )
+                
+                db.session.add(personal_company)
+                db.session.flush()  # Get company ID
+
+                # Create freelancer user
+                new_user = User(
+                    username=username,
+                    email=email,
+                    company_id=personal_company.id,
+                    account_type=AccountType.FREELANCER,
+                    business_name=business_name if business_name else None,
+                    role=Role.ADMIN,  # Freelancers are admins of their personal company
+                    is_verified=True  # Auto-verify freelancers
+                )
+                new_user.set_password(password)
+
+                db.session.add(new_user)
+                db.session.commit()
+
+                logger.info(f"Freelancer account created: {username} with personal company: {company_name}")
+                flash(f'Welcome {username}! Your freelancer account has been created successfully. You can now log in.', 'success')
+                
+                return redirect(url_for('login'))
+                
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Error during freelancer registration: {str(e)}")
+                error = f"An error occurred during registration: {str(e)}"
+
+        if error:
+            flash(error, 'error')
+
+    return render_template('register_freelancer.html', title='Register as Freelancer')
 
 @app.route('/setup_company', methods=['GET', 'POST'])
 def setup_company():

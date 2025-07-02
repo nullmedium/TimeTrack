@@ -1,0 +1,65 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="auth-container">
+    <h1>Register as Freelancer</h1>
+    <p class="text-muted">Create your independent freelancer account</p>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <form method="POST" action="{{ url_for('register_freelancer') }}" class="auth-form">
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" class="form-control" required autofocus>
+        </div>
+        
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" class="form-control" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="business_name">Business Name (Optional)</label>
+            <input type="text" id="business_name" name="business_name" class="form-control" 
+                   placeholder="Your business or freelance name">
+            <small class="form-text text-muted">Leave blank to use your username as your workspace name.</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" class="form-control" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="confirm_password">Confirm Password</label>
+            <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
+        </div>
+        
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary">Create Freelancer Account</button>
+        </div>
+        
+        <div class="auth-links">
+            <p>Working for a company? <a href="{{ url_for('register') }}">Register with company code</a></p>
+            <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+        </div>
+        
+        <div class="freelancer-info">
+            <h4>What you get as a freelancer:</h4>
+            <ul>
+                <li>Your own personal workspace</li>
+                <li>Time tracking for your projects</li>
+                <li>Project management tools</li>
+                <li>Export capabilities for invoicing</li>
+                <li>No company code required</li>
+            </ul>
+        </div>
+    </form>
+</div>
+{% endblock %}

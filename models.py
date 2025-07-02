@@ -13,6 +13,11 @@ class Role(enum.Enum):
     SUPERVISOR = "Supervisor"
     ADMIN = "Administrator"  # Keep existing admin role
 
+# Define Account Type for freelancer support
+class AccountType(enum.Enum):
+    COMPANY_USER = "Company User"
+    FREELANCER = "Freelancer"
+
 # Company model for multi-tenancy
 class Company(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -20,6 +25,9 @@ class Company(db.Model):
     slug = db.Column(db.String(50), unique=True, nullable=False)  # URL-friendly identifier
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # Freelancer support
+    is_personal = db.Column(db.Boolean, default=False)  # True for auto-created freelancer companies
     
     # Company settings
     is_active = db.Column(db.Boolean, default=True)
@@ -134,6 +142,10 @@ class User(db.Model):
     # New fields for role and team
     role = db.Column(db.Enum(Role), default=Role.TEAM_MEMBER)
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
+    
+    # Freelancer support
+    account_type = db.Column(db.Enum(AccountType), default=AccountType.COMPANY_USER)
+    business_name = db.Column(db.String(100), nullable=True)  # Optional business name for freelancers
     
     # Unique constraints per company
     __table_args__ = (
