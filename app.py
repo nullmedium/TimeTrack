@@ -1580,6 +1580,98 @@ def resume_entry(entry_id):
         'total_break_duration': entry_to_resume.total_break_duration
     })
 
+@app.route('/api/manual-entry', methods=['POST'])
+@login_required
+def manual_entry():
+    try:
+        data = request.get_json()
+        
+        # Extract data from request
+        project_id = data.get('project_id')
+        start_date = data.get('start_date')
+        start_time = data.get('start_time')
+        end_date = data.get('end_date')
+        end_time = data.get('end_time')
+        break_minutes = int(data.get('break_minutes', 0))
+        notes = data.get('notes', '')
+        
+        # Validate required fields
+        if not all([start_date, start_time, end_date, end_time]):
+            return jsonify({'error': 'Start and end date/time are required'}), 400
+        
+        # Parse datetime strings
+        try:
+            arrival_datetime = datetime.strptime(f"{start_date} {start_time}", '%Y-%m-%d %H:%M:%S')
+            departure_datetime = datetime.strptime(f"{end_date} {end_time}", '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            try:
+                # Try without seconds if parsing fails
+                arrival_datetime = datetime.strptime(f"{start_date} {start_time}:00", '%Y-%m-%d %H:%M:%S')
+                departure_datetime = datetime.strptime(f"{end_date} {end_time}:00", '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                return jsonify({'error': 'Invalid date/time format'}), 400
+        
+        # Validate that end time is after start time
+        if departure_datetime <= arrival_datetime:
+            return jsonify({'error': 'End time must be after start time'}), 400
+        
+        # Validate project access if project is specified
+        if project_id:
+            project = Project.query.get(project_id)
+            if not project or not project.is_user_allowed(g.user):
+                return jsonify({'error': 'Invalid or unauthorized project'}), 403
+        
+        # Check for overlapping entries for this user
+        overlapping_entry = TimeEntry.query.filter(
+            TimeEntry.user_id == g.user.id,
+            TimeEntry.departure_time.isnot(None),
+            TimeEntry.arrival_time < departure_datetime,
+            TimeEntry.departure_time > arrival_datetime
+        ).first()
+        
+        if overlapping_entry:
+            return jsonify({
+                'error': 'This time entry overlaps with an existing entry'
+            }), 400
+        
+        # Calculate total duration in seconds
+        total_duration = int((departure_datetime - arrival_datetime).total_seconds())
+        break_duration_seconds = break_minutes * 60
+        
+        # Validate break duration doesn't exceed total duration
+        if break_duration_seconds >= total_duration:
+            return jsonify({'error': 'Break duration cannot exceed total work duration'}), 400
+        
+        # Calculate work duration (total duration minus breaks)
+        work_duration = total_duration - break_duration_seconds
+        
+        # Create the manual time entry
+        new_entry = TimeEntry(
+            user_id=g.user.id,
+            arrival_time=arrival_datetime,
+            departure_time=departure_datetime,
+            duration=work_duration,
+            total_break_duration=break_duration_seconds,
+            project_id=int(project_id) if project_id else None,
+            notes=notes,
+            is_paused=False,
+            pause_start_time=None
+        )
+        
+        db.session.add(new_entry)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Manual time entry added successfully',
+            'entry_id': new_entry.id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating manual time entry: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'An error occurred while creating the time entry'}), 500
+
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404

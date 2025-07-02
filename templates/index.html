@@ -61,6 +61,7 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
                         <textarea id="work-notes" name="notes" rows="2" placeholder="What are you working on?"></textarea>
                     </div>
                     <button id="arrive-btn" class="arrive-btn">Arrive</button>
+                    <button id="manual-entry-btn" class="manual-entry-btn">Add Manual Entry</button>
                 </div>
             </div>
         {% endif %}
@@ -181,8 +182,113 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
     </div>
 </div>
 
+<!-- Manual Time Entry Modal -->
+<div id="manual-entry-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Add Manual Time Entry</h3>
+        <form id="manual-entry-form">
+            <div class="form-group">
+                <label for="manual-project-select">Project (Optional):</label>
+                <select id="manual-project-select" name="project_id">
+                    <option value="">No specific project</option>
+                    {% for project in available_projects %}
+                    <option value="{{ project.id }}">{{ project.code }} - {{ project.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="manual-start-date">Start Date:</label>
+                <input type="date" id="manual-start-date" required>
+            </div>
+            <div class="form-group">
+                <label for="manual-start-time">Start Time:</label>
+                <input type="time" id="manual-start-time" required step="1">
+            </div>
+            <div class="form-group">
+                <label for="manual-end-date">End Date:</label>
+                <input type="date" id="manual-end-date" required>
+            </div>
+            <div class="form-group">
+                <label for="manual-end-time">End Time:</label>
+                <input type="time" id="manual-end-time" required step="1">
+            </div>
+            <div class="form-group">
+                <label for="manual-break-minutes">Break Duration (minutes):</label>
+                <input type="number" id="manual-break-minutes" min="0" value="0" placeholder="Break time in minutes">
+            </div>
+            <div class="form-group">
+                <label for="manual-notes">Notes (Optional):</label>
+                <textarea id="manual-notes" name="notes" rows="3" placeholder="Description of work performed"></textarea>
+            </div>
+            <button type="submit" class="btn">Add Entry</button>
+        </form>
+    </div>
+</div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Manual entry functionality
+        document.getElementById('manual-entry-btn').addEventListener('click', function() {
+            // Set default dates to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('manual-start-date').value = today;
+            document.getElementById('manual-end-date').value = today;
+            document.getElementById('manual-entry-modal').style.display = 'block';
+        });
+
+        // Manual entry form submission
+        document.getElementById('manual-entry-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const projectId = document.getElementById('manual-project-select').value || null;
+            const startDate = document.getElementById('manual-start-date').value;
+            const startTime = document.getElementById('manual-start-time').value;
+            const endDate = document.getElementById('manual-end-date').value;
+            const endTime = document.getElementById('manual-end-time').value;
+            const breakMinutes = parseInt(document.getElementById('manual-break-minutes').value) || 0;
+            const notes = document.getElementById('manual-notes').value;
+
+            // Validate end time is after start time
+            const startDateTime = new Date(`${startDate}T${startTime}`);
+            const endDateTime = new Date(`${endDate}T${endTime}`);
+
+            if (endDateTime <= startDateTime) {
+                alert('End time must be after start time');
+                return;
+            }
+
+            // Send request to create manual entry
+            fetch('/api/manual-entry', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    project_id: projectId,
+                    start_date: startDate,
+                    start_time: startTime,
+                    end_date: endDate,
+                    end_time: endTime,
+                    break_minutes: breakMinutes,
+                    notes: notes
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('manual-entry-modal').style.display = 'none';
+                    location.reload(); // Refresh to show new entry
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while adding the manual entry');
+            });
+        });
+
         // Edit entry functionality
         document.querySelectorAll('.edit-entry-btn').forEach(button => {
             button.addEventListener('click', function() {
@@ -401,6 +507,74 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
 .time-history .project-tag + small {
     display: block;
     margin-top: 0.25rem;
+}
+
+.manual-entry-btn {
+    background: #17a2b8;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    margin-left: 1rem;
+    transition: background-color 0.2s ease;
+}
+
+.manual-entry-btn:hover {
+    background: #138496;
+}
+
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    border-radius: 8px;
+    width: 500px;
+    max-width: 90%;
+    max-height: 80%;
+    overflow-y: auto;
+}
+
+.modal .form-group {
+    margin-bottom: 1rem;
+}
+
+.modal label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.modal input,
+.modal select,
+.modal textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.modal input:focus,
+.modal select:focus,
+.modal textarea:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
 }
 </style>
 
