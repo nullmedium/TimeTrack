@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data
@@ -281,6 +281,49 @@ def run_migrations():
             )
             """)
 
+        # Create company_work_config table if it doesn't exist
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='company_work_config'")
+        if not cursor.fetchone():
+            print("Creating company_work_config table...")
+            cursor.execute("""
+            CREATE TABLE company_work_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                work_hours_per_day FLOAT DEFAULT 8.0,
+                mandatory_break_minutes INTEGER DEFAULT 30,
+                break_threshold_hours FLOAT DEFAULT 6.0,
+                additional_break_minutes INTEGER DEFAULT 15,
+                additional_break_threshold_hours FLOAT DEFAULT 9.0,
+                region VARCHAR(20) DEFAULT 'DE',
+                region_name VARCHAR(50) DEFAULT 'Germany',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by_id INTEGER,
+                FOREIGN KEY (company_id) REFERENCES company (id),
+                FOREIGN KEY (created_by_id) REFERENCES user (id),
+                UNIQUE(company_id)
+            )
+            """)
+
+        # Create user_preferences table if it doesn't exist
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_preferences'")
+        if not cursor.fetchone():
+            print("Creating user_preferences table...")
+            cursor.execute("""
+            CREATE TABLE user_preferences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                time_format_24h BOOLEAN DEFAULT 1,
+                date_format VARCHAR(20) DEFAULT 'ISO',
+                time_rounding_minutes INTEGER DEFAULT 0,
+                round_to_nearest BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES user (id),
+                UNIQUE(user_id)
+            )
+            """)
+
         # Commit all schema changes
         conn.commit()
 
@@ -487,10 +530,61 @@ def migrate_data():
 
         db.session.commit()
 
+def migrate_work_config_data():
+    """Migrate existing WorkConfig data to new architecture"""
+    try:
+        # Create CompanyWorkConfig for each company that doesn't have one
+        companies = Company.query.all()
+        for company in companies:
+            existing_config = CompanyWorkConfig.query.filter_by(company_id=company.id).first()
+            if not existing_config:
+                print(f"Creating CompanyWorkConfig for {company.name}")
+                
+                # Use Germany defaults (existing system default)
+                preset = CompanyWorkConfig.get_regional_preset(WorkRegion.GERMANY)
+                
+                company_config = CompanyWorkConfig(
+                    company_id=company.id,
+                    work_hours_per_day=preset['work_hours_per_day'],
+                    mandatory_break_minutes=preset['mandatory_break_minutes'],
+                    break_threshold_hours=preset['break_threshold_hours'],
+                    additional_break_minutes=preset['additional_break_minutes'],
+                    additional_break_threshold_hours=preset['additional_break_threshold_hours'],
+                    region=WorkRegion.GERMANY,
+                    region_name=preset['region_name']
+                )
+                db.session.add(company_config)
+        
+        # Migrate existing WorkConfig user preferences to UserPreferences
+        old_configs = WorkConfig.query.filter(WorkConfig.user_id.isnot(None)).all()
+        for old_config in old_configs:
+            user = User.query.get(old_config.user_id)
+            if user:
+                existing_prefs = UserPreferences.query.filter_by(user_id=user.id).first()
+                if not existing_prefs:
+                    print(f"Migrating preferences for user {user.username}")
+                    
+                    user_prefs = UserPreferences(
+                        user_id=user.id,
+                        time_format_24h=getattr(old_config, 'time_format_24h', True),
+                        date_format=getattr(old_config, 'date_format', 'ISO'),
+                        time_rounding_minutes=getattr(old_config, 'time_rounding_minutes', 0),
+                        round_to_nearest=getattr(old_config, 'round_to_nearest', True)
+                    )
+                    db.session.add(user_prefs)
+        
+        db.session.commit()
+        print("Work config data migration completed successfully")
+        
+    except Exception as e:
+        print(f"Error during work config migration: {e}")
+        db.session.rollback()
+
 # Call this function during app initialization
 @app.before_first_request
 def initialize_app():
     run_migrations()
+    migrate_work_config_data()
 
 # Add this after initializing the app but before defining routes
 @app.context_processor
@@ -1451,7 +1545,8 @@ def leave(entry_id):
     entry.duration, effective_break = calculate_work_duration(
         rounded_arrival,
         rounded_departure,
-        entry.total_break_duration
+        entry.total_break_duration,
+        g.user
     )
 
     db.session.commit()
@@ -1501,43 +1596,40 @@ def toggle_pause(entry_id):
 @app.route('/config', methods=['GET', 'POST'])
 @login_required
 def config():
-    # Get current configuration or create default if none exists
-    config = WorkConfig.query.order_by(WorkConfig.id.desc()).first()
-    if not config:
-        config = WorkConfig()
-        db.session.add(config)
+    # Get user preferences or create default if none exists
+    preferences = UserPreferences.query.filter_by(user_id=g.user.id).first()
+    if not preferences:
+        preferences = UserPreferences(user_id=g.user.id)
+        db.session.add(preferences)
         db.session.commit()
 
     if request.method == 'POST':
         try:
-            # Update configuration with form data
-            config.work_hours_per_day = float(request.form.get('work_hours_per_day', 8.0))
-            config.mandatory_break_minutes = int(request.form.get('mandatory_break_minutes', 30))
-            config.break_threshold_hours = float(request.form.get('break_threshold_hours', 6.0))
-            config.additional_break_minutes = int(request.form.get('additional_break_minutes', 15))
-            config.additional_break_threshold_hours = float(request.form.get('additional_break_threshold_hours', 9.0))
-            
-            # Update time rounding settings
-            config.time_rounding_minutes = int(request.form.get('time_rounding_minutes', 0))
-            config.round_to_nearest = 'round_to_nearest' in request.form
-            
-            # Update date/time format settings
-            config.time_format_24h = 'time_format_24h' in request.form
-            config.date_format = request.form.get('date_format', 'ISO')
+            # Update only user preferences (no company policies)
+            preferences.time_format_24h = 'time_format_24h' in request.form
+            preferences.date_format = request.form.get('date_format', 'ISO')
+            preferences.time_rounding_minutes = int(request.form.get('time_rounding_minutes', 0))
+            preferences.round_to_nearest = 'round_to_nearest' in request.form
 
             db.session.commit()
-            flash('Configuration updated successfully!', 'success')
+            flash('Preferences updated successfully!', 'success')
             return redirect(url_for('config'))
         except ValueError:
-            flash('Please enter valid numbers for all fields', 'error')
+            flash('Please enter valid values for all fields', 'error')
 
+    # Get company work policies for display (read-only)
+    company_config = CompanyWorkConfig.query.filter_by(company_id=g.user.company_id).first()
+    
     # Import time utils for display options
     from time_utils import get_available_rounding_options, get_available_date_formats
     rounding_options = get_available_rounding_options()
     date_format_options = get_available_date_formats()
     
-    return render_template('config.html', title='Configuration', config=config, 
-                         rounding_options=rounding_options, date_format_options=date_format_options)
+    return render_template('config.html', title='User Preferences', 
+                         preferences=preferences, 
+                         company_config=company_config,
+                         rounding_options=rounding_options, 
+                         date_format_options=date_format_options)
 
 @app.route('/api/delete/<int:entry_id>', methods=['DELETE'])
 @login_required
@@ -1568,7 +1660,8 @@ def update_entry(entry_id):
                 entry.duration, _ = calculate_work_duration(
                     entry.arrival_time,
                     entry.departure_time,
-                    entry.total_break_duration
+                    entry.total_break_duration,
+                    g.user
                 )
         except ValueError:
             return jsonify({'success': False, 'message': 'Invalid departure time format'}), 400
@@ -1587,7 +1680,7 @@ def update_entry(entry_id):
         }
     })
 
-def calculate_work_duration(arrival_time, departure_time, total_break_duration):
+def calculate_work_duration(arrival_time, departure_time, total_break_duration, user):
     """
     Calculate work duration considering both configured and actual break times.
 
@@ -1595,6 +1688,7 @@ def calculate_work_duration(arrival_time, departure_time, total_break_duration):
         arrival_time: Datetime of arrival
         departure_time: Datetime of departure
         total_break_duration: Actual logged break duration in seconds
+        user: User object to get company configuration
 
     Returns:
         tuple: (work_duration_in_seconds, effective_break_duration_in_seconds)
@@ -1602,16 +1696,20 @@ def calculate_work_duration(arrival_time, departure_time, total_break_duration):
     # Calculate raw duration
     raw_duration = (departure_time - arrival_time).total_seconds()
 
-    # Get work configuration for break rules
-    config = WorkConfig.query.order_by(WorkConfig.id.desc()).first()
-    if not config:
-        config = WorkConfig()  # Use default values if no config exists
-
-    # Ensure configuration values are not None, use defaults if they are
-    break_threshold_hours = config.break_threshold_hours if config.break_threshold_hours is not None else 6.0
-    mandatory_break_minutes = config.mandatory_break_minutes if config.mandatory_break_minutes is not None else 30
-    additional_break_threshold_hours = config.additional_break_threshold_hours if config.additional_break_threshold_hours is not None else 9.0
-    additional_break_minutes = config.additional_break_minutes if config.additional_break_minutes is not None else 15
+    # Get company work configuration for break rules
+    company_config = CompanyWorkConfig.query.filter_by(company_id=user.company_id).first()
+    if not company_config:
+        # Use Germany defaults if no company config exists
+        preset = CompanyWorkConfig.get_regional_preset(WorkRegion.GERMANY)
+        break_threshold_hours = preset['break_threshold_hours']
+        mandatory_break_minutes = preset['mandatory_break_minutes']
+        additional_break_threshold_hours = preset['additional_break_threshold_hours']
+        additional_break_minutes = preset['additional_break_minutes']
+    else:
+        break_threshold_hours = company_config.break_threshold_hours
+        mandatory_break_minutes = company_config.mandatory_break_minutes
+        additional_break_threshold_hours = company_config.additional_break_threshold_hours
+        additional_break_minutes = company_config.additional_break_minutes
 
     # Calculate mandatory breaks based on work duration
     work_hours = raw_duration / 3600  # Convert seconds to hours
@@ -1830,6 +1928,82 @@ def admin_settings():
 
     return render_template('admin_settings.html', title='System Settings', settings=settings)
 
+@app.route('/admin/work-policies', methods=['GET', 'POST'])
+@admin_required
+@company_required
+def admin_work_policies():
+    # Get or create company work config
+    work_config = CompanyWorkConfig.query.filter_by(company_id=g.user.company_id).first()
+    if not work_config:
+        # Create default config for the company
+        preset = CompanyWorkConfig.get_regional_preset(WorkRegion.GERMANY)
+        work_config = CompanyWorkConfig(
+            company_id=g.user.company_id,
+            work_hours_per_day=preset['work_hours_per_day'],
+            mandatory_break_minutes=preset['mandatory_break_minutes'],
+            break_threshold_hours=preset['break_threshold_hours'],
+            additional_break_minutes=preset['additional_break_minutes'],
+            additional_break_threshold_hours=preset['additional_break_threshold_hours'],
+            region=WorkRegion.GERMANY,
+            region_name=preset['region_name'],
+            created_by_id=g.user.id
+        )
+        db.session.add(work_config)
+        db.session.commit()
+    
+    if request.method == 'POST':
+        try:
+            # Handle regional preset selection
+            if request.form.get('action') == 'apply_preset':
+                region_code = request.form.get('region_preset')
+                if region_code:
+                    region = WorkRegion(region_code)
+                    preset = CompanyWorkConfig.get_regional_preset(region)
+                    
+                    work_config.work_hours_per_day = preset['work_hours_per_day']
+                    work_config.mandatory_break_minutes = preset['mandatory_break_minutes']
+                    work_config.break_threshold_hours = preset['break_threshold_hours']
+                    work_config.additional_break_minutes = preset['additional_break_minutes']
+                    work_config.additional_break_threshold_hours = preset['additional_break_threshold_hours']
+                    work_config.region = region
+                    work_config.region_name = preset['region_name']
+                    
+                    db.session.commit()
+                    flash(f'Applied {preset["region_name"]} work policy preset', 'success')
+                    return redirect(url_for('admin_work_policies'))
+            
+            # Handle manual configuration update
+            else:
+                work_config.work_hours_per_day = float(request.form.get('work_hours_per_day', 8.0))
+                work_config.mandatory_break_minutes = int(request.form.get('mandatory_break_minutes', 30))
+                work_config.break_threshold_hours = float(request.form.get('break_threshold_hours', 6.0))
+                work_config.additional_break_minutes = int(request.form.get('additional_break_minutes', 15))
+                work_config.additional_break_threshold_hours = float(request.form.get('additional_break_threshold_hours', 9.0))
+                work_config.region = WorkRegion.CUSTOM
+                work_config.region_name = 'Custom Configuration'
+                
+                db.session.commit()
+                flash('Work policies updated successfully!', 'success')
+                return redirect(url_for('admin_work_policies'))
+                
+        except ValueError:
+            flash('Please enter valid numbers for all fields', 'error')
+    
+    # Get available regional presets
+    regional_presets = []
+    for region in WorkRegion:
+        preset = CompanyWorkConfig.get_regional_preset(region)
+        regional_presets.append({
+            'code': region.value,
+            'name': preset['region_name'],
+            'description': f"{preset['work_hours_per_day']}h/day, {preset['mandatory_break_minutes']}min break after {preset['break_threshold_hours']}h"
+        })
+    
+    return render_template('admin_work_policies.html', 
+                         title='Work Policies', 
+                         work_config=work_config,
+                         regional_presets=regional_presets,
+                         WorkRegion=WorkRegion)
 
 # Company Management Routes
 @app.route('/admin/company')

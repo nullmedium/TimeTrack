@@ -2,49 +2,49 @@
 
 {% block content %}
 <div class="config-container">
-    <h1>Work Configuration</h1>
+    <h1>User Preferences</h1>
+    <p class="description">Configure your personal display preferences and time tracking settings.</p>
 
+    <!-- Company Policies (Read-only) -->
+    {% if company_config %}
+    <div class="info-section">
+        <h3>Company Work Policies <span class="read-only">(Read-only)</span></h3>
+        <p class="section-description">
+            These policies are set by your administrator and apply to all employees.
+            {% if g.user.role == Role.ADMIN %}
+            <a href="{{ url_for('admin_work_policies') }}">Click here to modify these settings</a>.
+            {% endif %}
+        </p>
+        
+        <div class="policy-info">
+            <div class="policy-item">
+                <strong>Region:</strong> {{ company_config.region_name }}
+            </div>
+            <div class="policy-item">
+                <strong>Standard Work Day:</strong> {{ company_config.work_hours_per_day }} hours
+            </div>
+            <div class="policy-item">
+                <strong>Break Policy:</strong> 
+                {% if company_config.mandatory_break_minutes > 0 %}
+                    {{ company_config.mandatory_break_minutes }} minutes after {{ company_config.break_threshold_hours }} hours
+                {% else %}
+                    No mandatory breaks
+                {% endif %}
+            </div>
+            <div class="policy-item">
+                <strong>Additional Break:</strong>
+                {% if company_config.additional_break_minutes > 0 %}
+                    {{ company_config.additional_break_minutes }} minutes after {{ company_config.additional_break_threshold_hours }} hours
+                {% else %}
+                    No additional breaks
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- User Preferences Form -->
     <form method="POST" action="{{ url_for('config') }}" class="config-form">
-        <div class="form-group">
-            <label for="work_hours_per_day">Work Hours Per Day:</label>
-            <input type="number" id="work_hours_per_day" name="work_hours_per_day"
-                   value="{{ config.work_hours_per_day }}" step="0.5" min="0.5" max="24" required>
-            <small>Standard number of work hours in a day</small>
-        </div>
-
-        <div class="form-section">
-            <h3>Primary Break</h3>
-            <div class="form-group">
-                <label for="mandatory_break_minutes">Mandatory Break Duration (minutes):</label>
-                <input type="number" id="mandatory_break_minutes" name="mandatory_break_minutes"
-                       value="{{ config.mandatory_break_minutes }}" step="1" min="0" max="240" required>
-                <small>Required break time in minutes</small>
-            </div>
-
-            <div class="form-group">
-                <label for="break_threshold_hours">Break Threshold (hours):</label>
-                <input type="number" id="break_threshold_hours" name="break_threshold_hours"
-                       value="{{ config.break_threshold_hours }}" step="0.5" min="0" max="24" required>
-                <small>Work hours after which a break becomes mandatory</small>
-            </div>
-        </div>
-
-        <div class="form-section">
-            <h3>Additional Break</h3>
-            <div class="form-group">
-                <label for="additional_break_minutes">Additional Break Duration (minutes):</label>
-                <input type="number" id="additional_break_minutes" name="additional_break_minutes"
-                       value="{{ config.additional_break_minutes }}" step="1" min="0" max="240" required>
-                <small>Duration of additional break in minutes</small>
-            </div>
-
-            <div class="form-group">
-                <label for="additional_break_threshold_hours">Additional Break Threshold (hours):</label>
-                <input type="number" id="additional_break_threshold_hours" name="additional_break_threshold_hours"
-                       value="{{ config.additional_break_threshold_hours }}" step="0.5" min="0" max="24" required>
-                <small>Work hours after which an additional break becomes necessary</small>
-            </div>
-        </div>
 
         <div class="form-section">
             <h3>Display Format Settings</h3>
@@ -56,7 +56,7 @@
                 <label for="date_format">Date Format:</label>
                 <select id="date_format" name="date_format">
                     {% for value, label, example in date_format_options %}
-                    <option value="{{ value }}" {% if config.date_format == value %}selected{% endif %}>
+                    <option value="{{ value }}" {% if preferences.date_format == value %}selected{% endif %}>
                         {{ label }}
                     </option>
                     {% endfor %}
@@ -69,7 +69,7 @@
                     <input type="checkbox" 
                            id="time_format_24h" 
                            name="time_format_24h" 
-                           {% if config.time_format_24h %}checked{% endif %}>
+                           {% if preferences.time_format_24h %}checked{% endif %}>
                     <label for="time_format_24h">Use 24-hour time format</label>
                     <small>If unchecked, will use 12-hour format with AM/PM</small>
                 </div>
@@ -93,7 +93,7 @@
                 <label for="time_rounding_minutes">Time Rounding Interval:</label>
                 <select id="time_rounding_minutes" name="time_rounding_minutes">
                     {% for value, label in rounding_options %}
-                    <option value="{{ value }}" {% if config.time_rounding_minutes == value %}selected{% endif %}>
+                    <option value="{{ value }}" {% if preferences.time_rounding_minutes == value %}selected{% endif %}>
                         {{ label }}
                     </option>
                     {% endfor %}
@@ -106,7 +106,7 @@
                     <input type="checkbox" 
                            id="round_to_nearest" 
                            name="round_to_nearest" 
-                           {% if config.round_to_nearest %}checked{% endif %}>
+                           {% if preferences.round_to_nearest %}checked{% endif %}>
                     <label for="round_to_nearest">Round to nearest interval</label>
                     <small>If unchecked, will always round up</small>
                 </div>
@@ -120,7 +120,7 @@
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save Configuration</button>
+        <button type="submit" class="btn btn-primary">Save Preferences</button>
     </form>
 </div>
 
@@ -240,6 +240,49 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+.config-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.description {
+    color: #666;
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
+}
+
+.info-section {
+    background: #e8f4fd;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    border-left: 4px solid #17a2b8;
+}
+
+.info-section h3 {
+    margin-top: 0;
+    color: #0c5460;
+}
+
+.read-only {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-weight: normal;
+}
+
+.policy-info {
+    background: white;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+}
+
+.policy-item {
+    margin-bottom: 0.5rem;
+    color: #495057;
+}
+
 .section-description {
     color: #666;
     font-style: italic;

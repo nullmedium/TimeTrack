@@ -253,3 +253,116 @@ class WorkConfig(db.Model):
 
     def __repr__(self):
         return f'<WorkConfig {self.id}: {self.work_hours_per_day}h/day, {self.mandatory_break_minutes}min break>'
+
+# Define regional presets as an Enum
+class WorkRegion(enum.Enum):
+    GERMANY = "DE"
+    UNITED_STATES = "US"
+    UNITED_KINGDOM = "UK"
+    FRANCE = "FR"
+    EUROPEAN_UNION = "EU"
+    CUSTOM = "CUSTOM"
+
+# Company Work Configuration (Admin-only policies)
+class CompanyWorkConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
+    
+    # Work policy settings (legal requirements)
+    work_hours_per_day = db.Column(db.Float, default=8.0)  # Standard work hours per day
+    mandatory_break_minutes = db.Column(db.Integer, default=30)  # Required break duration
+    break_threshold_hours = db.Column(db.Float, default=6.0)  # Hours that trigger mandatory break
+    additional_break_minutes = db.Column(db.Integer, default=15)  # Additional break duration
+    additional_break_threshold_hours = db.Column(db.Float, default=9.0)  # Hours that trigger additional break
+    
+    # Regional compliance
+    region = db.Column(db.Enum(WorkRegion), default=WorkRegion.GERMANY)
+    region_name = db.Column(db.String(50), default='Germany')
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    
+    # Relationships
+    company = db.relationship('Company', backref='work_config')
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    
+    # Unique constraint - one config per company
+    __table_args__ = (db.UniqueConstraint('company_id', name='uq_company_work_config'),)
+    
+    def __repr__(self):
+        return f'<CompanyWorkConfig {self.company.name}: {self.region.value}, {self.work_hours_per_day}h/day>'
+    
+    @classmethod
+    def get_regional_preset(cls, region):
+        """Get regional preset configuration."""
+        presets = {
+            WorkRegion.GERMANY: {
+                'work_hours_per_day': 8.0,
+                'mandatory_break_minutes': 30,
+                'break_threshold_hours': 6.0,
+                'additional_break_minutes': 15,
+                'additional_break_threshold_hours': 9.0,
+                'region_name': 'Germany'
+            },
+            WorkRegion.UNITED_STATES: {
+                'work_hours_per_day': 8.0,
+                'mandatory_break_minutes': 0,  # No federal requirement
+                'break_threshold_hours': 999.0,  # Effectively disabled
+                'additional_break_minutes': 0,
+                'additional_break_threshold_hours': 999.0,
+                'region_name': 'United States'
+            },
+            WorkRegion.UNITED_KINGDOM: {
+                'work_hours_per_day': 8.0,
+                'mandatory_break_minutes': 20,
+                'break_threshold_hours': 6.0,
+                'additional_break_minutes': 0,
+                'additional_break_threshold_hours': 999.0,
+                'region_name': 'United Kingdom'
+            },
+            WorkRegion.FRANCE: {
+                'work_hours_per_day': 7.0,  # 35-hour work week
+                'mandatory_break_minutes': 20,
+                'break_threshold_hours': 6.0,
+                'additional_break_minutes': 0,
+                'additional_break_threshold_hours': 999.0,
+                'region_name': 'France'
+            },
+            WorkRegion.EUROPEAN_UNION: {
+                'work_hours_per_day': 8.0,
+                'mandatory_break_minutes': 20,
+                'break_threshold_hours': 6.0,
+                'additional_break_minutes': 0,
+                'additional_break_threshold_hours': 999.0,
+                'region_name': 'European Union (General)'
+            }
+        }
+        return presets.get(region, presets[WorkRegion.GERMANY])
+
+# User Preferences (User-configurable display settings)
+class UserPreferences(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Display format preferences
+    time_format_24h = db.Column(db.Boolean, default=True)  # True = 24h, False = 12h (AM/PM)
+    date_format = db.Column(db.String(20), default='ISO')  # ISO, US, EU, etc.
+    
+    # Time rounding preferences
+    time_rounding_minutes = db.Column(db.Integer, default=0)  # 0 = no rounding, 15 = 15 min, 30 = 30 min
+    round_to_nearest = db.Column(db.Boolean, default=True)  # True = round to nearest, False = round up
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationships  
+    user = db.relationship('User', backref=db.backref('preferences', uselist=False))
+    
+    # Unique constraint - one preferences per user
+    __table_args__ = (db.UniqueConstraint('user_id', name='uq_user_preferences'),)
+    
+    def __repr__(self):
+        return f'<UserPreferences {self.user.username}: {self.date_format}, {"24h" if self.time_format_24h else "12h"}>'

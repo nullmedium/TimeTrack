@@ -1,0 +1,343 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Company Work Policies</h2>
+    <p class="description">Configure company-wide work policies and break time requirements. These settings apply to all employees and ensure compliance with local labor laws.</p>
+    
+    <!-- Regional Presets Section -->
+    <div class="section">
+        <h3>Regional Presets</h3>
+        <p class="section-description">
+            Apply predefined work policies based on your country's labor laws. These presets ensure compliance with local regulations.
+        </p>
+        
+        <form method="POST" class="preset-form">
+            <input type="hidden" name="action" value="apply_preset">
+            
+            <div class="preset-grid">
+                {% for preset in regional_presets %}
+                <div class="preset-card {% if work_config.region.value == preset.code %}active{% endif %}">
+                    <div class="preset-header">
+                        <h4>{{ preset.name }}</h4>
+                        <input type="radio" name="region_preset" value="{{ preset.code }}" 
+                               {% if work_config.region.value == preset.code %}checked{% endif %}>
+                    </div>
+                    <div class="preset-details">
+                        {{ preset.description }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Apply Selected Preset</button>
+        </form>
+    </div>
+    
+    <!-- Manual Configuration Section -->
+    <div class="section">
+        <h3>Custom Configuration</h3>
+        <p class="section-description">
+            Manually configure work policies for custom requirements. Note: Ensure compliance with local labor laws.
+        </p>
+        
+        <form method="POST" class="config-form">
+            <div class="form-group">
+                <label for="work_hours_per_day">Standard Work Hours Per Day:</label>
+                <input type="number" 
+                       id="work_hours_per_day" 
+                       name="work_hours_per_day" 
+                       value="{{ work_config.work_hours_per_day }}" 
+                       min="1" 
+                       max="24" 
+                       step="0.5" 
+                       required>
+                <small>Standard number of work hours per day for full-time employees</small>
+            </div>
+            
+            <div class="form-section">
+                <h4>Primary Break Requirements</h4>
+                
+                <div class="form-group">
+                    <label for="mandatory_break_minutes">Mandatory Break Duration (minutes):</label>
+                    <input type="number" 
+                           id="mandatory_break_minutes" 
+                           name="mandatory_break_minutes" 
+                           value="{{ work_config.mandatory_break_minutes }}" 
+                           min="0" 
+                           max="240" 
+                           required>
+                    <small>Required break time in minutes (set to 0 to disable)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="break_threshold_hours">Break Threshold (hours):</label>
+                    <input type="number" 
+                           id="break_threshold_hours" 
+                           name="break_threshold_hours" 
+                           value="{{ work_config.break_threshold_hours }}" 
+                           min="0" 
+                           max="24" 
+                           step="0.5" 
+                           required>
+                    <small>Work hours after which a break becomes mandatory</small>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h4>Additional Break Requirements</h4>
+                
+                <div class="form-group">
+                    <label for="additional_break_minutes">Additional Break Duration (minutes):</label>
+                    <input type="number" 
+                           id="additional_break_minutes" 
+                           name="additional_break_minutes" 
+                           value="{{ work_config.additional_break_minutes }}" 
+                           min="0" 
+                           max="240" 
+                           required>
+                    <small>Additional break time for extended work sessions (set to 0 to disable)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="additional_break_threshold_hours">Additional Break Threshold (hours):</label>
+                    <input type="number" 
+                           id="additional_break_threshold_hours" 
+                           name="additional_break_threshold_hours" 
+                           value="{{ work_config.additional_break_threshold_hours }}" 
+                           min="0" 
+                           max="24" 
+                           step="0.5" 
+                           required>
+                    <small>Work hours after which an additional break becomes necessary</small>
+                </div>
+            </div>
+            
+            <div class="current-config">
+                <h4>Current Configuration Summary</h4>
+                <div class="config-summary">
+                    <strong>Region:</strong> {{ work_config.region_name }}<br>
+                    <strong>Work Day:</strong> {{ work_config.work_hours_per_day }} hours<br>
+                    <strong>Break Policy:</strong> 
+                    {% if work_config.mandatory_break_minutes > 0 %}
+                        {{ work_config.mandatory_break_minutes }} minutes after {{ work_config.break_threshold_hours }} hours
+                    {% else %}
+                        No mandatory breaks
+                    {% endif %}
+                    <br>
+                    <strong>Additional Break:</strong>
+                    {% if work_config.additional_break_minutes > 0 %}
+                        {{ work_config.additional_break_minutes }} minutes after {{ work_config.additional_break_threshold_hours }} hours
+                    {% else %}
+                        No additional breaks
+                    {% endif %}
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Save Custom Configuration</button>
+            <a href="{{ url_for('admin_company') }}" class="btn btn-secondary">Back to Company Settings</a>
+        </form>
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.description {
+    color: #666;
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
+}
+
+.section {
+    background: #f8f9fa;
+    padding: 2rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.section h3 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 0.5rem;
+}
+
+.section-description {
+    color: #666;
+    font-style: italic;
+    margin-bottom: 1.5rem;
+}
+
+.preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.preset-card {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preset-card:hover {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+}
+
+.preset-card.active {
+    border-color: #007bff;
+    background: #e7f3ff;
+}
+
+.preset-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.preset-header h4 {
+    margin: 0;
+    color: #333;
+}
+
+.preset-details {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.form-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #28a745;
+}
+
+.form-section h4 {
+    margin-top: 0;
+    color: #28a745;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.5rem;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.current-config {
+    background: #fff3cd;
+    padding: 1rem;
+    border-radius: 6px;
+    border-left: 4px solid #ffc107;
+    margin-bottom: 1.5rem;
+}
+
+.current-config h4 {
+    margin-top: 0;
+    color: #856404;
+}
+
+.config-summary {
+    font-family: monospace;
+    background: white;
+    padding: 1rem;
+    border-radius: 4px;
+    color: #495057;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    text-decoration: none;
+    cursor: pointer;
+    margin-right: 1rem;
+    margin-bottom: 0.5rem;
+    transition: background-color 0.2s ease;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+/* Make preset cards clickable */
+.preset-card {
+    position: relative;
+}
+
+.preset-card input[type="radio"] {
+    width: auto;
+    margin: 0;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Make preset cards clickable
+    document.querySelectorAll('.preset-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const radio = this.querySelector('input[type="radio"]');
+            radio.checked = true;
+            
+            // Update active state
+            document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -84,11 +84,23 @@ def get_user_rounding_settings(user):
     Returns:
         tuple: (interval_minutes, round_to_nearest)
     """
-    work_config = user.work_config
-    if work_config:
-        return work_config.time_rounding_minutes, work_config.round_to_nearest
-    else:
-        return 0, True  # Default: no rounding, round to nearest
+    # Handle both new UserPreferences model and old WorkConfig fallback
+    try:
+        # First try new UserPreferences model
+        from models import UserPreferences
+        preferences = UserPreferences.query.filter_by(user_id=user.id).first()
+        if preferences:
+            return preferences.time_rounding_minutes, preferences.round_to_nearest
+        
+        # Fallback to old WorkConfig if no UserPreferences exists
+        work_config = getattr(user, 'work_config', None)
+        if work_config:
+            return getattr(work_config, 'time_rounding_minutes', 0), getattr(work_config, 'round_to_nearest', True)
+            
+    except Exception:
+        pass
+    
+    return 0, True  # Default: no rounding, round to nearest
 
 
 def apply_time_rounding(arrival_time, departure_time, user):
@@ -275,11 +287,23 @@ def get_user_format_settings(user):
     Returns:
         tuple: (date_format, time_format_24h)
     """
-    work_config = user.work_config
-    if work_config:
-        return work_config.date_format or 'ISO', work_config.time_format_24h
-    else:
-        return 'ISO', True  # Default: ISO date format, 24h time
+    # Handle both new UserPreferences model and old WorkConfig fallback
+    try:
+        # First try new UserPreferences model
+        from models import UserPreferences
+        preferences = UserPreferences.query.filter_by(user_id=user.id).first()
+        if preferences:
+            return preferences.date_format or 'ISO', preferences.time_format_24h
+        
+        # Fallback to old WorkConfig if no UserPreferences exists
+        work_config = getattr(user, 'work_config', None)
+        if work_config:
+            return getattr(work_config, 'date_format', 'ISO') or 'ISO', getattr(work_config, 'time_format_24h', True)
+            
+    except Exception:
+        pass
+    
+    return 'ISO', True  # Default: ISO date format, 24h time
 
 
 def format_duration_readable(duration_seconds):
