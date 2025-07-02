@@ -47,6 +47,43 @@
         </div>
 
         <div class="form-section">
+            <h3>Display Format Settings</h3>
+            <p class="section-description">
+                Customize how dates and times are displayed throughout the application.
+            </p>
+            
+            <div class="form-group">
+                <label for="date_format">Date Format:</label>
+                <select id="date_format" name="date_format">
+                    {% for value, label, example in date_format_options %}
+                    <option value="{{ value }}" {% if config.date_format == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <small>Choose how dates are displayed</small>
+            </div>
+            
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" 
+                           id="time_format_24h" 
+                           name="time_format_24h" 
+                           {% if config.time_format_24h %}checked{% endif %}>
+                    <label for="time_format_24h">Use 24-hour time format</label>
+                    <small>If unchecked, will use 12-hour format with AM/PM</small>
+                </div>
+            </div>
+            
+            <div class="format-example" id="format-example">
+                <h4>Example:</h4>
+                <div id="format-example-text">
+                    <!-- JavaScript will populate this -->
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
             <h3>Time Rounding Settings</h3>
             <p class="section-description">
                 Time rounding helps standardize billing and reporting by rounding time entries to specified intervals.
@@ -89,11 +126,59 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const dateFormatSelect = document.getElementById('date_format');
+    const timeFormat24hCheckbox = document.getElementById('time_format_24h');
+    const formatExampleDiv = document.getElementById('format-example-text');
+    
     const roundingSelect = document.getElementById('time_rounding_minutes');
     const roundToNearestCheckbox = document.getElementById('round_to_nearest');
     const exampleDiv = document.getElementById('example-text');
     
-    function updateExample() {
+    function updateFormatExample() {
+        const dateFormat = dateFormatSelect.value;
+        const timeFormat24h = timeFormat24hCheckbox.checked;
+        
+        // Create a sample date for demonstration
+        const sampleDate = new Date(2024, 11, 25, 14, 30, 45); // Dec 25, 2024, 2:30:45 PM
+        
+        let dateExample = '';
+        let timeExample = '';
+        
+        // Format date examples
+        switch(dateFormat) {
+            case 'ISO':
+                dateExample = '2024-12-25';
+                break;
+            case 'US':
+                dateExample = '12/25/2024';
+                break;
+            case 'EU':
+            case 'UK':
+                dateExample = '25/12/2024';
+                break;
+            case 'Readable':
+                dateExample = 'Dec 25, 2024';
+                break;
+            case 'Full':
+                dateExample = 'December 25, 2024';
+                break;
+        }
+        
+        // Format time examples
+        if (timeFormat24h) {
+            timeExample = '14:30:45';
+        } else {
+            timeExample = '2:30:45 PM';
+        }
+        
+        formatExampleDiv.innerHTML = `
+            <strong>Date:</strong> ${dateExample}<br>
+            <strong>Time:</strong> ${timeExample}<br>
+            <strong>Combined:</strong> ${dateExample} ${timeExample}
+        `;
+    }
+    
+    function updateRoundingExample() {
         const interval = parseInt(roundingSelect.value);
         const roundToNearest = roundToNearestCheckbox.checked;
         
@@ -142,12 +227,15 @@ document.addEventListener('DOMContentLoaded', function() {
         exampleDiv.innerHTML = exampleText;
     }
     
-    // Update example when settings change
-    roundingSelect.addEventListener('change', updateExample);
-    roundToNearestCheckbox.addEventListener('change', updateExample);
+    // Update examples when settings change
+    dateFormatSelect.addEventListener('change', updateFormatExample);
+    timeFormat24hCheckbox.addEventListener('change', updateFormatExample);
+    roundingSelect.addEventListener('change', updateRoundingExample);
+    roundToNearestCheckbox.addEventListener('change', updateRoundingExample);
     
-    // Initial example
-    updateExample();
+    // Initial examples
+    updateFormatExample();
+    updateRoundingExample();
 });
 </script>
 
@@ -185,6 +273,19 @@ document.addEventListener('DOMContentLoaded', function() {
 .rounding-example h4 {
     margin-top: 0;
     color: #2e7d32;
+}
+
+.format-example {
+    background: #e3f2fd;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+    border-left: 4px solid #2196f3;
+}
+
+.format-example h4 {
+    margin-top: 0;
+    color: #1976d2;
 }
 </style>
 {% endblock %}

@@ -19,7 +19,7 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
         {% if active_entry %}
             <div class="active-timer">
                 <h3>Currently Working</h3>
-                <p>Started at: {{ active_entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                <p>Started at: {{ active_entry.arrival_time|format_datetime }}</p>
                 {% if active_entry.project %}
                 <p class="project-info">Project: <strong>{{ active_entry.project.code }} - {{ active_entry.project.name }}</strong></p>
                 {% endif %}
@@ -29,11 +29,11 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
                      data-paused="{{ 'true' if active_entry.is_paused else 'false' }}">00:00:00</div>
 
                 {% if active_entry.is_paused %}
-                <p class="break-info">On break since {{ active_entry.pause_start_time.strftime('%H:%M:%S') }}</p>
+                <p class="break-info">On break since {{ active_entry.pause_start_time|format_time }}</p>
                 {% endif %}
 
                 {% if active_entry.total_break_duration > 0 %}
-                <p class="break-total">Total break time: {{ '%d:%02d:%02d'|format(active_entry.total_break_duration//3600, (active_entry.total_break_duration%3600)//60, active_entry.total_break_duration%60) }}</p>
+                <p class="break-total">Total break time: {{ active_entry.total_break_duration|format_duration }}</p>
                 {% endif %}
 
                 <div class="button-group">
@@ -85,7 +85,7 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
                 <tbody>
                     {% for entry in history %}
                     <tr data-entry-id="{{ entry.id }}">
-                        <td>{{ entry.arrival_time.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ entry.arrival_time|format_date }}</td>
                         <td>
                             {% if entry.project %}
                                 <span class="project-tag">{{ entry.project.code }}</span>
@@ -94,10 +94,10 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
                                 <em>No project</em>
                             {% endif %}
                         </td>
-                        <td>{{ entry.arrival_time.strftime('%H:%M:%S') }}</td>
-                        <td>{{ entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active' }}</td>
-                        <td>{{ '%d:%02d:%02d'|format(entry.duration//3600, (entry.duration%3600)//60, entry.duration%60) if entry.duration is not none else 'In progress' }}</td>
-                        <td>{{ '%d:%02d:%02d'|format(entry.total_break_duration//3600, (entry.total_break_duration%3600)//60, entry.total_break_duration%60) if entry.total_break_duration is not none else '00:00:00' }}</td>
+                        <td>{{ entry.arrival_time|format_time }}</td>
+                        <td>{{ entry.departure_time|format_time if entry.departure_time else 'Active' }}</td>
+                        <td>{{ entry.duration|format_duration if entry.duration is not none else 'In progress' }}</td>
+                        <td>{{ entry.total_break_duration|format_duration if entry.total_break_duration is not none else '0m' }}</td>
                         <td>
                             {% if entry.departure_time and not active_entry %}
                             <button class="resume-work-btn" data-id="{{ entry.id }}">Resume Work</button>
@@ -298,8 +298,8 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
 
                 // Get date and time from the row
                 const dateStr = cells[0].textContent.trim();
-                const arrivalTimeStr = cells[1].textContent.trim();
-                const departureTimeStr = cells[2].textContent.trim();
+                const arrivalTimeStr = cells[2].textContent.trim(); // arrival time is now in column 2
+                const departureTimeStr = cells[3].textContent.trim(); // departure time is now in column 3
 
                 // Set values in the form
                 document.getElementById('edit-entry-id').value = entryId;

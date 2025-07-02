@@ -243,6 +243,10 @@ class WorkConfig(db.Model):
     time_rounding_minutes = db.Column(db.Integer, default=0)  # 0 = no rounding, 15 = 15 min, 30 = 30 min
     round_to_nearest = db.Column(db.Boolean, default=True)  # True = round to nearest, False = round up
     
+    # Date/time format settings
+    time_format_24h = db.Column(db.Boolean, default=True)  # True = 24h, False = 12h (AM/PM)
+    date_format = db.Column(db.String(20), default='ISO')  # ISO, US, EU, etc.
+    
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)

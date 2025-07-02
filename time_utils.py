@@ -157,3 +157,171 @@ def get_available_rounding_options():
         (30, "30 minutes"),
         (60, "1 hour")
     ]
+
+
+# Date/Time Formatting Functions
+
+def get_available_date_formats():
+    """
+    Get the available date format options.
+    
+    Returns:
+        list: List of tuples (value, label, example)
+    """
+    return [
+        ('ISO', 'ISO Format (YYYY-MM-DD)', '2024-12-25'),
+        ('US', 'US Format (MM/DD/YYYY)', '12/25/2024'),
+        ('EU', 'European Format (DD/MM/YYYY)', '25/12/2024'),
+        ('UK', 'UK Format (DD/MM/YYYY)', '25/12/2024'),
+        ('Readable', 'Readable Format (Dec 25, 2024)', 'Dec 25, 2024'),
+        ('Full', 'Full Format (December 25, 2024)', 'December 25, 2024')
+    ]
+
+
+def format_date_by_preference(dt, date_format='ISO'):
+    """
+    Format a date according to user preference.
+    
+    Args:
+        dt (datetime): The datetime to format
+        date_format (str): The format preference
+        
+    Returns:
+        str: Formatted date string
+    """
+    if dt is None:
+        return ''
+    
+    format_map = {
+        'ISO': '%Y-%m-%d',
+        'US': '%m/%d/%Y',
+        'EU': '%d/%m/%Y',
+        'UK': '%d/%m/%Y',
+        'Readable': '%b %d, %Y',
+        'Full': '%B %d, %Y'
+    }
+    
+    format_string = format_map.get(date_format, '%Y-%m-%d')
+    return dt.strftime(format_string)
+
+
+def format_time_by_preference(dt, time_format_24h=True):
+    """
+    Format a time according to user preference.
+    
+    Args:
+        dt (datetime): The datetime to format
+        time_format_24h (bool): True for 24h format, False for 12h (AM/PM)
+        
+    Returns:
+        str: Formatted time string
+    """
+    if dt is None:
+        return ''
+    
+    if time_format_24h:
+        return dt.strftime('%H:%M:%S')
+    else:
+        return dt.strftime('%I:%M:%S %p')
+
+
+def format_datetime_by_preference(dt, date_format='ISO', time_format_24h=True):
+    """
+    Format a datetime according to user preferences.
+    
+    Args:
+        dt (datetime): The datetime to format
+        date_format (str): The date format preference
+        time_format_24h (bool): True for 24h format, False for 12h (AM/PM)
+        
+    Returns:
+        str: Formatted datetime string
+    """
+    if dt is None:
+        return ''
+    
+    date_part = format_date_by_preference(dt, date_format)
+    time_part = format_time_by_preference(dt, time_format_24h)
+    return f"{date_part} {time_part}"
+
+
+def format_time_short_by_preference(dt, time_format_24h=True):
+    """
+    Format a time without seconds according to user preference.
+    
+    Args:
+        dt (datetime): The datetime to format
+        time_format_24h (bool): True for 24h format, False for 12h (AM/PM)
+        
+    Returns:
+        str: Formatted time string (without seconds)
+    """
+    if dt is None:
+        return ''
+    
+    if time_format_24h:
+        return dt.strftime('%H:%M')
+    else:
+        return dt.strftime('%I:%M %p')
+
+
+def get_user_format_settings(user):
+    """
+    Get the date/time format settings for a user.
+    
+    Args:
+        user: The user object
+        
+    Returns:
+        tuple: (date_format, time_format_24h)
+    """
+    work_config = user.work_config
+    if work_config:
+        return work_config.date_format or 'ISO', work_config.time_format_24h
+    else:
+        return 'ISO', True  # Default: ISO date format, 24h time
+
+
+def format_duration_readable(duration_seconds):
+    """
+    Format duration in a readable format (e.g., "2h 30m").
+    
+    Args:
+        duration_seconds (int): Duration in seconds
+        
+    Returns:
+        str: Formatted duration string
+    """
+    if duration_seconds is None or duration_seconds == 0:
+        return '0m'
+    
+    hours = duration_seconds // 3600
+    minutes = (duration_seconds % 3600) // 60
+    seconds = duration_seconds % 60
+    
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+    if seconds > 0 and hours == 0:  # Only show seconds if less than an hour
+        parts.append(f"{seconds}s")
+    
+    return ' '.join(parts) if parts else '0m'
+
+
+def format_duration_decimal(duration_seconds):
+    """
+    Format duration as decimal hours (e.g., "2.5" for 2h 30m).
+    
+    Args:
+        duration_seconds (int): Duration in seconds
+        
+    Returns:
+        str: Formatted duration as decimal hours
+    """
+    if duration_seconds is None:
+        return '0.00'
+    
+    hours = duration_seconds / 3600
+    return f"{hours:.2f}"

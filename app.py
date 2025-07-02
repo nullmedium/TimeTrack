@@ -137,7 +137,9 @@ def run_migrations():
                 ('additional_break_threshold_hours', "ALTER TABLE work_config ADD COLUMN additional_break_threshold_hours FLOAT DEFAULT 9.0"),
                 ('user_id', "ALTER TABLE work_config ADD COLUMN user_id INTEGER"),
                 ('time_rounding_minutes', "ALTER TABLE work_config ADD COLUMN time_rounding_minutes INTEGER DEFAULT 0"),
-                ('round_to_nearest', "ALTER TABLE work_config ADD COLUMN round_to_nearest BOOLEAN DEFAULT 1")
+                ('round_to_nearest', "ALTER TABLE work_config ADD COLUMN round_to_nearest BOOLEAN DEFAULT 1"),
+                ('time_format_24h', "ALTER TABLE work_config ADD COLUMN time_format_24h BOOLEAN DEFAULT 1"),
+                ('date_format', "ALTER TABLE work_config ADD COLUMN date_format VARCHAR(20) DEFAULT 'ISO'")
             ]
 
             for column_name, sql_command in work_config_migrations:
@@ -498,6 +500,56 @@ def inject_globals():
         'Role': Role,
         'current_year': datetime.now().year
     }
+
+# Template filters for date/time formatting
+@app.template_filter('format_date')
+def format_date_filter(dt):
+    """Format date according to user preferences."""
+    if not dt or not g.user:
+        return dt.strftime('%Y-%m-%d') if dt else ''
+    
+    from time_utils import format_date_by_preference, get_user_format_settings
+    date_format, _ = get_user_format_settings(g.user)
+    return format_date_by_preference(dt, date_format)
+
+@app.template_filter('format_time')
+def format_time_filter(dt):
+    """Format time according to user preferences."""
+    if not dt or not g.user:
+        return dt.strftime('%H:%M:%S') if dt else ''
+    
+    from time_utils import format_time_by_preference, get_user_format_settings
+    _, time_format_24h = get_user_format_settings(g.user)
+    return format_time_by_preference(dt, time_format_24h)
+
+@app.template_filter('format_time_short')
+def format_time_short_filter(dt):
+    """Format time without seconds according to user preferences."""
+    if not dt or not g.user:
+        return dt.strftime('%H:%M') if dt else ''
+    
+    from time_utils import format_time_short_by_preference, get_user_format_settings
+    _, time_format_24h = get_user_format_settings(g.user)
+    return format_time_short_by_preference(dt, time_format_24h)
+
+@app.template_filter('format_datetime')
+def format_datetime_filter(dt):
+    """Format datetime according to user preferences."""
+    if not dt or not g.user:
+        return dt.strftime('%Y-%m-%d %H:%M:%S') if dt else ''
+    
+    from time_utils import format_datetime_by_preference, get_user_format_settings
+    date_format, time_format_24h = get_user_format_settings(g.user)
+    return format_datetime_by_preference(dt, date_format, time_format_24h)
+
+@app.template_filter('format_duration')
+def format_duration_filter(duration_seconds):
+    """Format duration in readable format."""
+    if duration_seconds is None:
+        return '00:00:00'
+    
+    from time_utils import format_duration_readable
+    return format_duration_readable(duration_seconds)
 
 # Authentication decorator
 def login_required(f):
@@ -1352,9 +1404,13 @@ def arrive():
     db.session.add(new_entry)
     db.session.commit()
 
+    # Format response with user preferences
+    from time_utils import format_datetime_by_preference, get_user_format_settings
+    date_format, time_format_24h = get_user_format_settings(g.user)
+    
     return jsonify({
         'id': new_entry.id,
-        'arrival_time': new_entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S'),
+        'arrival_time': format_datetime_by_preference(new_entry.arrival_time, date_format, time_format_24h),
         'project': {
             'id': new_entry.project.id,
             'code': new_entry.project.code,
@@ -1464,6 +1520,10 @@ def config():
             # Update time rounding settings
             config.time_rounding_minutes = int(request.form.get('time_rounding_minutes', 0))
             config.round_to_nearest = 'round_to_nearest' in request.form
+            
+            # Update date/time format settings
+            config.time_format_24h = 'time_format_24h' in request.form
+            config.date_format = request.form.get('date_format', 'ISO')
 
             db.session.commit()
             flash('Configuration updated successfully!', 'success')
@@ -1472,10 +1532,12 @@ def config():
             flash('Please enter valid numbers for all fields', 'error')
 
     # Import time utils for display options
-    from time_utils import get_available_rounding_options
+    from time_utils import get_available_rounding_options, get_available_date_formats
     rounding_options = get_available_rounding_options()
+    date_format_options = get_available_date_formats()
     
-    return render_template('config.html', title='Configuration', config=config, rounding_options=rounding_options)
+    return render_template('config.html', title='Configuration', config=config, 
+                         rounding_options=rounding_options, date_format_options=date_format_options)
 
 @app.route('/api/delete/<int:entry_id>', methods=['DELETE'])
 @login_required
