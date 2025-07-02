@@ -57,10 +57,10 @@ db.init_app(app)
 def run_migrations():
     """Run all database migrations and initialize system settings."""
     import sqlite3
-    
+
     # Determine database path based on environment
     db_path = '/data/timetrack.db' if os.path.exists('/data') else 'timetrack.db'
-    
+
     # Check if database exists
     if not os.path.exists(db_path):
         print("Database doesn't exist. Creating new database.")
@@ -86,7 +86,7 @@ def run_migrations():
             conn.commit()
             conn.close()
             return
-        
+
         # Migrate time_entry table
         cursor.execute("PRAGMA table_info(time_entry)")
         time_entry_columns = [column[1] for column in cursor.fetchall()]
@@ -130,13 +130,13 @@ def run_migrations():
             # Check and add missing columns to work_config
             cursor.execute("PRAGMA table_info(work_config)")
             work_config_columns = [column[1] for column in cursor.fetchall()]
-            
+
             work_config_migrations = [
                 ('additional_break_minutes', "ALTER TABLE work_config ADD COLUMN additional_break_minutes INTEGER DEFAULT 15"),
                 ('additional_break_threshold_hours', "ALTER TABLE work_config ADD COLUMN additional_break_threshold_hours FLOAT DEFAULT 9.0"),
                 ('user_id', "ALTER TABLE work_config ADD COLUMN user_id INTEGER")
             ]
-            
+
             for column_name, sql_command in work_config_migrations:
                 if column_name not in work_config_columns:
                     print(f"Adding {column_name} column to work_config...")
@@ -168,11 +168,11 @@ def run_migrations():
             # First ensure all users have roles set based on is_admin
             cursor.execute("UPDATE user SET role = 'Administrator' WHERE is_admin = 1 AND (role IS NULL OR role = '')")
             cursor.execute("UPDATE user SET role = 'Team Member' WHERE is_admin = 0 AND (role IS NULL OR role = '')")
-            
+
             # Drop the is_admin column (SQLite requires table recreation)
             print("Removing is_admin column...")
             cursor.execute("PRAGMA foreign_keys=off")
-            
+
             # Create new table without is_admin column
             cursor.execute("""
             CREATE TABLE user_new (
@@ -191,18 +191,18 @@ def run_migrations():
                 two_factor_secret VARCHAR(32)
             )
             """)
-            
+
             # Copy data from old table to new table (excluding is_admin)
             cursor.execute("""
-            INSERT INTO user_new (id, username, email, password_hash, created_at, is_verified, 
-                                verification_token, token_expiry, is_blocked, role, team_id, 
+            INSERT INTO user_new (id, username, email, password_hash, created_at, is_verified,
+                                verification_token, token_expiry, is_blocked, role, team_id,
                                 two_factor_enabled, two_factor_secret)
-            SELECT id, username, email, password_hash, created_at, is_verified, 
-                   verification_token, token_expiry, is_blocked, role, team_id, 
+            SELECT id, username, email, password_hash, created_at, is_verified,
+                   verification_token, token_expiry, is_blocked, role, team_id,
                    two_factor_enabled, two_factor_secret
             FROM user
             """)
-            
+
             # Drop old table and rename new table
             cursor.execute("DROP TABLE user")
             cursor.execute("ALTER TABLE user_new RENAME TO user")
@@ -278,7 +278,7 @@ def run_migrations():
 
         # Commit all schema changes
         conn.commit()
-        
+
     except Exception as e:
         print(f"Error during database migration: {e}")
         conn.rollback()
@@ -288,60 +288,60 @@ def run_migrations():
 
     # Now use SQLAlchemy for data migrations
     db.create_all()  # This will create any remaining tables defined in models
-    
+
     # Initialize system settings
     init_system_settings()
-    
+
     # Handle company migration and admin user setup
     migrate_to_company_model()
     migrate_data()
-    
+
     print("Database migrations completed successfully!")
 
 def migrate_to_company_model():
     """Migrate existing data to support company model"""
     import sqlite3
-    
+
     # Determine database path based on environment
     db_path = '/data/timetrack.db' if os.path.exists('/data') else 'timetrack.db'
-    
+
     # Connect to the database for raw SQL operations
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
+
     try:
         # Check if company_id column exists in user table
         cursor.execute("PRAGMA table_info(user)")
         user_columns = [column[1] for column in cursor.fetchall()]
-        
+
         if 'company_id' not in user_columns:
             print("Migrating to company model...")
-            
+
             # Add company_id columns to existing tables
             tables_to_migrate = [
                 ('user', 'ALTER TABLE user ADD COLUMN company_id INTEGER'),
                 ('team', 'ALTER TABLE team ADD COLUMN company_id INTEGER'),
                 ('project', 'ALTER TABLE project ADD COLUMN company_id INTEGER')
             ]
-            
+
             for table_name, sql_command in tables_to_migrate:
                 cursor.execute(f"PRAGMA table_info({table_name})")
                 columns = [column[1] for column in cursor.fetchall()]
                 if 'company_id' not in columns:
                     print(f"Adding company_id column to {table_name}...")
                     cursor.execute(sql_command)
-            
+
             # Check if there are existing users but no companies
             cursor.execute("SELECT COUNT(*) FROM user")
             user_count = cursor.fetchone()[0]
-            
+
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='company'")
             company_table_exists = cursor.fetchone()
-            
+
             if user_count > 0 and company_table_exists:
                 cursor.execute("SELECT COUNT(*) FROM company")
                 company_count = cursor.fetchone()[0]
-                
+
                 if company_count == 0:
                     print("Creating default company for existing data...")
                     # Create default company
@@ -349,20 +349,20 @@ def migrate_to_company_model():
                     INSERT INTO company (name, slug, description, is_active, max_users)
                     VALUES ('Default Organization', 'default', 'Migrated from single-tenant installation', 1, 1000)
                     """)
-                    
+
                     # Get the company ID
                     cursor.execute("SELECT last_insert_rowid()")
                     company_id = cursor.fetchone()[0]
-                    
+
                     # Update all existing records to use the default company
                     cursor.execute(f"UPDATE user SET company_id = {company_id} WHERE company_id IS NULL")
                     cursor.execute(f"UPDATE team SET company_id = {company_id} WHERE company_id IS NULL")
                     cursor.execute(f"UPDATE project SET company_id = {company_id} WHERE company_id IS NULL")
-                    
+
                     print(f"Assigned {user_count} existing users to default company")
-        
+
         conn.commit()
-        
+
     except Exception as e:
         print(f"Error during company migration: {e}")
         conn.rollback()
@@ -381,7 +381,7 @@ def init_system_settings():
         )
         db.session.add(reg_setting)
         db.session.commit()
-    
+
     if not SystemSettings.query.filter_by(key='email_verification_required').first():
         print("Adding email_verification_required system setting...")
         email_setting = SystemSettings(
@@ -398,7 +398,7 @@ def migrate_data():
     if Company.query.count() == 0:
         print("No companies exist, skipping admin user creation. Use company setup instead.")
         return
-    
+
     # Check if admin user exists in the first company
     default_company = Company.query.first()
     if default_company:
@@ -466,7 +466,7 @@ def migrate_data():
                     'description': 'Customer service and technical support activities'
                 }
             ]
-            
+
             for proj_data in sample_projects:
                 project = Project(
                     name=proj_data['name'],
@@ -477,7 +477,7 @@ def migrate_data():
                     is_active=True
                 )
                 db.session.add(project)
-            
+
             print(f"Created {len(sample_projects)} sample projects for {default_company.name}")
 
         db.session.commit()
@@ -560,17 +560,17 @@ def company_required(f):
     def decorated_function(*args, **kwargs):
         if g.user is None:
             return redirect(url_for('login', next=request.url))
-        
+
         if g.user.company_id is None:
             flash('You must be associated with a company to access this page.', 'error')
             return redirect(url_for('setup_company'))
-        
+
         # Set company context
         g.company = Company.query.get(g.user.company_id)
         if not g.company or not g.company.is_active:
             flash('Your company is not active. Please contact support.', 'error')
             return redirect(url_for('login'))
-        
+
         return f(*args, **kwargs)
     return decorated_function
 
@@ -588,7 +588,7 @@ def load_logged_in_user():
                 g.company = Company.query.get(g.user.company_id)
             else:
                 g.company = None
-            
+
             # Check if user is verified
             if not g.user.is_verified and request.endpoint not in ['verify_email', 'static', 'logout', 'setup_company']:
                 # Allow unverified users to access only verification and static resources
@@ -621,7 +621,7 @@ def home():
         available_projects = []
         if g.user.company_id:
             all_projects = Project.query.filter_by(
-                company_id=g.user.company_id, 
+                company_id=g.user.company_id,
                 is_active=True
             ).all()
             for project in all_projects:
@@ -633,7 +633,7 @@ def home():
                              history=history,
                              available_projects=available_projects)
     else:
-        return render_template('index.html', title='Home')
+        return render_template('about.html', title='Home')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -729,14 +729,14 @@ def register():
             error = 'Passwords do not match'
         elif not company_code:
             error = 'Company code is required'
-        
+
         # Find company by code
         company = None
         if company_code:
             company = Company.query.filter_by(slug=company_code.lower()).first()
             if not company:
                 error = 'Invalid company code'
-        
+
         # Check for existing users within the company
         if company and not error:
             if User.query.filter_by(username=username, company_id=company.id).first():
@@ -748,13 +748,13 @@ def register():
             try:
                 # Check if this is the first user account in this company
                 is_first_user_in_company = User.query.filter_by(company_id=company.id).count() == 0
-                
+
                 # Check if email verification is required
                 email_verification_required = get_system_setting('email_verification_required', 'true') == 'true'
 
                 new_user = User(
-                    username=username, 
-                    email=email, 
+                    username=username,
+                    email=email,
                     company_id=company.id,
                     is_verified=False
                 )
@@ -818,17 +818,17 @@ The TimeTrack Team
 def setup_company():
     """Company setup route for creating new companies with admin users"""
     existing_companies = Company.query.count()
-    
+
     # Determine access level
     is_initial_setup = existing_companies == 0
     is_super_admin = g.user and g.user.role == Role.ADMIN and existing_companies > 0
     is_authorized = is_initial_setup or is_super_admin
-    
+
     # Check authorization for non-initial setups
     if not is_initial_setup and not is_super_admin:
         flash('You do not have permission to create new companies.', 'error')
         return redirect(url_for('home') if g.user else url_for('login'))
-    
+
     if request.method == 'POST':
         company_name = request.form.get('company_name')
         company_description = request.form.get('company_description', '')
@@ -836,7 +836,7 @@ def setup_company():
         admin_email = request.form.get('admin_email')
         admin_password = request.form.get('admin_password')
         confirm_password = request.form.get('confirm_password')
-        
+
         # Validate input
         error = None
         if not company_name:
@@ -851,21 +851,21 @@ def setup_company():
             error = 'Passwords do not match'
         elif len(admin_password) < 6:
             error = 'Password must be at least 6 characters long'
-        
+
         if error is None:
             try:
                 # Generate company slug
                 import re
                 slug = re.sub(r'[^\w\s-]', '', company_name.lower())
                 slug = re.sub(r'[-\s]+', '-', slug).strip('-')
-                
+
                 # Ensure slug uniqueness
                 base_slug = slug
                 counter = 1
                 while Company.query.filter_by(slug=slug).first():
                     slug = f"{base_slug}-{counter}"
                     counter += 1
-                
+
                 # Create company
                 company = Company(
                     name=company_name,
@@ -875,22 +875,22 @@ def setup_company():
                 )
                 db.session.add(company)
                 db.session.flush()  # Get company.id without committing
-                
+
                 # Check if username/email already exists in this company context
                 existing_user_by_username = User.query.filter_by(
-                    username=admin_username, 
+                    username=admin_username,
                     company_id=company.id
                 ).first()
                 existing_user_by_email = User.query.filter_by(
-                    email=admin_email, 
+                    email=admin_email,
                     company_id=company.id
                 ).first()
-                
+
                 if existing_user_by_username:
                     error = 'Username already exists in this company'
                 elif existing_user_by_email:
                     error = 'Email already registered in this company'
-                
+
                 if error is None:
                     # Create admin user
                     admin_user = User(
@@ -903,13 +903,13 @@ def setup_company():
                     admin_user.set_password(admin_password)
                     db.session.add(admin_user)
                     db.session.commit()
-                    
+
                     if is_initial_setup:
                         # Auto-login the admin user for initial setup
                         session['user_id'] = admin_user.id
                         session['username'] = admin_user.username
                         session['role'] = admin_user.role.value
-                        
+
                         flash(f'Company "{company_name}" created successfully! You are now logged in as the administrator.', 'success')
                         return redirect(url_for('home'))
                     else:
@@ -918,17 +918,17 @@ def setup_company():
                         return redirect(url_for('admin_company') if g.user else url_for('login'))
                 else:
                     db.session.rollback()
-                    
+
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Error during company setup: {str(e)}")
                 error = f"An error occurred during setup: {str(e)}"
-        
+
         if error:
             flash(error, 'error')
-    
-    return render_template('setup_company.html', 
-                         title='Company Setup', 
+
+    return render_template('setup_company.html',
+                         title='Company Setup',
                          existing_companies=existing_companies,
                          is_initial_setup=is_initial_setup,
                          is_super_admin=is_super_admin)
@@ -1311,7 +1311,6 @@ def verify_2fa():
     return render_template('verify_2fa.html', title='Two-Factor Authentication')
 
 @app.route('/about')
-@login_required
 def about():
     return render_template('about.html', title='About')
 
@@ -1625,13 +1624,13 @@ def admin_settings():
         reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
         if reg_setting:
             reg_setting.value = 'true' if registration_enabled else 'false'
-        
+
         # Update email verification setting
         email_verification_required = 'email_verification_required' in request.form
         email_setting = SystemSettings.query.filter_by(key='email_verification_required').first()
         if email_setting:
             email_setting.value = 'true' if email_verification_required else 'false'
-        
+
         db.session.commit()
         flash('System settings updated successfully!', 'success')
 
@@ -1652,7 +1651,7 @@ def admin_settings():
 def admin_company():
     """View and manage company settings"""
     company = g.company
-    
+
     # Get company statistics
     stats = {
         'total_users': User.query.filter_by(company_id=company.id).count(),
@@ -1660,7 +1659,7 @@ def admin_company():
         'total_projects': Project.query.filter_by(company_id=company.id).count(),
         'active_projects': Project.query.filter_by(company_id=company.id, is_active=True).count(),
     }
-    
+
     return render_template('admin_company.html', title='Company Management', company=company, stats=stats)
 
 @app.route('/admin/company/edit', methods=['GET', 'POST'])
@@ -1669,20 +1668,20 @@ def admin_company():
 def edit_company():
     """Edit company details"""
     company = g.company
-    
+
     if request.method == 'POST':
         name = request.form.get('name')
         description = request.form.get('description', '')
         max_users = request.form.get('max_users')
         is_active = 'is_active' in request.form
-        
+
         # Validate input
         error = None
         if not name:
             error = 'Company name is required'
         elif name != company.name and Company.query.filter_by(name=name).first():
             error = 'Company name already exists'
-        
+
         if max_users:
             try:
                 max_users = int(max_users)
@@ -1692,19 +1691,19 @@ def edit_company():
                 error = 'Maximum users must be a valid number'
         else:
             max_users = None
-        
+
         if error is None:
             company.name = name
             company.description = description
             company.max_users = max_users
             company.is_active = is_active
             db.session.commit()
-            
+
             flash('Company details updated successfully!', 'success')
             return redirect(url_for('admin_company'))
         else:
             flash(error, 'error')
-    
+
     return render_template('edit_company.html', title='Edit Company', company=company)
 
 @app.route('/admin/company/users')
@@ -1713,7 +1712,7 @@ def edit_company():
 def company_users():
     """List all users in the company with detailed information"""
     users = User.query.filter_by(company_id=g.company.id).order_by(User.created_at.desc()).all()
-    
+
     # Calculate user statistics
     user_stats = {
         'total': len(users),
@@ -1726,8 +1725,8 @@ def company_users():
         'team_leaders': len([u for u in users if u.role == Role.TEAM_LEADER]),
         'team_members': len([u for u in users if u.role == Role.TEAM_MEMBER]),
     }
-    
-    return render_template('company_users.html', title='Company Users', 
+
+    return render_template('company_users.html', title='Company Users',
                          users=users, stats=user_stats, company=g.company)
 
 # Add these routes for team management

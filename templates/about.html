@@ -5,7 +5,7 @@
     <div class="about-content">
         <div class="intro">
             <h2>Professional Time Tracking Made Simple</h2>
-            <p>TimeTrack is a comprehensive time management solution designed to help organizations and individuals monitor work hours efficiently. Built with simplicity and accuracy in mind, our platform provides the tools you need to track, manage, and analyze time spent on work activities.</p>
+            <p>TimeTrack is a comprehensive multi-tenant time management solution designed to help organizations and individuals monitor work hours efficiently. Built with simplicity and accuracy in mind, our platform provides the tools you need to track, manage, and analyze time spent on work activities across multiple companies and teams.</p>
         </div>
         
         <div class="features-section">
@@ -38,6 +38,11 @@
                 </div>
                 
                 <div class="feature-item">
+                    <h3>🏢 Multi-Company Support</h3>
+                    <p>Enterprise-ready multi-tenant architecture allows multiple companies to operate independently within a single TimeTrack instance, with complete data isolation and security.</p>
+                </div>
+                
+                <div class="feature-item">
                     <h3>🔐 Secure & Reliable</h3>
                     <p>Built with security best practices, user authentication, email verification, and role-based access control to protect your organization's data.</p>
                 </div>
@@ -65,7 +70,7 @@
                 
                 <div class="role-card">
                     <h3>⚙️ Administrator</h3>
-                    <p>Full system access including user management, team configuration, system settings, and complete administrative control.</p>
+                    <p>Full company access including user management, team configuration, system settings, and complete administrative control within their company. Can also manage company information and setup new user registration.</p>
                 </div>
             </div>
         </div>
@@ -86,7 +91,7 @@
                 
                 <div class="benefit">
                     <h3>✅ Scalable Solution</h3>
-                    <p>Grows with your organization from small teams to large enterprises. Role-based architecture supports complex organizational structures.</p>
+                    <p>Grows with your organization from small teams to large enterprises. Multi-tenant architecture supports multiple companies, complex organizational structures, and unlimited growth potential.</p>
                 </div>
                 
                 <div class="benefit">
@@ -99,6 +104,21 @@
         <div class="technical-section">
             <h2>Technical Information</h2>
             <p>TimeTrack is built using modern web technologies including Flask (Python), SQLite database, and responsive HTML/CSS/JavaScript frontend. The application features a REST API architecture, secure session management, and email integration for user verification.</p>
+        </div>
+        
+        <div class="company-setup-section">
+            <h2>Company Setup & Registration</h2>
+            <div class="setup-options">
+                <div class="setup-option">
+                    <h3>🏢 New Company Setup</h3>
+                    <p>Setting up TimeTrack for the first time or adding a new company? Create your company profile and administrator account to get started.</p>
+                </div>
+                
+                <div class="setup-option">
+                    <h3>👥 Join Existing Company</h3>
+                    <p>Already have a company using TimeTrack? Get your company code from your administrator and register to join your organization.</p>
+                </div>
+            </div>
         </div>
         
         <div class="support-section">
@@ -216,12 +236,47 @@
     color: #cceeff;
 }
 
+.company-setup-section {
+    margin: 3rem 0;
+}
+
+.setup-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.setup-option {
+    background: #f0f8ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    border-left: 4px solid #007bff;
+}
+
+.setup-option h3 {
+    color: #0066cc;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.setup-option p {
+    margin-bottom: 0;
+    color: #333;
+    line-height: 1.5;
+}
+
 @media (max-width: 768px) {
-    .feature-grid, .role-cards, .benefits-list {
+    .feature-grid, .role-cards, .benefits-list, .setup-options {
         grid-template-columns: 1fr;
     }
     
     .benefits-list .benefit {
+        min-width: auto;
+    }
+    
+    .setup-options .setup-option {
         min-width: auto;
     }
 }
