@@ -3,7 +3,7 @@
 {% block content %}
 <div class="admin-container">
     <h1>
-        {% if g.user.is_admin or g.user.role == Role.ADMIN %}
+        {% if g.user.role == Role.ADMIN %}
             Admin Dashboard
         {% elif g.user.role == Role.SUPERVISOR %}
             Supervisor Dashboard
@@ -39,7 +39,7 @@
     </div>
 
     <!-- Admin-only sections -->
-    {% if g.user.is_admin or g.user.role == Role.ADMIN %}
+    {% if g.user.role == Role.ADMIN %}
     <div class="stats-section">
         <h2>System Overview</h2>
         <div class="stats-grid">
@@ -90,7 +90,7 @@
     {% endif %}
 
     <!-- Team Leader and Supervisor sections -->
-    {% if g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] or g.user.is_admin %}
+    {% if g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN] %}
     <div class="team-section">
         <h2>Team Management</h2>
 
@@ -107,8 +107,7 @@
         </div>
 
         <div class="admin-panel">
-
-            {% if g.user.is_admin %}
+            {% if g.user.role == Role.ADMIN %}
             <div class="admin-card">
                 <h2>Team Configuration</h2>
                 <p>Create and manage team structures.</p>
@@ -156,7 +155,7 @@
             <table class="time-history">
                 <thead>
                     <tr>
-                        {% if g.user.is_admin or g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
+                        {% if g.user.role in [Role.ADMIN, Role.TEAM_LEADER, Role.SUPERVISOR] %}
                         <th>User</th>
                         {% endif %}
                         <th>Date</th>
@@ -169,7 +168,7 @@
                 <tbody>
                     {% for entry in recent_entries %}
                     <tr>
-                        {% if g.user.is_admin or g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
+                        {% if g.user.role in [Role.ADMIN, Role.TEAM_LEADER, Role.SUPERVISOR] %}
                         <td>{{ entry.user.username }}</td>
                         {% endif %}
                         <td>{{ entry.arrival_time.strftime('%Y-%m-%d') }}</td>

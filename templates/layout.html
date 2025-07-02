@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - TimeTrack</title>
+    <title>{{ title }} - TimeTrack{% if g.company %} - {{ g.company.name }}{% endif %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -11,6 +11,9 @@
     <header class="mobile-header">
         <div class="mobile-nav-brand">
             <a href="{{ url_for('home') }}">TimeTrack</a>
+            {% if g.company %}
+                <small class="company-name">{{ g.company.name }}</small>
+            {% endif %}
         </div>
         <button class="mobile-nav-toggle" id="mobile-nav-toggle">
             <span></span>
@@ -23,6 +26,11 @@
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h2><a href="{{ url_for('home') }}">TimeTrack</a></h2>
+            {% if g.company %}
+                <div class="company-info">
+                    <small class="text-muted">{{ g.company.name }}</small>
+                </div>
+            {% endif %}
             <button class="sidebar-toggle" id="sidebar-toggle">
                 <span></span>
                 <span></span>
@@ -36,13 +44,14 @@
                     <li><a href="{{ url_for('analytics') }}" data-tooltip="Time Analytics"><i class="nav-icon">📊</i><span class="nav-text">Analytics</span></a></li>
                     
                     <!-- Role-based menu items -->
-                    {% if g.user.is_admin %}
+                    {% if g.user.role == Role.ADMIN %}
                     <li class="nav-divider">Admin</li>
                     <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
                     <li><a href="{{ url_for('config') }}" data-tooltip="Config"><i class="nav-icon">⚙️</i><span class="nav-text">Config</span></a></li>
                     <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📈</i><span class="nav-text">Dashboard</span></a></li>
+                    <li><a href="{{ url_for('admin_company') }}" data-tooltip="Company"><i class="nav-icon">🏢</i><span class="nav-text">Company</span></a></li>
                     <li><a href="{{ url_for('admin_users') }}" data-tooltip="Manage Users"><i class="nav-icon">👥</i><span class="nav-text">Manage Users</span></a></li>
-                    <li><a href="{{ url_for('admin_teams') }}" data-tooltip="Manage Teams"><i class="nav-icon">🏢</i><span class="nav-text">Manage Teams</span></a></li>
+                    <li><a href="{{ url_for('admin_teams') }}" data-tooltip="Manage Teams"><i class="nav-icon">🏭</i><span class="nav-text">Manage Teams</span></a></li>
                     <li><a href="{{ url_for('admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
                     <li><a href="{{ url_for('admin_settings') }}" data-tooltip="System Settings"><i class="nav-icon">🔧</i><span class="nav-text">System Settings</span></a></li>
                     {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}

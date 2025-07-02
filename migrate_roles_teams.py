@@ -73,8 +73,8 @@ def migrate_roles_teams():
                     # Try to map the string to an enum value
                     user.role = role_mapping.get(user.role, Role.TEAM_MEMBER)
                 elif user.role is None:
-                    # Set default role based on admin status
-                    user.role = Role.ADMIN if user.is_admin else Role.TEAM_MEMBER
+                    # Set default role 
+                    user.role = Role.TEAM_MEMBER
             
             db.session.commit()
             logger.info(f"Assigned {len(users)} existing users to default team and updated roles")
