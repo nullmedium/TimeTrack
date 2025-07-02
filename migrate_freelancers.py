@@ -52,8 +52,8 @@ def migrate_freelancer_support():
         # Add account_type column to user table if it doesn't exist
         if 'account_type' not in user_columns:
             print("Adding account_type column to user table...")
-            # Default to 'Company User' for existing users
-            cursor.execute("ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'Company User'")
+            # Default to 'COMPANY_USER' for existing users
+            cursor.execute("ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'COMPANY_USER'")
             
         # Add business_name column to user table if it doesn't exist
         if 'business_name' not in user_columns:
@@ -65,8 +65,8 @@ def migrate_freelancer_support():
         print("✓ Freelancer migration completed successfully!")
         
         # Update existing users to have explicit account_type
-        print("Updating existing users to Company User account type...")
-        cursor.execute("UPDATE user SET account_type = 'Company User' WHERE account_type IS NULL OR account_type = ''")
+        print("Updating existing users to COMPANY_USER account type...")
+        cursor.execute("UPDATE user SET account_type = 'COMPANY_USER' WHERE account_type IS NULL OR account_type = ''")
         conn.commit()
         
         return True

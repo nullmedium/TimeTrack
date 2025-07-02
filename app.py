@@ -160,7 +160,7 @@ def run_migrations():
             ('team_id', "ALTER TABLE user ADD COLUMN team_id INTEGER"),
             ('two_factor_enabled', "ALTER TABLE user ADD COLUMN two_factor_enabled BOOLEAN DEFAULT 0"),
             ('two_factor_secret', "ALTER TABLE user ADD COLUMN two_factor_secret VARCHAR(32)"),
-            ('account_type', "ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'Company User'"),
+            ('account_type', "ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'COMPANY_USER'"),
             ('business_name', "ALTER TABLE user ADD COLUMN business_name VARCHAR(100)")
         ]
 
@@ -196,7 +196,7 @@ def run_migrations():
                 team_id INTEGER,
                 two_factor_enabled BOOLEAN DEFAULT 0,
                 two_factor_secret VARCHAR(32),
-                account_type VARCHAR(20) DEFAULT 'Company User',
+                account_type VARCHAR(20) DEFAULT 'COMPANY_USER',
                 business_name VARCHAR(100),
                 company_id INTEGER
             )
@@ -210,7 +210,7 @@ def run_migrations():
             SELECT id, username, email, password_hash, created_at, is_verified,
                    verification_token, token_expiry, is_blocked, role, team_id,
                    two_factor_enabled, two_factor_secret, 
-                   COALESCE(account_type, 'Company User'),
+                   COALESCE(account_type, 'COMPANY_USER'),
                    business_name,
                    company_id
             FROM user

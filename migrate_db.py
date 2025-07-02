@@ -120,7 +120,7 @@ def migrate_database():
     # Add freelancer support columns to user table
     if 'account_type' not in user_columns:
         print("Adding account_type column to user table...")
-        cursor.execute("ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'Company User'")
+        cursor.execute("ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'COMPANY_USER'")
         
     if 'business_name' not in user_columns:
         print("Adding business_name column to user table...")

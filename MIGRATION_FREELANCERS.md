@@ -13,7 +13,7 @@ The freelancer migration adds support for independent users who can register wit
 ## Database Changes
 
 ### User Table Changes
-- `account_type` VARCHAR(20) DEFAULT 'Company User' - Type of account
+- `account_type` VARCHAR(20) DEFAULT 'COMPANY_USER' - Type of account
 - `business_name` VARCHAR(100) - Optional business name for freelancers  
 - `company_id` INTEGER - Foreign key to company table (for multi-tenancy)
 
@@ -46,7 +46,7 @@ If you prefer manual control:
 
 ```sql
 -- Add columns to user table
-ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'Company User';
+ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'COMPANY_USER';
 ALTER TABLE user ADD COLUMN business_name VARCHAR(100);
 ALTER TABLE user ADD COLUMN company_id INTEGER;
 
@@ -66,7 +66,7 @@ CREATE TABLE company (
 ALTER TABLE company ADD COLUMN is_personal BOOLEAN DEFAULT 0;
 
 -- Update existing users
-UPDATE user SET account_type = 'Company User' WHERE account_type IS NULL;
+UPDATE user SET account_type = 'COMPANY_USER' WHERE account_type IS NULL;
 ```
 
 ## Post-Migration Steps
