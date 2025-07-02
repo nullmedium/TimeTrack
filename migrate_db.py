@@ -293,6 +293,14 @@ def migrate_database():
                 updated = True
             if updated:
                 updated_count += 1
+        
+        # Check if any system admin users exist
+        system_admin_count = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
+        if system_admin_count == 0:
+            print("No system administrators found. Consider promoting a user to SYSTEM_ADMIN role manually.")
+            print("Use: UPDATE user SET role = 'System Administrator' WHERE username = 'your_username';")
+        else:
+            print(f"Found {system_admin_count} system administrator(s)")
             
         db.session.commit()
         print(f"Associated {len(orphan_entries)} existing time entries with admin user")

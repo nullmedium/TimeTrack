@@ -681,8 +681,18 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if g.user is None or g.user.role != Role.ADMIN:
+        if g.user is None or (g.user.role != Role.ADMIN and g.user.role != Role.SYSTEM_ADMIN):
             flash('You need administrator privileges to access this page.', 'error')
+            return redirect(url_for('home'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# System Admin-only decorator
+def system_admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if g.user is None or g.user.role != Role.SYSTEM_ADMIN:
+            flash('You need system administrator privileges to access this page.', 'error')
             return redirect(url_for('home'))
         return f(*args, **kwargs)
     return decorated_function
@@ -691,6 +701,16 @@ def get_system_setting(key, default='false'):
     """Helper function to get system setting value"""
     setting = SystemSettings.query.filter_by(key=key).first()
     return setting.value if setting else default
+
+def is_system_admin(user=None):
+    """Helper function to check if user is system admin"""
+    if user is None:
+        user = g.user
+    return user and user.role == Role.SYSTEM_ADMIN
+
+def can_access_system_settings(user=None):
+    """Helper function to check if user can access system-wide settings"""
+    return is_system_admin(user)
 
 # Add this decorator function after your existing decorators
 def role_required(min_role):
@@ -704,8 +724,8 @@ def role_required(min_role):
             if g.user is None:
                 return redirect(url_for('login', next=request.url))
 
-            # Admin always has access
-            if g.user.role == Role.ADMIN:
+            # Admin and System Admin always have access
+            if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN:
                 return f(*args, **kwargs)
 
             # Check role hierarchy
@@ -713,7 +733,8 @@ def role_required(min_role):
                 Role.TEAM_MEMBER: 1,
                 Role.TEAM_LEADER: 2,
                 Role.SUPERVISOR: 3,
-                Role.ADMIN: 4
+                Role.ADMIN: 4,
+                Role.SYSTEM_ADMIN: 5
             }
 
             if role_hierarchy.get(g.user.role, 0) < role_hierarchy.get(min_role, 0):
@@ -733,6 +754,10 @@ def company_required(f):
         if g.user is None:
             return redirect(url_for('login', next=request.url))
 
+        # System admins can access without company association
+        if g.user.role == Role.SYSTEM_ADMIN:
+            return f(*args, **kwargs)
+            
         if g.user.company_id is None:
             flash('You must be associated with a company to access this page.', 'error')
             return redirect(url_for('setup_company'))

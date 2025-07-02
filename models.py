@@ -11,7 +11,8 @@ class Role(enum.Enum):
     TEAM_MEMBER = "Team Member"
     TEAM_LEADER = "Team Leader"
     SUPERVISOR = "Supervisor"
-    ADMIN = "Administrator"  # Keep existing admin role
+    ADMIN = "Administrator"  # Company-level admin
+    SYSTEM_ADMIN = "System Administrator"  # System-wide admin
 
 # Define Account Type for freelancer support
 class AccountType(enum.Enum):
