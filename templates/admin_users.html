@@ -24,7 +24,7 @@
                 <tr>
                     <td>{{ user.username }}</td>
                     <td>{{ user.email }}</td>
-                    <td>{% if user.is_admin %}Admin{% else %}User{% endif %}</td>
+                    <td>{{ user.role.value if user.role else 'Team Member' }}</td>
                     <td>
                         <span class="status-badge {% if user.is_blocked %}status-blocked{% else %}status-active{% endif %}">
                             {% if user.is_blocked %}Blocked{% else %}Active{% endif %}

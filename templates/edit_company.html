@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="admin-container">
+    <h1>Edit Company</h1>
+    
+    <form method="POST" class="user-form">
+        <div class="form-group">
+            <label for="name">Company Name</label>
+            <input type="text" id="name" name="name" class="form-control" 
+                   value="{{ company.name }}" required autofocus>
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" class="form-control" 
+                      rows="3">{{ company.description or '' }}</textarea>
+            <small class="form-help">Optional description of your company</small>
+        </div>
+
+        <div class="form-group">
+            <label for="max_users">Maximum Users</label>
+            <input type="number" id="max_users" name="max_users" class="form-control" 
+                   value="{{ company.max_users or '' }}" min="1">
+            <small class="form-help">Leave empty for unlimited users</small>
+        </div>
+
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="is_active" name="is_active" 
+                       {{ 'checked' if company.is_active else '' }}>
+                Company is active
+            </label>
+            <small class="form-help">Inactive companies cannot be accessed by users</small>
+        </div>
+
+        <div class="info-box">
+            <h3>Company Code</h3>
+            <p><strong>{{ company.slug }}</strong></p>
+            <p>This code cannot be changed and is used by new users to register for your company.</p>
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('admin_company') }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+    </form>
+</div>
+
+<style>
+.info-box {
+    background: #e7f3ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.info-box h3 {
+    margin-top: 0;
+    color: #0066cc;
+}
+
+.info-box p {
+    margin-bottom: 10px;
+}
+
+.info-box p:last-child {
+    margin-bottom: 0;
+    color: #666;
+}
+</style>
+{% endblock %}

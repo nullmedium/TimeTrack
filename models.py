@@ -13,15 +13,48 @@ class Role(enum.Enum):
     SUPERVISOR = "Supervisor"
     ADMIN = "Administrator"  # Keep existing admin role
 
+# Company model for multi-tenancy
+class Company(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    slug = db.Column(db.String(50), unique=True, nullable=False)  # URL-friendly identifier
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # Company settings
+    is_active = db.Column(db.Boolean, default=True)
+    max_users = db.Column(db.Integer, default=100)  # Optional user limit
+    
+    # Relationships
+    users = db.relationship('User', backref='company', lazy=True)
+    teams = db.relationship('Team', backref='company', lazy=True) 
+    projects = db.relationship('Project', backref='company', lazy=True)
+    
+    def __repr__(self):
+        return f'<Company {self.name}>'
+    
+    def generate_slug(self):
+        """Generate URL-friendly slug from company name"""
+        import re
+        slug = re.sub(r'[^\w\s-]', '', self.name.lower())
+        slug = re.sub(r'[-\s]+', '-', slug)
+        return slug.strip('-')
+
 # Create Team model
 class Team(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, unique=True)
+    name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.now)
     
+    # Company association for multi-tenancy
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
+    
     # Relationship with users (one team has many users)
     users = db.relationship('User', backref='team', lazy=True)
+    
+    # Unique constraint per company
+    __table_args__ = (db.UniqueConstraint('company_id', 'name', name='uq_team_name_per_company'),)
     
     def __repr__(self):
         return f'<Team {self.name}>'
@@ -30,10 +63,13 @@ class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    code = db.Column(db.String(20), unique=True, nullable=False)  # Project code (e.g., PRJ001)
+    code = db.Column(db.String(20), nullable=False)  # Project code (e.g., PRJ001)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Company association for multi-tenancy
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
     
     # Foreign key to user who created the project (Admin/Supervisor)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -50,6 +86,9 @@ class Project(db.Model):
     team = db.relationship('Team', backref='projects')
     time_entries = db.relationship('TimeEntry', backref='project', lazy=True)
     
+    # Unique constraint per company
+    __table_args__ = (db.UniqueConstraint('company_id', 'code', name='uq_project_code_per_company'),)
+    
     def __repr__(self):
         return f'<Project {self.code}: {self.name}>'
     
@@ -58,7 +97,11 @@ class Project(db.Model):
         if not self.is_active:
             return False
         
-        # Admins and Supervisors can log time to any project
+        # Must be in same company
+        if self.company_id != user.company_id:
+            return False
+        
+        # Admins and Supervisors can log time to any project in their company
         if user.role in [Role.ADMIN, Role.SUPERVISOR]:
             return True
         
@@ -66,17 +109,19 @@ class Project(db.Model):
         if self.team_id:
             return user.team_id == self.team_id
         
-        # If no team restriction, any user can log time
+        # If no team restriction, any user in the company can log time
         return True
 
 # Update User model to include role and team relationship
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    username = db.Column(db.String(80), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
     password_hash = db.Column(db.String(128))
-    is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Company association for multi-tenancy
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
     
     # Email verification fields
     is_verified = db.Column(db.Boolean, default=False)
@@ -89,6 +134,12 @@ class User(db.Model):
     # New fields for role and team
     role = db.Column(db.Enum(Role), default=Role.TEAM_MEMBER)
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
+    
+    # Unique constraints per company
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'username', name='uq_user_username_per_company'),
+        db.UniqueConstraint('company_id', 'email', name='uq_user_email_per_company'),
+    )
     
     # Two-Factor Authentication fields
     two_factor_enabled = db.Column(db.Boolean, default=False)
