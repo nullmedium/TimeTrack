@@ -61,9 +61,7 @@ def migrate_projects():
             existing_projects = Project.query.count()
             if existing_projects == 0:
                 # Find an admin or supervisor user to be the creator
-                admin_user = User.query.filter_by(is_admin=True).first()
-                if not admin_user:
-                    admin_user = User.query.filter(User.role.in_([Role.ADMIN, Role.SUPERVISOR])).first()
+                admin_user = User.query.filter(User.role.in_([Role.ADMIN, Role.SUPERVISOR])).first()
                 
                 if admin_user:
                     # Create some sample projects

@@ -205,7 +205,6 @@ def migrate_database():
             admin = User(
                 username='admin',
                 email='admin@timetrack.local',
-                is_admin=True,
                 is_verified=True,  # Admin is automatically verified
                 role=Role.ADMIN,
                 two_factor_enabled=False
@@ -247,10 +246,7 @@ def migrate_database():
         for user in users_to_update:
             updated = False
             if not hasattr(user, 'role') or user.role is None:
-                if user.is_admin:
-                    user.role = Role.ADMIN
-                else:
-                    user.role = Role.TEAM_MEMBER
+                user.role = Role.TEAM_MEMBER
                 updated = True
             if not hasattr(user, 'two_factor_enabled') or user.two_factor_enabled is None:
                 user.two_factor_enabled = False

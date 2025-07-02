@@ -32,7 +32,7 @@ def repair_user_roles():
                 user.role = role_mapping.get(user.role, Role.TEAM_MEMBER)
                 fixed_count += 1
             elif user.role is None:
-                user.role = Role.ADMIN if user.is_admin else Role.TEAM_MEMBER
+                user.role = Role.TEAM_MEMBER
                 fixed_count += 1
         
         if fixed_count > 0:

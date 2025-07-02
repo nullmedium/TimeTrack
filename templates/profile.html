@@ -14,7 +14,7 @@
     
     <div class="profile-info">
         <p><strong>Username:</strong> {{ user.username }}</p>
-        <p><strong>Account Type:</strong> {% if user.is_admin %}Administrator{% else %}User{% endif %}</p>
+        <p><strong>Account Type:</strong> {{ user.role.value if user.role else 'Team Member' }}</p>
         <p><strong>Member Since:</strong> {{ user.created_at.strftime('%Y-%m-%d') }}</p>
         <p><strong>Two-Factor Authentication:</strong> 
             {% if user.two_factor_enabled %}
