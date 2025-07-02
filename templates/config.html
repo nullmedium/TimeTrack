@@ -46,7 +46,145 @@
             </div>
         </div>
 
+        <div class="form-section">
+            <h3>Time Rounding Settings</h3>
+            <p class="section-description">
+                Time rounding helps standardize billing and reporting by rounding time entries to specified intervals.
+            </p>
+            
+            <div class="form-group">
+                <label for="time_rounding_minutes">Time Rounding Interval:</label>
+                <select id="time_rounding_minutes" name="time_rounding_minutes">
+                    {% for value, label in rounding_options %}
+                    <option value="{{ value }}" {% if config.time_rounding_minutes == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <small>Round time entries to the nearest interval</small>
+            </div>
+            
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" 
+                           id="round_to_nearest" 
+                           name="round_to_nearest" 
+                           {% if config.round_to_nearest %}checked{% endif %}>
+                    <label for="round_to_nearest">Round to nearest interval</label>
+                    <small>If unchecked, will always round up</small>
+                </div>
+            </div>
+            
+            <div class="rounding-example" id="rounding-example">
+                <h4>Example:</h4>
+                <div id="example-text">
+                    <!-- JavaScript will populate this -->
+                </div>
+            </div>
+        </div>
+
         <button type="submit" class="btn btn-primary">Save Configuration</button>
     </form>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const roundingSelect = document.getElementById('time_rounding_minutes');
+    const roundToNearestCheckbox = document.getElementById('round_to_nearest');
+    const exampleDiv = document.getElementById('example-text');
+    
+    function updateExample() {
+        const interval = parseInt(roundingSelect.value);
+        const roundToNearest = roundToNearestCheckbox.checked;
+        
+        if (interval === 0) {
+            exampleDiv.innerHTML = '<em>No rounding applied. Times are recorded exactly as entered.</em>';
+            return;
+        }
+        
+        const roundingType = roundToNearest ? 'nearest' : 'up';
+        const examples = [];
+        
+        if (interval === 15) {
+            if (roundToNearest) {
+                examples.push('9:07 AM → 9:00 AM');
+                examples.push('9:08 AM → 9:15 AM');
+                examples.push('9:23 AM → 9:30 AM');
+            } else {
+                examples.push('9:01 AM → 9:15 AM');
+                examples.push('9:16 AM → 9:30 AM');
+                examples.push('9:31 AM → 9:45 AM');
+            }
+        } else if (interval === 30) {
+            if (roundToNearest) {
+                examples.push('9:14 AM → 9:00 AM');
+                examples.push('9:16 AM → 9:30 AM');
+                examples.push('9:45 AM → 10:00 AM');
+            } else {
+                examples.push('9:01 AM → 9:30 AM');
+                examples.push('9:31 AM → 10:00 AM');
+                examples.push('10:01 AM → 10:30 AM');
+            }
+        } else if (interval === 60) {
+            if (roundToNearest) {
+                examples.push('9:29 AM → 9:00 AM');
+                examples.push('9:31 AM → 10:00 AM');
+                examples.push('10:30 AM → 11:00 AM');
+            } else {
+                examples.push('9:01 AM → 10:00 AM');
+                examples.push('10:01 AM → 11:00 AM');
+                examples.push('11:01 AM → 12:00 PM');
+            }
+        }
+        
+        const exampleText = `Rounding ${roundingType} to ${interval} minute intervals:<br>` + 
+                           examples.map(ex => `• ${ex}`).join('<br>');
+        exampleDiv.innerHTML = exampleText;
+    }
+    
+    // Update example when settings change
+    roundingSelect.addEventListener('change', updateExample);
+    roundToNearestCheckbox.addEventListener('change', updateExample);
+    
+    // Initial example
+    updateExample();
+});
+</script>
+
+<style>
+.section-description {
+    color: #666;
+    font-style: italic;
+    margin-bottom: 1.5rem;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+.checkbox-group label {
+    margin: 0;
+    font-weight: normal;
+}
+
+.rounding-example {
+    background: #e8f5e9;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+    border-left: 4px solid #4CAF50;
+}
+
+.rounding-example h4 {
+    margin-top: 0;
+    color: #2e7d32;
+}
+</style>
 {% endblock %}

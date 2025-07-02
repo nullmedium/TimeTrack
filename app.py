@@ -8,6 +8,7 @@ from data_export import (
     export_to_csv, export_to_excel, export_team_hours_to_csv, export_team_hours_to_excel,
     export_analytics_csv, export_analytics_excel
 )
+from time_utils import apply_time_rounding, round_duration_to_interval, get_user_rounding_settings
 import logging
 from datetime import datetime, time, timedelta
 import os
@@ -134,7 +135,9 @@ def run_migrations():
             work_config_migrations = [
                 ('additional_break_minutes', "ALTER TABLE work_config ADD COLUMN additional_break_minutes INTEGER DEFAULT 15"),
                 ('additional_break_threshold_hours', "ALTER TABLE work_config ADD COLUMN additional_break_threshold_hours FLOAT DEFAULT 9.0"),
-                ('user_id', "ALTER TABLE work_config ADD COLUMN user_id INTEGER")
+                ('user_id', "ALTER TABLE work_config ADD COLUMN user_id INTEGER"),
+                ('time_rounding_minutes', "ALTER TABLE work_config ADD COLUMN time_rounding_minutes INTEGER DEFAULT 0"),
+                ('round_to_nearest', "ALTER TABLE work_config ADD COLUMN round_to_nearest BOOLEAN DEFAULT 1")
             ]
 
             for column_name, sql_command in work_config_migrations:
@@ -1368,19 +1371,30 @@ def leave(entry_id):
 
     # Set the departure time
     departure_time = datetime.now()
-    entry.departure_time = departure_time
+    
+    # Apply time rounding if enabled
+    rounded_arrival, rounded_departure = apply_time_rounding(entry.arrival_time, departure_time, g.user)
+    entry.arrival_time = rounded_arrival
+    entry.departure_time = rounded_departure
 
     # If currently paused, add the final break duration
     if entry.is_paused and entry.pause_start_time:
-        final_break_duration = int((departure_time - entry.pause_start_time).total_seconds())
+        final_break_duration = int((rounded_departure - entry.pause_start_time).total_seconds())
         entry.total_break_duration += final_break_duration
         entry.is_paused = False
         entry.pause_start_time = None
 
+    # Apply rounding to break duration if enabled
+    interval_minutes, round_to_nearest = get_user_rounding_settings(g.user)
+    if interval_minutes > 0:
+        entry.total_break_duration = round_duration_to_interval(
+            entry.total_break_duration, interval_minutes, round_to_nearest
+        )
+
     # Calculate work duration considering breaks
     entry.duration, effective_break = calculate_work_duration(
-        entry.arrival_time,
-        departure_time,
+        rounded_arrival,
+        rounded_departure,
         entry.total_break_duration
     )
 
@@ -1446,6 +1460,10 @@ def config():
             config.break_threshold_hours = float(request.form.get('break_threshold_hours', 6.0))
             config.additional_break_minutes = int(request.form.get('additional_break_minutes', 15))
             config.additional_break_threshold_hours = float(request.form.get('additional_break_threshold_hours', 9.0))
+            
+            # Update time rounding settings
+            config.time_rounding_minutes = int(request.form.get('time_rounding_minutes', 0))
+            config.round_to_nearest = 'round_to_nearest' in request.form
 
             db.session.commit()
             flash('Configuration updated successfully!', 'success')
@@ -1453,7 +1471,11 @@ def config():
         except ValueError:
             flash('Please enter valid numbers for all fields', 'error')
 
-    return render_template('config.html', title='Configuration', config=config)
+    # Import time utils for display options
+    from time_utils import get_available_rounding_options
+    rounding_options = get_available_rounding_options()
+    
+    return render_template('config.html', title='Configuration', config=config, rounding_options=rounding_options)
 
 @app.route('/api/delete/<int:entry_id>', methods=['DELETE'])
 @login_required
@@ -1615,18 +1637,21 @@ def manual_entry():
         if departure_datetime <= arrival_datetime:
             return jsonify({'error': 'End time must be after start time'}), 400
         
+        # Apply time rounding if enabled
+        rounded_arrival, rounded_departure = apply_time_rounding(arrival_datetime, departure_datetime, g.user)
+        
         # Validate project access if project is specified
         if project_id:
             project = Project.query.get(project_id)
             if not project or not project.is_user_allowed(g.user):
                 return jsonify({'error': 'Invalid or unauthorized project'}), 403
         
-        # Check for overlapping entries for this user
+        # Check for overlapping entries for this user (using rounded times)
         overlapping_entry = TimeEntry.query.filter(
             TimeEntry.user_id == g.user.id,
             TimeEntry.departure_time.isnot(None),
-            TimeEntry.arrival_time < departure_datetime,
-            TimeEntry.departure_time > arrival_datetime
+            TimeEntry.arrival_time < rounded_departure,
+            TimeEntry.departure_time > rounded_arrival
         ).first()
         
         if overlapping_entry:
@@ -1634,9 +1659,16 @@ def manual_entry():
                 'error': 'This time entry overlaps with an existing entry'
             }), 400
         
-        # Calculate total duration in seconds
-        total_duration = int((departure_datetime - arrival_datetime).total_seconds())
+        # Calculate total duration in seconds (using rounded times)
+        total_duration = int((rounded_departure - rounded_arrival).total_seconds())
         break_duration_seconds = break_minutes * 60
+        
+        # Apply rounding to break duration if enabled
+        interval_minutes, round_to_nearest = get_user_rounding_settings(g.user)
+        if interval_minutes > 0:
+            break_duration_seconds = round_duration_to_interval(
+                break_duration_seconds, interval_minutes, round_to_nearest
+            )
         
         # Validate break duration doesn't exceed total duration
         if break_duration_seconds >= total_duration:
@@ -1645,11 +1677,11 @@ def manual_entry():
         # Calculate work duration (total duration minus breaks)
         work_duration = total_duration - break_duration_seconds
         
-        # Create the manual time entry
+        # Create the manual time entry (using rounded times)
         new_entry = TimeEntry(
             user_id=g.user.id,
-            arrival_time=arrival_datetime,
-            departure_time=departure_datetime,
+            arrival_time=rounded_arrival,
+            departure_time=rounded_departure,
             duration=work_duration,
             total_break_duration=break_duration_seconds,
             project_id=int(project_id) if project_id else None,
@@ -1735,6 +1767,7 @@ def admin_settings():
             settings['email_verification_required'] = setting.value == 'true'
 
     return render_template('admin_settings.html', title='System Settings', settings=settings)
+
 
 # Company Management Routes
 @app.route('/admin/company')

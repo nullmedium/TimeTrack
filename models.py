@@ -238,6 +238,11 @@ class WorkConfig(db.Model):
     break_threshold_hours = db.Column(db.Float, default=6.0)  # Work hours that trigger mandatory break
     additional_break_minutes = db.Column(db.Integer, default=15)  # Default 15 minutes for additional break
     additional_break_threshold_hours = db.Column(db.Float, default=9.0)  # Work hours that trigger additional break
+    
+    # Time rounding settings
+    time_rounding_minutes = db.Column(db.Integer, default=0)  # 0 = no rounding, 15 = 15 min, 30 = 30 min
+    round_to_nearest = db.Column(db.Boolean, default=True)  # True = round to nearest, False = round up
+    
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
