@@ -347,6 +347,54 @@ def run_migrations():
             )
             """)
 
+        # Fix enum constraint for SYSTEM_ADMIN role
+        # SQLite doesn't have native enum support, but SQLAlchemy creates check constraints
+        # We need to drop and recreate the table to add the new enum value
+        cursor.execute("PRAGMA table_info(user)")
+        user_columns = cursor.fetchall()
+        
+        # Check if we need to migrate the role enum constraint
+        cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='user'")
+        create_table_sql = cursor.fetchone()
+        
+        if create_table_sql and 'System Administrator' not in create_table_sql[0]:
+            print("Updating role enum constraint to include SYSTEM_ADMIN...")
+            
+            # Create a backup table with the new enum constraint
+            cursor.execute("""
+            CREATE TABLE user_new (
+                id INTEGER PRIMARY KEY,
+                username VARCHAR(80) NOT NULL,
+                email VARCHAR(120) NOT NULL,
+                password_hash VARCHAR(128),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                company_id INTEGER NOT NULL,
+                is_verified BOOLEAN DEFAULT 0,
+                verification_token VARCHAR(100),
+                token_expiry TIMESTAMP,
+                is_blocked BOOLEAN DEFAULT 0,
+                role VARCHAR(50) DEFAULT 'Team Member' CHECK (role IN ('Team Member', 'Team Leader', 'Supervisor', 'Administrator', 'System Administrator')),
+                team_id INTEGER,
+                account_type VARCHAR(20) DEFAULT 'COMPANY_USER',
+                business_name VARCHAR(100),
+                two_factor_enabled BOOLEAN DEFAULT 0,
+                two_factor_secret VARCHAR(32),
+                FOREIGN KEY (company_id) REFERENCES company (id),
+                FOREIGN KEY (team_id) REFERENCES team (id)
+            )
+            """)
+            
+            # Copy all data from old table to new table
+            cursor.execute("""
+            INSERT INTO user_new SELECT * FROM user
+            """)
+            
+            # Drop the old table and rename the new one
+            cursor.execute("DROP TABLE user")
+            cursor.execute("ALTER TABLE user_new RENAME TO user")
+            
+            print("✓ Role enum constraint updated successfully")
+
         # Commit all schema changes
         conn.commit()
 
@@ -516,6 +564,14 @@ def migrate_data():
                 user.role = Role.TEAM_MEMBER
             if user.two_factor_enabled is None:
                 user.two_factor_enabled = False
+        
+        # Check if any system admin users exist
+        system_admin_count = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
+        if system_admin_count == 0:
+            print("No system administrators found. SYSTEM_ADMIN role is now available for assignment.")
+            print("To promote a user: UPDATE user SET role = 'System Administrator' WHERE username = 'your_username';")
+        else:
+            print(f"Found {system_admin_count} system administrator(s)")
 
         # Create sample projects if none exist for this company
         existing_projects = Project.query.filter_by(company_id=default_company.id).count()
