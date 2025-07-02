@@ -44,7 +44,7 @@
                     <li><a href="{{ url_for('analytics') }}" data-tooltip="Time Analytics"><i class="nav-icon">📊</i><span class="nav-text">Analytics</span></a></li>
                     
                     <!-- Role-based menu items -->
-                    {% if g.user.role == Role.ADMIN %}
+                    {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">Admin</li>
                     <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
                     <li><a href="{{ url_for('config') }}" data-tooltip="Config"><i class="nav-icon">⚙️</i><span class="nav-text">Config</span></a></li>

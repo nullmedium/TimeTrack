@@ -11,7 +11,7 @@
         <h3>Company Work Policies <span class="read-only">(Read-only)</span></h3>
         <p class="section-description">
             These policies are set by your administrator and apply to all employees.
-            {% if g.user.role == Role.ADMIN %}
+            {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
             <a href="{{ url_for('admin_work_policies') }}">Click here to modify these settings</a>.
             {% endif %}
         </p>
