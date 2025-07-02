@@ -158,6 +158,7 @@ def run_migrations():
             ('is_blocked', "ALTER TABLE user ADD COLUMN is_blocked BOOLEAN DEFAULT 0"),
             ('role', "ALTER TABLE user ADD COLUMN role VARCHAR(50) DEFAULT 'Team Member'"),
             ('team_id', "ALTER TABLE user ADD COLUMN team_id INTEGER"),
+            ('company_id', "ALTER TABLE user ADD COLUMN company_id INTEGER"),
             ('two_factor_enabled', "ALTER TABLE user ADD COLUMN two_factor_enabled BOOLEAN DEFAULT 0"),
             ('two_factor_secret', "ALTER TABLE user ADD COLUMN two_factor_secret VARCHAR(32)"),
             ('account_type', "ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'COMPANY_USER'"),
