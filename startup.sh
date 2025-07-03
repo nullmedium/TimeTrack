@@ -55,6 +55,6 @@ with app.app_context():
     print('Database tables created/verified')
 "
 
-# Start the Flask application 
-echo "Starting Flask application..."
-exec flask run --host=0.0.0.0 --port=5000
+# Start the Flask application with gunicorn
+echo "Starting Flask application with gunicorn..."
+exec gunicorn --bind 0.0.0.0:5000 --workers 4 --threads 2 --timeout 30 app:app

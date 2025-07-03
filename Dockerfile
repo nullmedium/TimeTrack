@@ -27,6 +27,7 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install gunicorn==21.2.0
 
 # Copy the rest of the application
 COPY . .
@@ -36,9 +37,6 @@ RUN mkdir -p /app/instance && chmod 777 /app/instance
 
 VOLUME /data
 RUN mkdir /data && chmod 777 /data
-
-# Copy uwsgi configuration
-COPY uwsgi.ini .
 
 # Make startup script executable
 RUN chmod +x startup.sh
