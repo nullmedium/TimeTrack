@@ -389,8 +389,8 @@ def migrate_user_roles(cursor):
                 # Create a default company if none exists
                 print("No companies found, creating default company...")
                 cursor.execute("""
-                INSERT INTO company (name, slug, description, created_at, is_active, max_users)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1, 100)
+                INSERT INTO company (name, slug, description, created_at, is_personal, is_active, max_users)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0, 1, 100)
                 """, ("Default Company", "default-company", "Auto-created default company for migration"))
                 default_company_id = cursor.lastrowid
                 print(f"Created default company with ID {default_company_id}")

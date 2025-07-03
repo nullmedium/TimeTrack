@@ -154,12 +154,22 @@ class SQLiteToPostgresMigration:
             for row in rows:
                 data_row = []
                 for i, value in enumerate(row):
+                    col_name = column_names[i]
                     # Handle special data type conversions
                     if value is None:
                         data_row.append(None)
                     elif isinstance(value, str) and value.startswith('{"') and value.endswith('}'):
                         # Handle JSON strings
                         data_row.append(value)
+                    elif table_name == 'company' and col_name == 'is_personal' and isinstance(value, int):
+                        # Convert integer boolean to actual boolean for PostgreSQL
+                        data_row.append(bool(value))
+                    elif table_name == 'company' and col_name == 'is_active' and isinstance(value, int):
+                        # Convert integer boolean to actual boolean for PostgreSQL
+                        data_row.append(bool(value))
+                    elif col_name in ['is_verified', 'is_blocked', 'two_factor_enabled', 'is_paused'] and isinstance(value, int):
+                        # Convert other integer booleans to actual booleans for PostgreSQL
+                        data_row.append(bool(value))
                     else:
                         data_row.append(value)
                 data_rows.append(tuple(data_row))
