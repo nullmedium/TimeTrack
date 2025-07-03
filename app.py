@@ -29,14 +29,14 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/timetrack.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:////data/timetrack.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_key_for_timetrack')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Session lasts for 7 days
 
 # Configure Flask-Mail
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.example.com')
-app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT') or 587)
 app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'your-email@example.com')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'your-password')
@@ -57,19 +57,37 @@ db.init_app(app)
 # Consolidated migration using migrate_db module
 def run_migrations():
     """Run all database migrations using the consolidated migrate_db module."""
-    try:
-        from migrate_db import run_all_migrations
-        run_all_migrations()
-        print("Database migrations completed successfully!")
-    except ImportError as e:
-        print(f"Error importing migrate_db: {e}")
-        print("Falling back to basic table creation...")
+    # Check if we're using PostgreSQL or SQLite
+    database_url = app.config['SQLALCHEMY_DATABASE_URI']
+    print(f"DEBUG: Database URL: {database_url}")
+    
+    is_postgresql = 'postgresql://' in database_url or 'postgres://' in database_url
+    print(f"DEBUG: Is PostgreSQL: {is_postgresql}")
+    
+    if is_postgresql:
+        print("Using PostgreSQL - skipping SQLite migrations, ensuring tables exist...")
         with app.app_context():
             db.create_all()
             init_system_settings()
-    except Exception as e:
-        print(f"Error during database migration: {e}")
-        raise
+        print("PostgreSQL setup completed successfully!")
+    else:
+        print("Using SQLite - running SQLite migrations...")
+        try:
+            from migrate_db import run_all_migrations
+            run_all_migrations()
+            print("SQLite database migrations completed successfully!")
+        except ImportError as e:
+            print(f"Error importing migrate_db: {e}")
+            print("Falling back to basic table creation...")
+            with app.app_context():
+                db.create_all()
+                init_system_settings()
+        except Exception as e:
+            print(f"Error during SQLite migration: {e}")
+            print("Falling back to basic table creation...")
+            with app.app_context():
+                db.create_all()
+                init_system_settings()
 
 def migrate_to_company_model():
     """Migrate existing data to support company model (stub - handled by migrate_db)"""

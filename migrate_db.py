@@ -368,6 +368,44 @@ def migrate_user_roles(cursor):
         null_roles = cursor.rowcount
         if null_roles > 0:
             print(f"Set {null_roles} NULL/invalid roles to 'Team Member'")
+        
+        # Ensure all users have a company_id before creating NOT NULL constraint
+        print("Checking for users without company_id...")
+        cursor.execute("SELECT COUNT(*) FROM user WHERE company_id IS NULL")
+        null_company_count = cursor.fetchone()[0]
+        print(f"Found {null_company_count} users without company_id")
+        
+        if null_company_count > 0:
+            print(f"Assigning {null_company_count} users to default company...")
+            
+            # Get or create a default company
+            cursor.execute("SELECT id FROM company ORDER BY id LIMIT 1")
+            company_result = cursor.fetchone()
+            
+            if company_result:
+                default_company_id = company_result[0]
+                print(f"Using existing company ID {default_company_id} as default")
+            else:
+                # Create a default company if none exists
+                print("No companies found, creating default company...")
+                cursor.execute("""
+                INSERT INTO company (name, slug, description, created_at, is_personal, is_active, max_users)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0, 1, 100)
+                """, ("Default Company", "default-company", "Auto-created default company for migration"))
+                default_company_id = cursor.lastrowid
+                print(f"Created default company with ID {default_company_id}")
+            
+            # Assign all users without company_id to the default company
+            cursor.execute("UPDATE user SET company_id = ? WHERE company_id IS NULL", (default_company_id,))
+            updated_users = cursor.rowcount
+            print(f"Assigned {updated_users} users to default company")
+            
+            # Verify the fix
+            cursor.execute("SELECT COUNT(*) FROM user WHERE company_id IS NULL")
+            remaining_null = cursor.fetchone()[0]
+            print(f"After assignment, {remaining_null} users still have NULL company_id")
+        else:
+            print("All users already have company_id assigned")
 
         # Drop user_new table if it exists from previous failed migration
         cursor.execute("DROP TABLE IF EXISTS user_new")
@@ -396,10 +434,16 @@ def migrate_user_roles(cursor):
         )
         """)
 
+        # Get default company ID for any remaining NULL company_id values
+        cursor.execute("SELECT id FROM company ORDER BY id LIMIT 1")
+        company_result = cursor.fetchone()
+        default_company_id = company_result[0] if company_result else 1
+        
         # Copy all data from old table to new table with validation
         cursor.execute("""
         INSERT INTO user_new 
-        SELECT id, username, email, password_hash, created_at, company_id, 
+        SELECT id, username, email, password_hash, created_at, 
+               COALESCE(company_id, ?) as company_id,
                is_verified, verification_token, token_expiry, is_blocked,
                CASE 
                    WHEN role IN (?, ?, ?, ?, ?) THEN role
@@ -412,7 +456,7 @@ def migrate_user_roles(cursor):
                END as account_type,
                business_name, two_factor_enabled, two_factor_secret
         FROM user
-        """, (Role.TEAM_MEMBER.value, Role.TEAM_LEADER.value, Role.SUPERVISOR.value, 
+        """, (default_company_id, Role.TEAM_MEMBER.value, Role.TEAM_LEADER.value, Role.SUPERVISOR.value, 
               Role.ADMIN.value, Role.SYSTEM_ADMIN.value, Role.TEAM_MEMBER.value,
               AccountType.COMPANY_USER.value, AccountType.FREELANCER.value, 
               AccountType.COMPANY_USER.value))

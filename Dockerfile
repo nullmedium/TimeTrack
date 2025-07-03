@@ -11,14 +11,23 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    build-essential \
+    python3-dev \
+    postgresql-client \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Create www-data user and log directory
+RUN groupadd -r www-data && useradd -r -g www-data www-data || true
+RUN mkdir -p /var/log/uwsgi && chown -R www-data:www-data /var/log/uwsgi
+RUN mkdir -p /host/shared && chown -R www-data:www-data /host/shared
 
 # Copy requirements file first for better caching
 COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install gunicorn==21.2.0
 
 # Copy the rest of the application
 COPY . .
@@ -29,10 +38,11 @@ RUN mkdir -p /app/instance && chmod 777 /app/instance
 VOLUME /data
 RUN mkdir /data && chmod 777 /data
 
-# Expose the port the app runs on
+# Make startup script executable
+RUN chmod +x startup.sh
+
+# Expose the port the app runs on (though we'll use unix socket)
 EXPOSE 5000
 
-# Database will be created at runtime when /data volume is mounted
-
-# Command to run the application
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+# Use startup script for automatic migration
+CMD ["./startup.sh"]
