@@ -173,15 +173,12 @@ class SQLiteToPostgresMigration:
                     elif isinstance(value, str) and value.startswith('{"') and value.endswith('}'):
                         # Handle JSON strings
                         data_row.append(value)
-                    elif table_name == 'company' and col_name == 'is_personal' and isinstance(value, int):
+                    elif (col_name.startswith('is_') or col_name.endswith('_enabled') or col_name in ['is_paused']) and isinstance(value, int):
                         # Convert integer boolean to actual boolean for PostgreSQL
                         data_row.append(bool(value))
-                    elif table_name == 'company' and col_name == 'is_active' and isinstance(value, int):
-                        # Convert integer boolean to actual boolean for PostgreSQL
-                        data_row.append(bool(value))
-                    elif col_name in ['is_verified', 'is_blocked', 'two_factor_enabled', 'is_paused'] and isinstance(value, int):
-                        # Convert other integer booleans to actual booleans for PostgreSQL
-                        data_row.append(bool(value))
+                    elif isinstance(value, str) and value == '':
+                        # Convert empty strings to None for PostgreSQL
+                        data_row.append(None)
                     else:
                         data_row.append(value)
                 data_rows.append(tuple(data_row))
@@ -190,8 +187,21 @@ class SQLiteToPostgresMigration:
             batch_size = 1000
             for i in range(0, len(data_rows), batch_size):
                 batch = data_rows[i:i + batch_size]
-                postgres_cursor.executemany(insert_sql, batch)
-                self.postgres_conn.commit()
+                try:
+                    postgres_cursor.executemany(insert_sql, batch)
+                    self.postgres_conn.commit()
+                except Exception as batch_error:
+                    logger.error(f"Error inserting batch {i//batch_size + 1} for table {table_name}: {batch_error}")
+                    # Try inserting rows one by one to identify problematic rows
+                    self.postgres_conn.rollback()
+                    for j, row in enumerate(batch):
+                        try:
+                            postgres_cursor.execute(insert_sql, row)
+                            self.postgres_conn.commit()
+                        except Exception as row_error:
+                            logger.error(f"Error inserting row {i + j} in table {table_name}: {row_error}")
+                            logger.error(f"Problematic row data: {row}")
+                            self.postgres_conn.rollback()
             
             logger.info(f"Migrated {len(rows)} rows from table: {table_name}")
             self.migration_stats[table_name] = len(rows)
@@ -206,22 +216,28 @@ class SQLiteToPostgresMigration:
         """Update PostgreSQL sequences after data migration"""
         try:
             with self.postgres_conn.cursor() as cursor:
-                # Get all sequences
+                # Get all sequences - fix the query to properly extract sequence names
                 cursor.execute("""
-                    SELECT sequence_name, column_name, table_name 
+                    SELECT 
+                        pg_get_serial_sequence(table_name, column_name) as sequence_name,
+                        column_name, 
+                        table_name 
                     FROM information_schema.columns 
                     WHERE column_default LIKE 'nextval%'
+                    AND table_schema = 'public'
                 """)
                 sequences = cursor.fetchall()
                 
                 for seq_name, col_name, table_name in sequences:
+                    if seq_name is None:
+                        continue
                     # Get the maximum value for each sequence
                     cursor.execute(f'SELECT MAX("{col_name}") FROM "{table_name}"')
                     max_val = cursor.fetchone()[0]
                     
                     if max_val is not None:
-                        # Update sequence to start from max_val + 1
-                        cursor.execute(f'ALTER SEQUENCE "{seq_name}" RESTART WITH {max_val + 1}')
+                        # Update sequence to start from max_val + 1 - don't quote sequence name from pg_get_serial_sequence
+                        cursor.execute(f'ALTER SEQUENCE {seq_name} RESTART WITH {max_val + 1}')
                         logger.info(f"Updated sequence {seq_name} to start from {max_val + 1}")
                 
                 self.postgres_conn.commit()
