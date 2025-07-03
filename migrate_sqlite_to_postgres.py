@@ -128,6 +128,13 @@ class SQLiteToPostgresMigration:
             sqlite_cursor = self.sqlite_conn.cursor()
             postgres_cursor = self.postgres_conn.cursor()
             
+            # Check if table exists in SQLite
+            sqlite_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+            if not sqlite_cursor.fetchone():
+                logger.info(f"Table {table_name} does not exist in SQLite, skipping...")
+                self.migration_stats[table_name] = 0
+                return True
+            
             # Get data from SQLite
             sqlite_cursor.execute(f"SELECT * FROM {table_name}")
             rows = sqlite_cursor.fetchall()
