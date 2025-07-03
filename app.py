@@ -2210,7 +2210,7 @@ def system_admin_dashboard():
     
     recent_users = User.query.filter(User.created_at >= week_ago).count()
     recent_companies = Company.query.filter(Company.created_at >= week_ago).count()
-    recent_time_entries = TimeEntry.query.filter(TimeEntry.start_time >= week_ago).count()
+    recent_time_entries = TimeEntry.query.filter(TimeEntry.arrival_time >= week_ago).count()
     
     # Top companies by user count
     top_companies = db.session.query(
@@ -2424,7 +2424,7 @@ def system_admin_company_detail(company_id):
     week_ago = datetime.now() - timedelta(days=7)
     recent_time_entries = TimeEntry.query.join(User).filter(
         User.company_id == company.id,
-        TimeEntry.start_time >= week_ago
+        TimeEntry.arrival_time >= week_ago
     ).count()
     
     # Role distribution
@@ -2464,8 +2464,8 @@ def system_admin_time_entries():
         Project.name.label('project_name')
     ).outerjoin(Project)
     
-    # Order by start time (newest first)
-    query = query.order_by(TimeEntry.start_time.desc())
+    # Order by arrival time (newest first)
+    query = query.order_by(TimeEntry.arrival_time.desc())
     
     # Paginate
     entries = query.paginate(page=page, per_page=per_page, error_out=False)
