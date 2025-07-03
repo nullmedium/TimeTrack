@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent, KanbanBoard, KanbanColumn, KanbanCard
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent, KanbanBoard, KanbanColumn, KanbanCard, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data
@@ -879,62 +879,11 @@ def verify_email(token):
     return redirect(url_for('login'))
 
 @app.route('/dashboard')
-@role_required(Role.TEAM_LEADER)
+@role_required(Role.TEAM_MEMBER)
+@company_required
 def dashboard():
-    # Get dashboard data based on user role
-    dashboard_data = {}
-
-    if g.user.role == Role.ADMIN and g.user.company_id:
-        # Admin sees everything within their company
-
-        dashboard_data.update({
-            'total_users': User.query.filter_by(company_id=g.user.company_id).count(),
-            'total_teams': Team.query.filter_by(company_id=g.user.company_id).count(),
-            'blocked_users': User.query.filter_by(company_id=g.user.company_id, is_blocked=True).count(),
-            'unverified_users': User.query.filter_by(company_id=g.user.company_id, is_verified=False).count(),
-            'recent_registrations': User.query.filter_by(company_id=g.user.company_id).order_by(User.id.desc()).limit(5).all()
-        })
-
-    if g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN]:
-
-        # Team leaders and supervisors see team-related data
-        if g.user.team_id or g.user.role == Role.ADMIN:
-            if g.user.role == Role.ADMIN and g.user.company_id:
-                # Admin can see all teams in their company
-                teams = Team.query.filter_by(company_id=g.user.company_id).all()
-                team_members = User.query.filter(
-                    User.team_id.isnot(None),
-                    User.company_id == g.user.company_id
-                ).all()
-            else:
-                # Team leaders/supervisors see their own team
-                teams = [Team.query.get(g.user.team_id)] if g.user.team_id else []
-
-                team_members = User.query.filter_by(
-                    team_id=g.user.team_id,
-                    company_id=g.user.company_id
-                ).all() if g.user.team_id else []
-
-            dashboard_data.update({
-                'teams': teams,
-                'team_members': team_members,
-                'team_member_count': len(team_members)
-            })
-
-    # Get recent time entries for the user's oversight
-    if g.user.role == Role.ADMIN:
-        # Admin sees all recent entries
-        recent_entries = TimeEntry.query.order_by(TimeEntry.arrival_time.desc()).limit(10).all()
-    elif g.user.team_id:
-        # Team leaders see their team's entries
-        team_user_ids = [user.id for user in User.query.filter_by(team_id=g.user.team_id).all()]
-        recent_entries = TimeEntry.query.filter(TimeEntry.user_id.in_(team_user_ids)).order_by(TimeEntry.arrival_time.desc()).limit(10).all()
-    else:
-        recent_entries = []
-
-    dashboard_data['recent_entries'] = recent_entries
-
-    return render_template('dashboard.html', title='Dashboard', **dashboard_data)
+    """User dashboard with configurable widgets."""
+    return render_template('dashboard.html', title='Dashboard')
 
 # Redirect old admin dashboard URL to new dashboard
 
@@ -4467,6 +4416,606 @@ def delete_kanban_column(column_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)})
 
+# Dashboard API Endpoints
+@app.route('/api/dashboard')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_dashboard():
+    """Get user's dashboard configuration and widgets."""
+    try:
+        # Get or create user dashboard
+        dashboard = UserDashboard.query.filter_by(user_id=g.user.id).first()
+        if not dashboard:
+            dashboard = UserDashboard(user_id=g.user.id)
+            db.session.add(dashboard)
+            db.session.commit()
+            logger.info(f"Created new dashboard {dashboard.id} for user {g.user.id}")
+        else:
+            logger.info(f"Using existing dashboard {dashboard.id} for user {g.user.id}")
+
+        # Get user's widgets
+        widgets = DashboardWidget.query.filter_by(dashboard_id=dashboard.id).order_by(DashboardWidget.grid_y, DashboardWidget.grid_x).all()
+
+        logger.info(f"Found {len(widgets)} widgets for dashboard {dashboard.id}")
+
+        # Convert to JSON format
+        widget_data = []
+        for widget in widgets:
+            # Convert grid size to simple size names
+            if widget.grid_width == 1 and widget.grid_height == 1:
+                size = 'small'
+            elif widget.grid_width == 2 and widget.grid_height == 1:
+                size = 'medium'
+            elif widget.grid_width == 2 and widget.grid_height == 2:
+                size = 'large'
+            elif widget.grid_width == 3 and widget.grid_height == 1:
+                size = 'wide'
+            else:
+                size = 'small'
+
+            # Parse config JSON
+            try:
+                import json
+                config = json.loads(widget.config) if widget.config else {}
+            except (json.JSONDecodeError, TypeError):
+                config = {}
+
+            widget_data.append({
+                'id': widget.id,
+                'type': widget.widget_type.value,
+                'title': widget.title,
+                'size': size,
+                'grid_x': widget.grid_x,
+                'grid_y': widget.grid_y,
+                'grid_width': widget.grid_width,
+                'grid_height': widget.grid_height,
+                'config': config
+            })
+
+        return jsonify({
+            'success': True,
+            'dashboard': {
+                'id': dashboard.id,
+                'layout_config': dashboard.layout_config,
+                'grid_columns': dashboard.grid_columns,
+                'theme': dashboard.theme
+            },
+            'widgets': widget_data
+        })
+
+    except Exception as e:
+        logger.error(f"Error loading dashboard: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/dashboard/widgets', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def create_or_update_widget():
+    """Create or update a dashboard widget."""
+    try:
+        data = request.get_json()
+
+        # Get or create user dashboard
+        dashboard = UserDashboard.query.filter_by(user_id=g.user.id).first()
+        if not dashboard:
+            dashboard = UserDashboard(user_id=g.user.id)
+            db.session.add(dashboard)
+            db.session.flush()  # Get the ID
+            logger.info(f"Created new dashboard {dashboard.id} for user {g.user.id} in widget creation")
+        else:
+            logger.info(f"Using existing dashboard {dashboard.id} for user {g.user.id} in widget creation")
+
+        # Check if updating existing widget
+        widget_id = data.get('widget_id')
+        if widget_id:
+            widget = DashboardWidget.query.filter_by(
+                id=widget_id,
+                dashboard_id=dashboard.id
+            ).first()
+            if not widget:
+                return jsonify({'success': False, 'error': 'Widget not found'})
+        else:
+            # Create new widget
+            widget = DashboardWidget(dashboard_id=dashboard.id)
+            # Find next available position
+            max_y = db.session.query(func.max(DashboardWidget.grid_y)).filter_by(
+                dashboard_id=dashboard.id
+            ).scalar() or 0
+            widget.grid_y = max_y + 1
+            widget.grid_x = 0
+
+        # Update widget properties
+        widget.widget_type = WidgetType(data['type'])
+        widget.title = data['title']
+
+        # Convert size to grid dimensions
+        size = data.get('size', 'small')
+        if size == 'small':
+            widget.grid_width = 1
+            widget.grid_height = 1
+        elif size == 'medium':
+            widget.grid_width = 2
+            widget.grid_height = 1
+        elif size == 'large':
+            widget.grid_width = 2
+            widget.grid_height = 2
+        elif size == 'wide':
+            widget.grid_width = 3
+            widget.grid_height = 1
+
+        # Build config from form data
+        config = {}
+        for key, value in data.items():
+            if key not in ['type', 'title', 'size', 'widget_id']:
+                config[key] = value
+
+        # Store config as JSON string
+        if config:
+            import json
+            widget.config = json.dumps(config)
+        else:
+            widget.config = None
+
+        if not widget_id:
+            db.session.add(widget)
+            logger.info(f"Creating new widget: {widget.widget_type.value} for dashboard {dashboard.id}")
+        else:
+            logger.info(f"Updating existing widget {widget_id}")
+
+        db.session.commit()
+        logger.info(f"Widget saved successfully with ID: {widget.id}")
+
+        # Verify the widget was actually saved
+        saved_widget = DashboardWidget.query.filter_by(id=widget.id).first()
+        if saved_widget:
+            logger.info(f"Verification: Widget {widget.id} exists in database with dashboard_id: {saved_widget.dashboard_id}")
+        else:
+            logger.error(f"Verification failed: Widget {widget.id} not found in database")
+
+        # Convert grid size back to simple size name for response
+        if widget.grid_width == 1 and widget.grid_height == 1:
+            size_name = 'small'
+        elif widget.grid_width == 2 and widget.grid_height == 1:
+            size_name = 'medium'
+        elif widget.grid_width == 2 and widget.grid_height == 2:
+            size_name = 'large'
+        elif widget.grid_width == 3 and widget.grid_height == 1:
+            size_name = 'wide'
+        else:
+            size_name = 'small'
+
+        # Parse config for response
+        try:
+            import json
+            config_dict = json.loads(widget.config) if widget.config else {}
+        except (json.JSONDecodeError, TypeError):
+            config_dict = {}
+
+        return jsonify({
+            'success': True,
+            'message': 'Widget saved successfully',
+            'widget': {
+                'id': widget.id,
+                'type': widget.widget_type.value,
+                'title': widget.title,
+                'size': size_name,
+                'grid_x': widget.grid_x,
+                'grid_y': widget.grid_y,
+                'grid_width': widget.grid_width,
+                'grid_height': widget.grid_height,
+                'config': config_dict
+            }
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error saving widget: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/dashboard/widgets/<int:widget_id>', methods=['DELETE'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def delete_widget(widget_id):
+    """Delete a dashboard widget."""
+    try:
+        # Get user dashboard
+        dashboard = UserDashboard.query.filter_by(user_id=g.user.id).first()
+        if not dashboard:
+            return jsonify({'success': False, 'error': 'Dashboard not found'})
+
+        # Find and delete widget
+        widget = DashboardWidget.query.filter_by(
+            id=widget_id,
+            dashboard_id=dashboard.id
+        ).first()
+
+        if not widget:
+            return jsonify({'success': False, 'error': 'Widget not found'})
+
+        # No need to update positions for grid-based layout
+
+        db.session.delete(widget)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Widget deleted successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting widget: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/dashboard/positions', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def update_widget_positions():
+    """Update widget grid positions after drag and drop."""
+    try:
+        data = request.get_json()
+        positions = data.get('positions', [])
+
+        # Get user dashboard
+        dashboard = UserDashboard.query.filter_by(user_id=g.user.id).first()
+        if not dashboard:
+            return jsonify({'success': False, 'error': 'Dashboard not found'})
+
+        # Update grid positions
+        for pos_data in positions:
+            widget = DashboardWidget.query.filter_by(
+                id=pos_data['id'],
+                dashboard_id=dashboard.id
+            ).first()
+            if widget:
+                # For now, just assign sequential grid positions
+                # In a more advanced implementation, we'd calculate actual grid coordinates
+                widget.grid_x = pos_data.get('grid_x', 0)
+                widget.grid_y = pos_data.get('grid_y', pos_data.get('position', 0))
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Positions updated successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating positions: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+# Widget data endpoints
+@app.route('/api/dashboard/widgets/<int:widget_id>/data')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_widget_data(widget_id):
+    """Get data for a specific widget."""
+    try:
+        # Get user dashboard
+        dashboard = UserDashboard.query.filter_by(user_id=g.user.id).first()
+        if not dashboard:
+            return jsonify({'success': False, 'error': 'Dashboard not found'})
+
+        # Find widget
+        widget = DashboardWidget.query.filter_by(
+            id=widget_id,
+            dashboard_id=dashboard.id
+        ).first()
+
+        if not widget:
+            return jsonify({'success': False, 'error': 'Widget not found'})
+
+        # Get widget-specific data based on type
+        widget_data = {}
+
+        if widget.widget_type == WidgetType.DAILY_SUMMARY:
+            from datetime import datetime, timedelta
+
+            config = widget.config or {}
+            period = config.get('summary_period', 'daily')
+
+            # Calculate time summaries
+            now = datetime.now()
+
+            # Today's summary
+            start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_entries = TimeEntry.query.filter(
+                TimeEntry.user_id == g.user.id,
+                TimeEntry.arrival_time >= start_of_today,
+                TimeEntry.departure_time.isnot(None)
+            ).all()
+            today_seconds = sum(entry.duration or 0 for entry in today_entries)
+
+            # This week's summary
+            start_of_week = start_of_today - timedelta(days=start_of_today.weekday())
+            week_entries = TimeEntry.query.filter(
+                TimeEntry.user_id == g.user.id,
+                TimeEntry.arrival_time >= start_of_week,
+                TimeEntry.departure_time.isnot(None)
+            ).all()
+            week_seconds = sum(entry.duration or 0 for entry in week_entries)
+
+            # This month's summary
+            start_of_month = start_of_today.replace(day=1)
+            month_entries = TimeEntry.query.filter(
+                TimeEntry.user_id == g.user.id,
+                TimeEntry.arrival_time >= start_of_month,
+                TimeEntry.departure_time.isnot(None)
+            ).all()
+            month_seconds = sum(entry.duration or 0 for entry in month_entries)
+
+            widget_data.update({
+                'today': f"{today_seconds // 3600}h {(today_seconds % 3600) // 60}m",
+                'week': f"{week_seconds // 3600}h {(week_seconds % 3600) // 60}m",
+                'month': f"{month_seconds // 3600}h {(month_seconds % 3600) // 60}m",
+                'entries_today': len(today_entries),
+                'entries_week': len(week_entries),
+                'entries_month': len(month_entries)
+            })
+
+        elif widget.widget_type == WidgetType.ACTIVE_PROJECTS:
+            config = widget.config or {}
+            project_filter = config.get('project_filter', 'all')
+            max_projects = int(config.get('max_projects', 5))
+
+            # Get user's projects
+            if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
+                projects = Project.query.filter_by(
+                    company_id=g.user.company_id,
+                    is_active=True
+                ).limit(max_projects).all()
+            elif g.user.team_id:
+                projects = Project.query.filter(
+                    Project.company_id == g.user.company_id,
+                    Project.is_active == True,
+                    db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+                ).limit(max_projects).all()
+            else:
+                projects = []
+
+            widget_data['projects'] = [{
+                'id': p.id,
+                'name': p.name,
+                'code': p.code,
+                'description': p.description
+            } for p in projects]
+
+        elif widget.widget_type == WidgetType.ASSIGNED_TASKS:
+            config = widget.config or {}
+            task_filter = config.get('task_filter', 'assigned')
+            task_status = config.get('task_status', 'active')
+
+            # Get user's tasks based on filter
+            if task_filter == 'assigned':
+                tasks = Task.query.filter_by(assigned_to_id=g.user.id)
+            elif task_filter == 'created':
+                tasks = Task.query.filter_by(created_by_id=g.user.id)
+            else:
+                # Get tasks from user's projects
+                if g.user.team_id:
+                    project_ids = [p.id for p in Project.query.filter(
+                        Project.company_id == g.user.company_id,
+                        db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+                    ).all()]
+                    tasks = Task.query.filter(Task.project_id.in_(project_ids))
+                else:
+                    tasks = Task.query.join(Project).filter(Project.company_id == g.user.company_id)
+
+            # Filter by status if specified
+            if task_status != 'all':
+                if task_status == 'active':
+                    tasks = tasks.filter(Task.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]))
+                elif task_status == 'pending':
+                    tasks = tasks.filter_by(status=TaskStatus.PENDING)
+                elif task_status == 'completed':
+                    tasks = tasks.filter_by(status=TaskStatus.COMPLETED)
+
+            tasks = tasks.limit(10).all()
+
+            widget_data['tasks'] = [{
+                'id': t.id,
+                'name': t.name,
+                'description': t.description,
+                'status': t.status.value if t.status else 'Pending',
+                'priority': t.priority.value if t.priority else 'Medium',
+                'project_name': t.project.name if t.project else 'No Project'
+            } for t in tasks]
+
+        elif widget.widget_type == WidgetType.WEEKLY_CHART:
+            from datetime import datetime, timedelta
+
+            # Get weekly data for chart
+            now = datetime.now()
+            start_of_week = now - timedelta(days=now.weekday())
+
+            weekly_data = []
+            for i in range(7):
+                day = start_of_week + timedelta(days=i)
+                day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+                day_end = day_start + timedelta(days=1)
+
+                day_entries = TimeEntry.query.filter(
+                    TimeEntry.user_id == g.user.id,
+                    TimeEntry.arrival_time >= day_start,
+                    TimeEntry.arrival_time < day_end,
+                    TimeEntry.departure_time.isnot(None)
+                ).all()
+
+                total_seconds = sum(entry.duration or 0 for entry in day_entries)
+                weekly_data.append({
+                    'day': day.strftime('%A'),
+                    'date': day.strftime('%Y-%m-%d'),
+                    'hours': round(total_seconds / 3600, 2),
+                    'entries': len(day_entries)
+                })
+
+            widget_data['weekly_data'] = weekly_data
+
+        elif widget.widget_type == WidgetType.TASK_PRIORITY:
+            # Get tasks by priority
+            if g.user.team_id:
+                project_ids = [p.id for p in Project.query.filter(
+                    Project.company_id == g.user.company_id,
+                    db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+                ).all()]
+                tasks = Task.query.filter(
+                    Task.project_id.in_(project_ids),
+                    Task.assigned_to_id == g.user.id
+                ).order_by(Task.priority.desc(), Task.created_at.desc()).limit(10).all()
+            else:
+                tasks = Task.query.filter_by(assigned_to_id=g.user.id).order_by(
+                    Task.priority.desc(), Task.created_at.desc()
+                ).limit(10).all()
+
+            widget_data['priority_tasks'] = [{
+                'id': t.id,
+                'name': t.name,
+                'description': t.description,
+                'priority': t.priority.value if t.priority else 'Medium',
+                'status': t.status.value if t.status else 'Pending',
+                'project_name': t.project.name if t.project else 'No Project'
+            } for t in tasks]
+
+        elif widget.widget_type == WidgetType.KANBAN_SUMMARY:
+            # Get kanban data summary
+            if g.user.team_id:
+                project_ids = [p.id for p in Project.query.filter(
+                    Project.company_id == g.user.company_id,
+                    db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+                ).all()]
+                boards = KanbanBoard.query.filter(
+                    KanbanBoard.project_id.in_(project_ids),
+                    KanbanBoard.is_active == True
+                ).limit(3).all()
+            else:
+                boards = []
+
+            board_summaries = []
+            for board in boards:
+                columns = KanbanColumn.query.filter_by(board_id=board.id).order_by(KanbanColumn.position).all()
+                total_cards = sum(len([c for c in col.cards if c.is_active]) for col in columns)
+
+                board_summaries.append({
+                    'id': board.id,
+                    'name': board.name,
+                    'project_name': board.project.name,
+                    'total_cards': total_cards,
+                    'columns': len(columns)
+                })
+
+            widget_data['kanban_boards'] = board_summaries
+
+        elif widget.widget_type == WidgetType.PROJECT_PROGRESS:
+            # Get project progress data
+            if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
+                projects = Project.query.filter_by(
+                    company_id=g.user.company_id,
+                    is_active=True
+                ).limit(5).all()
+            elif g.user.team_id:
+                projects = Project.query.filter(
+                    Project.company_id == g.user.company_id,
+                    Project.is_active == True,
+                    db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+                ).limit(5).all()
+            else:
+                projects = []
+
+            project_progress = []
+            for project in projects:
+                total_tasks = Task.query.filter_by(project_id=project.id).count()
+                completed_tasks = Task.query.filter_by(
+                    project_id=project.id,
+                    status=TaskStatus.COMPLETED
+                ).count()
+
+                progress = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+
+                project_progress.append({
+                    'id': project.id,
+                    'name': project.name,
+                    'code': project.code,
+                    'progress': round(progress, 1),
+                    'completed_tasks': completed_tasks,
+                    'total_tasks': total_tasks
+                })
+
+            widget_data['project_progress'] = project_progress
+
+        elif widget.widget_type == WidgetType.PRODUCTIVITY_METRICS:
+            from datetime import datetime, timedelta
+
+            # Calculate productivity metrics
+            now = datetime.now()
+            today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            week_ago = today - timedelta(days=7)
+
+            # This week vs last week comparison
+            this_week_entries = TimeEntry.query.filter(
+                TimeEntry.user_id == g.user.id,
+                TimeEntry.arrival_time >= week_ago,
+                TimeEntry.departure_time.isnot(None)
+            ).all()
+
+            last_week_entries = TimeEntry.query.filter(
+                TimeEntry.user_id == g.user.id,
+                TimeEntry.arrival_time >= week_ago - timedelta(days=7),
+                TimeEntry.arrival_time < week_ago,
+                TimeEntry.departure_time.isnot(None)
+            ).all()
+
+            this_week_hours = sum(entry.duration or 0 for entry in this_week_entries) / 3600
+            last_week_hours = sum(entry.duration or 0 for entry in last_week_entries) / 3600
+
+            productivity_change = ((this_week_hours - last_week_hours) / last_week_hours * 100) if last_week_hours > 0 else 0
+
+            widget_data.update({
+                'this_week_hours': round(this_week_hours, 1),
+                'last_week_hours': round(last_week_hours, 1),
+                'productivity_change': round(productivity_change, 1),
+                'avg_daily_hours': round(this_week_hours / 7, 1),
+                'total_entries': len(this_week_entries)
+            })
+
+        return jsonify({
+            'success': True,
+            'data': widget_data
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting widget data: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/current-timer-status')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_current_timer_status():
+    """Get current timer status for dashboard widgets."""
+    try:
+        # Get the user's current active time entry
+        active_entry = TimeEntry.query.filter_by(
+            user_id=g.user.id,
+            departure_time=None
+        ).first()
+
+        if active_entry:
+            # Calculate current duration
+            now = datetime.now()
+            elapsed_seconds = int((now - active_entry.arrival_time).total_seconds())
+
+            return jsonify({
+                'success': True,
+                'isActive': True,
+                'startTime': active_entry.arrival_time.isoformat(),
+                'currentDuration': elapsed_seconds,
+                'entryId': active_entry.id
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'isActive': False,
+                'message': 'No active timer'
+            })
+
+    except Exception as e:
+        logger.error(f"Error getting timer status: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=port)

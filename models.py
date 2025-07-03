@@ -831,3 +831,165 @@ class KanbanCard(db.Model):
         """Check if a user can access this card"""
         # Check board's project permissions
         return self.column.board.project.is_user_allowed(user)
+
+# Dashboard Widget System
+class WidgetType(enum.Enum):
+    # Time Tracking Widgets
+    CURRENT_TIMER = "current_timer"
+    DAILY_SUMMARY = "daily_summary"
+    WEEKLY_CHART = "weekly_chart"
+    BREAK_REMINDER = "break_reminder"
+    
+    # Project Management Widgets
+    ACTIVE_PROJECTS = "active_projects"
+    PROJECT_PROGRESS = "project_progress"
+    PROJECT_ACTIVITY = "project_activity"
+    PROJECT_DEADLINES = "project_deadlines"
+    
+    # Task Management Widgets
+    ASSIGNED_TASKS = "assigned_tasks"
+    TASK_PRIORITY = "task_priority"
+    KANBAN_SUMMARY = "kanban_summary"
+    TASK_TRENDS = "task_trends"
+    
+    # Analytics Widgets
+    PRODUCTIVITY_METRICS = "productivity_metrics"
+    TIME_DISTRIBUTION = "time_distribution"
+    GOAL_PROGRESS = "goal_progress"
+    PERFORMANCE_COMPARISON = "performance_comparison"
+    
+    # Team Widgets (Role-based)
+    TEAM_OVERVIEW = "team_overview"
+    RESOURCE_ALLOCATION = "resource_allocation"
+    TEAM_PERFORMANCE = "team_performance"
+    COMPANY_METRICS = "company_metrics"
+    
+    # Quick Action Widgets
+    QUICK_TIMER = "quick_timer"
+    FAVORITE_PROJECTS = "favorite_projects"
+    RECENT_ACTIONS = "recent_actions"
+    SHORTCUTS_PANEL = "shortcuts_panel"
+
+class WidgetSize(enum.Enum):
+    SMALL = "1x1"      # 1 grid unit
+    MEDIUM = "2x1"     # 2 grid units wide, 1 high
+    LARGE = "2x2"      # 2x2 grid units
+    WIDE = "3x1"       # 3 grid units wide, 1 high
+    TALL = "1x2"       # 1 grid unit wide, 2 high
+    EXTRA_LARGE = "3x2" # 3x2 grid units
+
+class UserDashboard(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    name = db.Column(db.String(100), default='My Dashboard')
+    is_default = db.Column(db.Boolean, default=True)
+    layout_config = db.Column(db.Text)  # JSON string for grid layout configuration
+    
+    # Dashboard settings
+    grid_columns = db.Column(db.Integer, default=6)  # Number of grid columns
+    theme = db.Column(db.String(20), default='light')  # light, dark, auto
+    auto_refresh = db.Column(db.Integer, default=300)  # Auto-refresh interval in seconds
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationships
+    user = db.relationship('User', backref='dashboards')
+    widgets = db.relationship('DashboardWidget', backref='dashboard', lazy=True, cascade='all, delete-orphan')
+    
+    # Unique constraint - one default dashboard per user
+    __table_args__ = (db.Index('idx_user_default_dashboard', 'user_id', 'is_default'),)
+    
+    def __repr__(self):
+        return f'<UserDashboard {self.name} (User: {self.user.username})>'
+
+class DashboardWidget(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    dashboard_id = db.Column(db.Integer, db.ForeignKey('user_dashboard.id'), nullable=False)
+    widget_type = db.Column(db.Enum(WidgetType), nullable=False)
+    
+    # Grid position and size
+    grid_x = db.Column(db.Integer, nullable=False, default=0)  # X position in grid
+    grid_y = db.Column(db.Integer, nullable=False, default=0)  # Y position in grid
+    grid_width = db.Column(db.Integer, nullable=False, default=1)  # Width in grid units
+    grid_height = db.Column(db.Integer, nullable=False, default=1)  # Height in grid units
+    
+    # Widget configuration
+    title = db.Column(db.String(100))  # Custom widget title
+    config = db.Column(db.Text)  # JSON string for widget-specific configuration
+    refresh_interval = db.Column(db.Integer, default=60)  # Refresh interval in seconds
+    
+    # Widget state
+    is_visible = db.Column(db.Boolean, default=True)
+    is_minimized = db.Column(db.Boolean, default=False)
+    z_index = db.Column(db.Integer, default=1)  # Stacking order
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    def __repr__(self):
+        return f'<DashboardWidget {self.widget_type.value} ({self.grid_width}x{self.grid_height})>'
+    
+    @property
+    def config_dict(self):
+        """Parse widget configuration JSON"""
+        if self.config:
+            import json
+            try:
+                return json.loads(self.config)
+            except:
+                return {}
+        return {}
+    
+    @config_dict.setter
+    def config_dict(self, value):
+        """Set widget configuration as JSON"""
+        import json
+        self.config = json.dumps(value) if value else None
+
+class WidgetTemplate(db.Model):
+    """Pre-defined widget templates for easy dashboard setup"""
+    id = db.Column(db.Integer, primary_key=True)
+    widget_type = db.Column(db.Enum(WidgetType), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    icon = db.Column(db.String(50))  # Icon name or emoji
+    
+    # Default configuration
+    default_width = db.Column(db.Integer, default=1)
+    default_height = db.Column(db.Integer, default=1)
+    default_config = db.Column(db.Text)  # JSON string for default widget configuration
+    
+    # Access control
+    required_role = db.Column(db.Enum(Role), default=Role.TEAM_MEMBER)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # Categories for organization
+    category = db.Column(db.String(50), default='General')  # Time, Projects, Tasks, Analytics, Team, Actions
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    def __repr__(self):
+        return f'<WidgetTemplate {self.name} ({self.widget_type.value})>'
+    
+    def can_user_access(self, user):
+        """Check if user has required role to use this widget"""
+        if not self.is_active:
+            return False
+        
+        # Define role hierarchy
+        role_hierarchy = {
+            Role.TEAM_MEMBER: 1,
+            Role.TEAM_LEADER: 2,
+            Role.SUPERVISOR: 3,
+            Role.ADMIN: 4,
+            Role.SYSTEM_ADMIN: 5
+        }
+        
+        user_level = role_hierarchy.get(user.role, 0)
+        required_level = role_hierarchy.get(self.required_role, 0)
+        
+        return user_level >= required_level

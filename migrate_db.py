@@ -16,7 +16,8 @@ try:
     from models import (User, TimeEntry, WorkConfig, SystemSettings, Team, Role, Project,
                        Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType,
                        ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent, KanbanBoard,
-                       KanbanColumn, KanbanCard)
+                       KanbanColumn, KanbanCard, WidgetType, UserDashboard, DashboardWidget,
+                       WidgetTemplate)
     from werkzeug.security import generate_password_hash
     FLASK_AVAILABLE = True
 except ImportError:
@@ -74,6 +75,7 @@ def run_all_migrations(db_path=None):
     migrate_task_system(db_path)
     migrate_system_events(db_path)
     migrate_kanban_system(db_path)
+    migrate_dashboard_system(db_path)
 
     if FLASK_AVAILABLE:
         with app.app_context():
@@ -985,6 +987,149 @@ def migrate_kanban_system(db_file=None):
         conn.close()
 
 
+def migrate_dashboard_system(db_file=None):
+    """Migrate to add Dashboard widget system."""
+    db_path = get_db_path(db_file)
+
+    print(f"Migrating Dashboard system in {db_path}...")
+
+    if not os.path.exists(db_path):
+        print(f"Database file {db_path} does not exist. Run basic migration first.")
+        return False
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        # Check if user_dashboard table already exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_dashboard'")
+        if cursor.fetchone():
+            print("Dashboard tables already exist. Skipping migration.")
+            return True
+
+        print("Creating Dashboard system tables...")
+
+        # Create user_dashboard table
+        cursor.execute("""
+        CREATE TABLE user_dashboard (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name VARCHAR(100) DEFAULT 'My Dashboard',
+            is_default BOOLEAN DEFAULT 1,
+            layout_config TEXT,
+            grid_columns INTEGER DEFAULT 6,
+            theme VARCHAR(20) DEFAULT 'light',
+            auto_refresh INTEGER DEFAULT 300,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES user (id)
+        )
+        """)
+
+        # Create dashboard_widget table
+        cursor.execute("""
+        CREATE TABLE dashboard_widget (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dashboard_id INTEGER NOT NULL,
+            widget_type VARCHAR(50) NOT NULL,
+            grid_x INTEGER NOT NULL DEFAULT 0,
+            grid_y INTEGER NOT NULL DEFAULT 0,
+            grid_width INTEGER NOT NULL DEFAULT 1,
+            grid_height INTEGER NOT NULL DEFAULT 1,
+            title VARCHAR(100),
+            config TEXT,
+            refresh_interval INTEGER DEFAULT 60,
+            is_visible BOOLEAN DEFAULT 1,
+            is_minimized BOOLEAN DEFAULT 0,
+            z_index INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (dashboard_id) REFERENCES user_dashboard (id)
+        )
+        """)
+
+        # Create widget_template table
+        cursor.execute("""
+        CREATE TABLE widget_template (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            widget_type VARCHAR(50) NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            description TEXT,
+            icon VARCHAR(50),
+            default_width INTEGER DEFAULT 1,
+            default_height INTEGER DEFAULT 1,
+            default_config TEXT,
+            required_role VARCHAR(50) DEFAULT 'Team Member',
+            is_active BOOLEAN DEFAULT 1,
+            category VARCHAR(50) DEFAULT 'General',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        # Create indexes for better performance
+        cursor.execute("CREATE INDEX idx_user_dashboard_user ON user_dashboard(user_id)")
+        cursor.execute("CREATE INDEX idx_user_dashboard_default ON user_dashboard(user_id, is_default)")
+        cursor.execute("CREATE INDEX idx_dashboard_widget_dashboard ON dashboard_widget(dashboard_id)")
+        cursor.execute("CREATE INDEX idx_dashboard_widget_type ON dashboard_widget(widget_type)")
+        cursor.execute("CREATE INDEX idx_widget_template_type ON widget_template(widget_type)")
+        cursor.execute("CREATE INDEX idx_widget_template_category ON widget_template(category)")
+
+        # Insert default widget templates
+        default_templates = [
+            # Time Tracking Widgets
+            ('current_timer', 'Current Timer', 'Shows active time tracking session', '⏲️', 2, 1, '{}', 'Team Member', 'Time'),
+            ('daily_summary', 'Daily Summary', 'Today\'s time tracking summary', '📊', 2, 1, '{}', 'Team Member', 'Time'),
+            ('weekly_chart', 'Weekly Chart', 'Weekly time distribution chart', '📈', 3, 2, '{}', 'Team Member', 'Time'),
+            ('break_reminder', 'Break Reminder', 'Reminds when breaks are due', '☕', 1, 1, '{}', 'Team Member', 'Time'),
+
+            # Project Management Widgets
+            ('active_projects', 'Active Projects', 'List of current active projects', '📁', 2, 2, '{}', 'Team Member', 'Projects'),
+            ('project_progress', 'Project Progress', 'Visual progress of projects', '🎯', 2, 1, '{}', 'Team Member', 'Projects'),
+            ('project_activity', 'Recent Activity', 'Recent project activities', '🔄', 2, 1, '{}', 'Team Member', 'Projects'),
+            ('project_deadlines', 'Upcoming Deadlines', 'Projects with approaching deadlines', '⚠️', 2, 1, '{}', 'Team Member', 'Projects'),
+
+            # Task Management Widgets
+            ('assigned_tasks', 'My Tasks', 'Tasks assigned to me', '✅', 2, 2, '{}', 'Team Member', 'Tasks'),
+            ('task_priority', 'Priority Matrix', 'Tasks organized by priority', '🔥', 2, 2, '{}', 'Team Member', 'Tasks'),
+            ('kanban_summary', 'Kanban Overview', 'Summary of Kanban boards', '📋', 3, 1, '{}', 'Team Member', 'Tasks'),
+            ('task_trends', 'Task Trends', 'Task completion trends', '📉', 2, 1, '{}', 'Team Member', 'Tasks'),
+
+            # Analytics Widgets
+            ('productivity_metrics', 'Productivity', 'Personal productivity metrics', '⚡', 1, 1, '{}', 'Team Member', 'Analytics'),
+            ('time_distribution', 'Time Distribution', 'How time is distributed', '🥧', 2, 2, '{}', 'Team Member', 'Analytics'),
+            ('goal_progress', 'Goals', 'Progress towards goals', '🎯', 1, 1, '{}', 'Team Member', 'Analytics'),
+            ('performance_comparison', 'Performance', 'Performance comparison over time', '📊', 2, 1, '{}', 'Team Member', 'Analytics'),
+
+            # Team Widgets (Role-based)
+            ('team_overview', 'Team Overview', 'Overview of team performance', '👥', 3, 2, '{}', 'Team Leader', 'Team'),
+            ('resource_allocation', 'Resources', 'Team resource allocation', '📊', 2, 2, '{}', 'Administrator', 'Team'),
+            ('team_performance', 'Team Performance', 'Team performance metrics', '📈', 3, 1, '{}', 'Supervisor', 'Team'),
+            ('company_metrics', 'Company Metrics', 'Company-wide metrics', '🏢', 3, 2, '{}', 'System Administrator', 'Team'),
+
+            # Quick Action Widgets
+            ('quick_timer', 'Quick Timer', 'Quick time tracking controls', '▶️', 1, 1, '{}', 'Team Member', 'Actions'),
+            ('favorite_projects', 'Favorites', 'Quick access to favorite projects', '⭐', 1, 2, '{}', 'Team Member', 'Actions'),
+            ('recent_actions', 'Recent Actions', 'Recently performed actions', '🕒', 2, 1, '{}', 'Team Member', 'Actions'),
+            ('shortcuts_panel', 'Shortcuts', 'Quick action shortcuts', '🚀', 1, 1, '{}', 'Team Member', 'Actions'),
+        ]
+
+        cursor.executemany("""
+        INSERT INTO widget_template
+        (widget_type, name, description, icon, default_width, default_height, default_config, required_role, category)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, default_templates)
+
+        conn.commit()
+        print("Dashboard system migration completed successfully!")
+        return True
+
+    except Exception as e:
+        print(f"Error during Dashboard system migration: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 def main():
     """Main function with command line interface."""
@@ -1004,6 +1149,8 @@ def main():
                        help='Run only system events migration')
     parser.add_argument('--kanban', '-k', action='store_true',
                        help='Run only Kanban system migration')
+    parser.add_argument('--dashboard', '--dash', action='store_true',
+                       help='Run only dashboard system migration')
 
     args = parser.parse_args()
 
@@ -1038,6 +1185,9 @@ def main():
 
         elif args.kanban:
             migrate_kanban_system(db_path)
+
+        elif args.dashboard:
+            migrate_dashboard_system(db_path)
 
         else:
             # Default: run all migrations
