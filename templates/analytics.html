@@ -7,7 +7,7 @@
         <div class="mode-switcher">
             <button class="mode-btn {% if mode == 'personal' %}active{% endif %}" 
                     onclick="switchMode('personal')">Personal</button>
-            {% if g.user.team_id and g.user.role.value in ['Team Leader', 'Supervisor', 'Administrator'] %}
+            {% if g.user.team_id and g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN] %}
             <button class="mode-btn {% if mode == 'team' %}active{% endif %}" 
                     onclick="switchMode('team')">Team</button>
             {% endif %}
