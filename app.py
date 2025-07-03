@@ -360,6 +360,9 @@ def run_migrations():
         if create_table_sql and 'System Administrator' not in create_table_sql[0]:
             print("Updating role enum constraint to include SYSTEM_ADMIN...")
             
+            # Drop user_new table if it exists from previous failed migration
+            cursor.execute("DROP TABLE IF EXISTS user_new")
+            
             # Create a backup table with the new enum constraint
             cursor.execute("""
             CREATE TABLE user_new (
@@ -767,6 +770,19 @@ def is_system_admin(user=None):
 def can_access_system_settings(user=None):
     """Helper function to check if user can access system-wide settings"""
     return is_system_admin(user)
+
+def get_available_roles():
+    """Get roles available for assignment, excluding SYSTEM_ADMIN unless one already exists"""
+    roles = list(Role)
+    
+    # Only show SYSTEM_ADMIN role if at least one system admin already exists
+    # This prevents accidental creation of system admins
+    system_admin_exists = User.query.filter_by(role=Role.SYSTEM_ADMIN).count() > 0
+    
+    if not system_admin_exists:
+        roles = [role for role in roles if role != Role.SYSTEM_ADMIN]
+    
+    return roles
 
 # Add this decorator function after your existing decorators
 def role_required(min_role):
@@ -1439,7 +1455,7 @@ The TimeTrack Team
 
     # Get all teams for the form (company-scoped)
     teams = Team.query.filter_by(company_id=g.user.company_id).all()
-    roles = [role for role in Role]
+    roles = get_available_roles()
 
     return render_template('create_user.html', title='Create User', teams=teams, roles=roles)
 
@@ -1492,7 +1508,7 @@ def edit_user(user_id):
 
     # Get all teams for the form (company-scoped)
     teams = Team.query.filter_by(company_id=g.user.company_id).all()
-    roles = [role for role in Role]
+    roles = get_available_roles()
 
     return render_template('edit_user.html', title='Edit User', user=user, teams=teams, roles=roles)
 
