@@ -360,6 +360,33 @@ def run_migrations():
         if create_table_sql and 'System Administrator' not in create_table_sql[0]:
             print("Updating role enum constraint to include SYSTEM_ADMIN...")
             
+            # First, check and normalize existing role values
+            cursor.execute("SELECT DISTINCT role FROM user WHERE role IS NOT NULL")
+            existing_roles = [row[0] for row in cursor.fetchall()]
+            print(f"Found existing roles: {existing_roles}")
+            
+            # Map old role values to new standardized values
+            role_mapping = {
+                'TEAM_MEMBER': 'Team Member',
+                'TEAM_LEADER': 'Team Leader', 
+                'SUPERVISOR': 'Supervisor',
+                'ADMIN': 'Administrator',
+                'SYSTEM_ADMIN': 'System Administrator'
+            }
+            
+            # Update any enum-style role values to display values
+            for old_role, new_role in role_mapping.items():
+                cursor.execute("UPDATE user SET role = ? WHERE role = ?", (new_role, old_role))
+                updated_count = cursor.rowcount
+                if updated_count > 0:
+                    print(f"Updated {updated_count} users from '{old_role}' to '{new_role}'")
+            
+            # Set any NULL roles to default
+            cursor.execute("UPDATE user SET role = 'Team Member' WHERE role IS NULL")
+            null_updated = cursor.rowcount
+            if null_updated > 0:
+                print(f"Set {null_updated} NULL roles to 'Team Member'")
+            
             # Drop user_new table if it exists from previous failed migration
             cursor.execute("DROP TABLE IF EXISTS user_new")
             
