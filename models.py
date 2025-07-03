@@ -86,6 +86,9 @@ class Project(db.Model):
     # Optional team assignment - if set, only team members can log time to this project
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
     
+    # Project categorization
+    category_id = db.Column(db.Integer, db.ForeignKey('project_category.id'), nullable=True)
+    
     # Project dates
     start_date = db.Column(db.Date, nullable=True)
     end_date = db.Column(db.Date, nullable=True)
@@ -94,6 +97,7 @@ class Project(db.Model):
     created_by = db.relationship('User', foreign_keys=[created_by_id], backref='created_projects')
     team = db.relationship('Team', backref='projects')
     time_entries = db.relationship('TimeEntry', backref='project', lazy=True)
+    category = db.relationship('ProjectCategory', back_populates='projects')
     
     # Unique constraint per company
     __table_args__ = (db.UniqueConstraint('company_id', 'code', name='uq_project_code_per_company'),)
@@ -237,6 +241,10 @@ class TimeEntry(db.Model):
     # Project association - nullable for backward compatibility
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
     
+    # Task/SubTask associations - nullable for backward compatibility
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=True)
+    subtask_id = db.Column(db.Integer, db.ForeignKey('sub_task.id'), nullable=True)
+    
     # Optional notes/description for the time entry
     notes = db.Column(db.Text, nullable=True)
 
@@ -379,3 +387,144 @@ class UserPreferences(db.Model):
     
     def __repr__(self):
         return f'<UserPreferences {self.user.username}: {self.date_format}, {"24h" if self.time_format_24h else "12h"}>'
+
+# Project Category model for organizing projects
+class ProjectCategory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    color = db.Column(db.String(7), default='#007bff')  # Hex color for UI
+    icon = db.Column(db.String(50), nullable=True)  # Icon name/emoji
+    
+    # Company association for multi-tenancy
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Relationships
+    company = db.relationship('Company', backref='project_categories')
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    projects = db.relationship('Project', back_populates='category', lazy=True)
+    
+    # Unique constraint per company
+    __table_args__ = (db.UniqueConstraint('company_id', 'name', name='uq_category_name_per_company'),)
+    
+    def __repr__(self):
+        return f'<ProjectCategory {self.name}>'
+
+# Task status enumeration
+class TaskStatus(enum.Enum):
+    NOT_STARTED = "Not Started"
+    IN_PROGRESS = "In Progress"
+    ON_HOLD = "On Hold"
+    COMPLETED = "Completed"
+    CANCELLED = "Cancelled"
+
+# Task priority enumeration
+class TaskPriority(enum.Enum):
+    LOW = "Low"
+    MEDIUM = "Medium"
+    HIGH = "High"
+    URGENT = "Urgent"
+
+# Task model for project breakdown
+class Task(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    
+    # Task properties
+    status = db.Column(db.Enum(TaskStatus), default=TaskStatus.NOT_STARTED)
+    priority = db.Column(db.Enum(TaskPriority), default=TaskPriority.MEDIUM)
+    estimated_hours = db.Column(db.Float, nullable=True)  # Estimated time to complete
+    
+    # Project association
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    
+    # Task assignment
+    assigned_to_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    
+    # Task dates
+    start_date = db.Column(db.Date, nullable=True)
+    due_date = db.Column(db.Date, nullable=True)
+    completed_date = db.Column(db.Date, nullable=True)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Relationships
+    project = db.relationship('Project', backref='tasks')
+    assigned_to = db.relationship('User', foreign_keys=[assigned_to_id], backref='assigned_tasks')
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    subtasks = db.relationship('SubTask', backref='parent_task', lazy=True, cascade='all, delete-orphan')
+    time_entries = db.relationship('TimeEntry', backref='task', lazy=True)
+    
+    def __repr__(self):
+        return f'<Task {self.name} ({self.status.value})>'
+    
+    @property
+    def progress_percentage(self):
+        """Calculate task progress based on subtasks completion"""
+        if not self.subtasks:
+            return 100 if self.status == TaskStatus.COMPLETED else 0
+        
+        completed_subtasks = sum(1 for subtask in self.subtasks if subtask.status == TaskStatus.COMPLETED)
+        return int((completed_subtasks / len(self.subtasks)) * 100)
+    
+    @property
+    def total_time_logged(self):
+        """Calculate total time logged to this task (in seconds)"""
+        return sum(entry.duration or 0 for entry in self.time_entries if entry.duration)
+    
+    def can_user_access(self, user):
+        """Check if a user can access this task"""
+        return self.project.is_user_allowed(user)
+
+# SubTask model for task breakdown
+class SubTask(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    
+    # SubTask properties
+    status = db.Column(db.Enum(TaskStatus), default=TaskStatus.NOT_STARTED)
+    priority = db.Column(db.Enum(TaskPriority), default=TaskPriority.MEDIUM)
+    estimated_hours = db.Column(db.Float, nullable=True)
+    
+    # Parent task association
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
+    
+    # Assignment
+    assigned_to_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    
+    # Dates
+    start_date = db.Column(db.Date, nullable=True)
+    due_date = db.Column(db.Date, nullable=True)
+    completed_date = db.Column(db.Date, nullable=True)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Relationships
+    assigned_to = db.relationship('User', foreign_keys=[assigned_to_id], backref='assigned_subtasks')
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    time_entries = db.relationship('TimeEntry', backref='subtask', lazy=True)
+    
+    def __repr__(self):
+        return f'<SubTask {self.name} ({self.status.value})>'
+    
+    @property
+    def total_time_logged(self):
+        """Calculate total time logged to this subtask (in seconds)"""
+        return sum(entry.duration or 0 for entry in self.time_entries if entry.duration)
+    
+    def can_user_access(self, user):
+        """Check if a user can access this subtask"""
+        return self.parent_task.can_user_access(user)

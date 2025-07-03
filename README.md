@@ -91,12 +91,6 @@ The integrated migration system handles:
 - Sample data initialization
 - Data integrity maintenance during upgrades
 
-**Legacy Migration Files**: The following files are maintained for reference but are no longer needed:
-- `migrate_db.py`: Legacy core database migration (now integrated)
-- `migrate_roles_teams.py`: Legacy role and team migration (now integrated)
-- `migrate_projects.py`: Legacy project migration (now integrated)
-- `repair_roles.py`: Legacy role repair utility (functionality now integrated)
-
 ### Configuration
 
 The application can be configured through:

@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data
@@ -54,489 +54,34 @@ mail = Mail(app)
 # Initialize the database with the app
 db.init_app(app)
 
-# Integrated migration and initialization function
+# Consolidated migration using migrate_db module
 def run_migrations():
-    """Run all database migrations and initialize system settings."""
-    import sqlite3
-
-    # Determine database path based on environment
-    db_path = '/data/timetrack.db' if os.path.exists('/data') else 'timetrack.db'
-
-    # Check if database exists
-    if not os.path.exists(db_path):
-        print("Database doesn't exist. Creating new database.")
+    """Run all database migrations using the consolidated migrate_db module."""
+    try:
+        from migrate_db import run_all_migrations
+        run_all_migrations()
+        print("Database migrations completed successfully!")
+    except ImportError as e:
+        print(f"Error importing migrate_db: {e}")
+        print("Falling back to basic table creation...")
         with app.app_context():
             db.create_all()
             init_system_settings()
-        return
-
-    print("Running database migrations...")
-
-    # Connect to the database for raw SQL operations
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    try:
-        # Check if time_entry table exists first
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='time_entry'")
-        if not cursor.fetchone():
-            print("time_entry table doesn't exist. Creating all tables...")
-            with app.app_context():
-                db.create_all()
-                init_system_settings()
-            conn.commit()
-            conn.close()
-            return
-
-        # Migrate time_entry table
-        cursor.execute("PRAGMA table_info(time_entry)")
-        time_entry_columns = [column[1] for column in cursor.fetchall()]
-
-        migrations = [
-            ('is_paused', "ALTER TABLE time_entry ADD COLUMN is_paused BOOLEAN DEFAULT 0"),
-            ('pause_start_time', "ALTER TABLE time_entry ADD COLUMN pause_start_time TIMESTAMP"),
-            ('total_break_duration', "ALTER TABLE time_entry ADD COLUMN total_break_duration INTEGER DEFAULT 0"),
-            ('user_id', "ALTER TABLE time_entry ADD COLUMN user_id INTEGER"),
-            ('project_id', "ALTER TABLE time_entry ADD COLUMN project_id INTEGER"),
-            ('notes', "ALTER TABLE time_entry ADD COLUMN notes TEXT")
-        ]
-
-        for column_name, sql_command in migrations:
-            if column_name not in time_entry_columns:
-                print(f"Adding {column_name} column to time_entry...")
-                cursor.execute(sql_command)
-
-        # Create work_config table if it doesn't exist
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='work_config'")
-        if not cursor.fetchone():
-            print("Creating work_config table...")
-            cursor.execute("""
-            CREATE TABLE work_config (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                work_hours_per_day FLOAT DEFAULT 8.0,
-                mandatory_break_minutes INTEGER DEFAULT 30,
-                break_threshold_hours FLOAT DEFAULT 6.0,
-                additional_break_minutes INTEGER DEFAULT 15,
-                additional_break_threshold_hours FLOAT DEFAULT 9.0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                user_id INTEGER
-            )
-            """)
-            cursor.execute("""
-            INSERT INTO work_config (work_hours_per_day, mandatory_break_minutes, break_threshold_hours)
-            VALUES (8.0, 30, 6.0)
-            """)
-        else:
-            # Check and add missing columns to work_config
-            cursor.execute("PRAGMA table_info(work_config)")
-            work_config_columns = [column[1] for column in cursor.fetchall()]
-
-            work_config_migrations = [
-                ('additional_break_minutes', "ALTER TABLE work_config ADD COLUMN additional_break_minutes INTEGER DEFAULT 15"),
-                ('additional_break_threshold_hours', "ALTER TABLE work_config ADD COLUMN additional_break_threshold_hours FLOAT DEFAULT 9.0"),
-                ('user_id', "ALTER TABLE work_config ADD COLUMN user_id INTEGER"),
-                ('time_rounding_minutes', "ALTER TABLE work_config ADD COLUMN time_rounding_minutes INTEGER DEFAULT 0"),
-                ('round_to_nearest', "ALTER TABLE work_config ADD COLUMN round_to_nearest BOOLEAN DEFAULT 1"),
-                ('time_format_24h', "ALTER TABLE work_config ADD COLUMN time_format_24h BOOLEAN DEFAULT 1"),
-                ('date_format', "ALTER TABLE work_config ADD COLUMN date_format VARCHAR(20) DEFAULT 'ISO'")
-            ]
-
-            for column_name, sql_command in work_config_migrations:
-                if column_name not in work_config_columns:
-                    print(f"Adding {column_name} column to work_config...")
-                    cursor.execute(sql_command)
-
-        # Migrate user table
-        cursor.execute("PRAGMA table_info(user)")
-        user_columns = [column[1] for column in cursor.fetchall()]
-
-        user_migrations = [
-            ('is_verified', "ALTER TABLE user ADD COLUMN is_verified BOOLEAN DEFAULT 0"),
-            ('verification_token', "ALTER TABLE user ADD COLUMN verification_token VARCHAR(100)"),
-            ('token_expiry', "ALTER TABLE user ADD COLUMN token_expiry TIMESTAMP"),
-            ('is_blocked', "ALTER TABLE user ADD COLUMN is_blocked BOOLEAN DEFAULT 0"),
-            ('role', "ALTER TABLE user ADD COLUMN role VARCHAR(50) DEFAULT 'Team Member'"),
-            ('team_id', "ALTER TABLE user ADD COLUMN team_id INTEGER"),
-            ('company_id', "ALTER TABLE user ADD COLUMN company_id INTEGER"),
-            ('two_factor_enabled', "ALTER TABLE user ADD COLUMN two_factor_enabled BOOLEAN DEFAULT 0"),
-            ('two_factor_secret', "ALTER TABLE user ADD COLUMN two_factor_secret VARCHAR(32)"),
-            ('account_type', "ALTER TABLE user ADD COLUMN account_type VARCHAR(20) DEFAULT 'COMPANY_USER'"),
-            ('business_name', "ALTER TABLE user ADD COLUMN business_name VARCHAR(100)")
-        ]
-
-        for column_name, sql_command in user_migrations:
-            if column_name not in user_columns:
-                print(f"Adding {column_name} column to user...")
-                cursor.execute(sql_command)
-
-        # Remove is_admin column if it exists (migration to role-based system)
-        if 'is_admin' in user_columns:
-            print("Migrating from is_admin to role-based system...")
-            # First ensure all users have roles set based on is_admin
-            cursor.execute("UPDATE user SET role = 'Administrator' WHERE is_admin = 1 AND (role IS NULL OR role = '')")
-            cursor.execute("UPDATE user SET role = 'Team Member' WHERE is_admin = 0 AND (role IS NULL OR role = '')")
-
-            # Drop the is_admin column (SQLite requires table recreation)
-            print("Removing is_admin column...")
-            cursor.execute("PRAGMA foreign_keys=off")
-
-            # Create new table without is_admin column
-            cursor.execute("""
-            CREATE TABLE user_new (
-                id INTEGER PRIMARY KEY,
-                username VARCHAR(80) UNIQUE NOT NULL,
-                email VARCHAR(120) UNIQUE NOT NULL,
-                password_hash VARCHAR(128),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                is_verified BOOLEAN DEFAULT 0,
-                verification_token VARCHAR(100),
-                token_expiry TIMESTAMP,
-                is_blocked BOOLEAN DEFAULT 0,
-                role VARCHAR(50) DEFAULT 'Team Member',
-                team_id INTEGER,
-                two_factor_enabled BOOLEAN DEFAULT 0,
-                two_factor_secret VARCHAR(32),
-                account_type VARCHAR(20) DEFAULT 'COMPANY_USER',
-                business_name VARCHAR(100),
-                company_id INTEGER
-            )
-            """)
-
-            # Copy data from old table to new table (excluding is_admin)
-            cursor.execute("""
-            INSERT INTO user_new (id, username, email, password_hash, created_at, is_verified,
-                                verification_token, token_expiry, is_blocked, role, team_id,
-                                two_factor_enabled, two_factor_secret, account_type, business_name, company_id)
-            SELECT id, username, email, password_hash, created_at, is_verified,
-                   verification_token, token_expiry, is_blocked, role, team_id,
-                   two_factor_enabled, two_factor_secret, 
-                   COALESCE(account_type, 'COMPANY_USER'),
-                   business_name,
-                   company_id
-            FROM user
-            """)
-
-            # Drop old table and rename new table
-            cursor.execute("DROP TABLE user")
-            cursor.execute("ALTER TABLE user_new RENAME TO user")
-            cursor.execute("PRAGMA foreign_keys=on")
-            print("Successfully removed is_admin column")
-
-        # Create team table if it doesn't exist
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='team'")
-        if not cursor.fetchone():
-            print("Creating team table...")
-            cursor.execute("""
-            CREATE TABLE team (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name VARCHAR(100) UNIQUE NOT NULL,
-                description VARCHAR(255),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """)
-
-        # Create system_settings table if it doesn't exist
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='system_settings'")
-        if not cursor.fetchone():
-            print("Creating system_settings table...")
-            cursor.execute("""
-            CREATE TABLE system_settings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                key VARCHAR(50) UNIQUE NOT NULL,
-                value VARCHAR(255) NOT NULL,
-                description VARCHAR(255),
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """)
-
-        # Create project table if it doesn't exist
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='project'")
-        if not cursor.fetchone():
-            print("Creating project table...")
-            cursor.execute("""
-            CREATE TABLE project (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name VARCHAR(100) NOT NULL,
-                description TEXT,
-                code VARCHAR(20) NOT NULL,
-                is_active BOOLEAN DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                created_by_id INTEGER NOT NULL,
-                team_id INTEGER,
-                start_date DATE,
-                end_date DATE,
-                company_id INTEGER,
-                FOREIGN KEY (created_by_id) REFERENCES user (id),
-                FOREIGN KEY (team_id) REFERENCES team (id),
-                FOREIGN KEY (company_id) REFERENCES company (id)
-            )
-            """)
-
-        # Create company table if it doesn't exist
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='company'")
-        if not cursor.fetchone():
-            print("Creating company table...")
-            cursor.execute("""
-            CREATE TABLE company (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name VARCHAR(100) UNIQUE NOT NULL,
-                slug VARCHAR(50) UNIQUE NOT NULL,
-                description TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                is_personal BOOLEAN DEFAULT 0,
-                is_active BOOLEAN DEFAULT 1,
-                max_users INTEGER DEFAULT 100
-            )
-            """)
-        else:
-            # Check and add missing columns to existing company table
-            cursor.execute("PRAGMA table_info(company)")
-            company_columns = [column[1] for column in cursor.fetchall()]
-            
-            company_migrations = [
-                ('is_personal', "ALTER TABLE company ADD COLUMN is_personal BOOLEAN DEFAULT 0")
-            ]
-            
-            for column_name, sql_command in company_migrations:
-                if column_name not in company_columns:
-                    print(f"Adding {column_name} column to company...")
-                    cursor.execute(sql_command)
-
-        # Create company_work_config table if it doesn't exist
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='company_work_config'")
-        if not cursor.fetchone():
-            print("Creating company_work_config table...")
-            cursor.execute("""
-            CREATE TABLE company_work_config (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                company_id INTEGER NOT NULL,
-                work_hours_per_day FLOAT DEFAULT 8.0,
-                mandatory_break_minutes INTEGER DEFAULT 30,
-                break_threshold_hours FLOAT DEFAULT 6.0,
-                additional_break_minutes INTEGER DEFAULT 15,
-                additional_break_threshold_hours FLOAT DEFAULT 9.0,
-                region VARCHAR(20) DEFAULT 'DE',
-                region_name VARCHAR(50) DEFAULT 'Germany',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                created_by_id INTEGER,
-                FOREIGN KEY (company_id) REFERENCES company (id),
-                FOREIGN KEY (created_by_id) REFERENCES user (id),
-                UNIQUE(company_id)
-            )
-            """)
-
-        # Create user_preferences table if it doesn't exist
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_preferences'")
-        if not cursor.fetchone():
-            print("Creating user_preferences table...")
-            cursor.execute("""
-            CREATE TABLE user_preferences (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                time_format_24h BOOLEAN DEFAULT 1,
-                date_format VARCHAR(20) DEFAULT 'ISO',
-                time_rounding_minutes INTEGER DEFAULT 0,
-                round_to_nearest BOOLEAN DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES user (id),
-                UNIQUE(user_id)
-            )
-            """)
-
-        # Fix enum constraint for SYSTEM_ADMIN role
-        # SQLite doesn't have native enum support, but SQLAlchemy creates check constraints
-        # We need to drop and recreate the table to add the new enum value
-        cursor.execute("PRAGMA table_info(user)")
-        user_columns = cursor.fetchall()
-        
-        # Check if we need to migrate the role enum constraint
-        cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='user'")
-        create_table_sql = cursor.fetchone()
-        
-        if create_table_sql and 'System Administrator' not in create_table_sql[0]:
-            print("Updating role enum constraint to include SYSTEM_ADMIN...")
-            
-            # Check existing role values
-            cursor.execute("SELECT DISTINCT role FROM user WHERE role IS NOT NULL")
-            existing_roles = [row[0] for row in cursor.fetchall()]
-            print(f"Found existing roles: {existing_roles}")
-            
-            # Drop user_new table if it exists from previous failed migration
-            cursor.execute("DROP TABLE IF EXISTS user_new")
-            
-            # Create a backup table with the new enum constraint
-            cursor.execute("""
-            CREATE TABLE user_new (
-                id INTEGER PRIMARY KEY,
-                username VARCHAR(80) NOT NULL,
-                email VARCHAR(120) NOT NULL,
-                password_hash VARCHAR(128),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                company_id INTEGER NOT NULL,
-                is_verified BOOLEAN DEFAULT 0,
-                verification_token VARCHAR(100),
-                token_expiry TIMESTAMP,
-                is_blocked BOOLEAN DEFAULT 0,
-                role VARCHAR(50) DEFAULT 'Team Member' CHECK (role IN ('Team Member', 'Team Leader', 'Supervisor', 'Administrator', 'System Administrator')),
-                team_id INTEGER,
-                account_type VARCHAR(20) DEFAULT 'Company User' CHECK (account_type IN ('Company User', 'Freelancer')),
-                business_name VARCHAR(100),
-                two_factor_enabled BOOLEAN DEFAULT 0,
-                two_factor_secret VARCHAR(32),
-                FOREIGN KEY (company_id) REFERENCES company (id),
-                FOREIGN KEY (team_id) REFERENCES team (id)
-            )
-            """)
-            
-            # Copy all data from old table to new table
-            cursor.execute("""
-            INSERT INTO user_new SELECT * FROM user
-            """)
-            
-            # Drop the old table and rename the new one
-            cursor.execute("DROP TABLE user")
-            cursor.execute("ALTER TABLE user_new RENAME TO user")
-            
-            print("✓ Role enum constraint updated successfully")
-
-        # Normalize all enum values before SQLAlchemy operations
-        print("Normalizing all enum values...")
-        
-        # Normalize role values
-        role_mapping = {
-            'TEAM_MEMBER': 'Team Member',
-            'TEAM_LEADER': 'Team Leader', 
-            'SUPERVISOR': 'Supervisor',
-            'ADMIN': 'Administrator',
-            'SYSTEM_ADMIN': 'System Administrator'
-        }
-        
-        for old_role, new_role in role_mapping.items():
-            cursor.execute("UPDATE user SET role = ? WHERE role = ?", (new_role, old_role))
-            updated_count = cursor.rowcount
-            if updated_count > 0:
-                print(f"Updated {updated_count} users from role '{old_role}' to '{new_role}'")
-        
-        # Normalize account_type values
-        account_type_mapping = {
-            'COMPANY_USER': 'Company User',
-            'FREELANCER': 'Freelancer'
-        }
-        
-        for old_type, new_type in account_type_mapping.items():
-            cursor.execute("UPDATE user SET account_type = ? WHERE account_type = ?", (new_type, old_type))
-            updated_count = cursor.rowcount
-            if updated_count > 0:
-                print(f"Updated {updated_count} users account_type from '{old_type}' to '{new_type}'")
-        
-        # Set any NULL values to defaults
-        cursor.execute("UPDATE user SET role = 'Team Member' WHERE role IS NULL")
-        null_roles = cursor.rowcount
-        if null_roles > 0:
-            print(f"Set {null_roles} NULL roles to 'Team Member'")
-            
-        cursor.execute("UPDATE user SET account_type = 'Company User' WHERE account_type IS NULL")
-        null_accounts = cursor.rowcount
-        if null_accounts > 0:
-            print(f"Set {null_accounts} NULL account_types to 'Company User'")
-
-        # Commit all schema changes
-        conn.commit()
-
     except Exception as e:
         print(f"Error during database migration: {e}")
-        conn.rollback()
         raise
-    finally:
-        conn.close()
-
-    # Now use SQLAlchemy for data migrations
-    db.create_all()  # This will create any remaining tables defined in models
-
-    # Initialize system settings
-    init_system_settings()
-
-    # Handle company migration and admin user setup
-    migrate_to_company_model()
-    migrate_data()
-
-    print("Database migrations completed successfully!")
 
 def migrate_to_company_model():
-    """Migrate existing data to support company model"""
-    import sqlite3
-
-    # Determine database path based on environment
-    db_path = '/data/timetrack.db' if os.path.exists('/data') else 'timetrack.db'
-
-    # Connect to the database for raw SQL operations
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
+    """Migrate existing data to support company model (stub - handled by migrate_db)"""
     try:
-        # Check if company_id column exists in user table
-        cursor.execute("PRAGMA table_info(user)")
-        user_columns = [column[1] for column in cursor.fetchall()]
-
-        if 'company_id' not in user_columns:
-            print("Migrating to company model...")
-
-            # Add company_id columns to existing tables
-            tables_to_migrate = [
-                ('user', 'ALTER TABLE user ADD COLUMN company_id INTEGER'),
-                ('team', 'ALTER TABLE team ADD COLUMN company_id INTEGER'),
-                ('project', 'ALTER TABLE project ADD COLUMN company_id INTEGER')
-            ]
-
-            for table_name, sql_command in tables_to_migrate:
-                cursor.execute(f"PRAGMA table_info({table_name})")
-                columns = [column[1] for column in cursor.fetchall()]
-                if 'company_id' not in columns:
-                    print(f"Adding company_id column to {table_name}...")
-                    cursor.execute(sql_command)
-
-            # Check if there are existing users but no companies
-            cursor.execute("SELECT COUNT(*) FROM user")
-            user_count = cursor.fetchone()[0]
-
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='company'")
-            company_table_exists = cursor.fetchone()
-
-            if user_count > 0 and company_table_exists:
-                cursor.execute("SELECT COUNT(*) FROM company")
-                company_count = cursor.fetchone()[0]
-
-                if company_count == 0:
-                    print("Creating default company for existing data...")
-                    # Create default company
-                    cursor.execute("""
-                    INSERT INTO company (name, slug, description, is_active, max_users)
-                    VALUES ('Default Organization', 'default', 'Migrated from single-tenant installation', 1, 1000)
-                    """)
-
-                    # Get the company ID
-                    cursor.execute("SELECT last_insert_rowid()")
-                    company_id = cursor.fetchone()[0]
-
-                    # Update all existing records to use the default company
-                    cursor.execute(f"UPDATE user SET company_id = {company_id} WHERE company_id IS NULL")
-                    cursor.execute(f"UPDATE team SET company_id = {company_id} WHERE company_id IS NULL")
-                    cursor.execute(f"UPDATE project SET company_id = {company_id} WHERE company_id IS NULL")
-
-                    print(f"Assigned {user_count} existing users to default company")
-
-        conn.commit()
-
+        from migrate_db import migrate_to_company_model, get_db_path
+        db_path = get_db_path()
+        migrate_to_company_model(db_path)
+    except ImportError:
+        print("migrate_db module not available - skipping company model migration")
     except Exception as e:
         print(f"Error during company migration: {e}")
-        conn.rollback()
         raise
-    finally:
-        conn.close()
 
 def init_system_settings():
     """Initialize system settings with default values if they don't exist"""
@@ -561,158 +106,44 @@ def init_system_settings():
         db.session.commit()
 
 def migrate_data():
-    """Handle data migrations and setup"""
-    # Only create default admin if no companies exist yet
-    if Company.query.count() == 0:
-        print("No companies exist, skipping admin user creation. Use company setup instead.")
-        return
-
-    # Check if admin user exists in the first company
-    default_company = Company.query.first()
-    if default_company:
-        admin = User.query.filter_by(username='admin', company_id=default_company.id).first()
-        if not admin:
-            # Create admin user for the default company
-            admin = User(
-                username='admin',
-                email='admin@timetrack.local',
-                company_id=default_company.id,
-                is_verified=True,
-                role=Role.ADMIN,
-                two_factor_enabled=False
-            )
-            admin.set_password('admin')
-            db.session.add(admin)
-            db.session.commit()
-            print("Created admin user with username 'admin' and password 'admin'")
-            print("IMPORTANT: Change the admin password after first login!")
-        else:
-            # Update existing admin user with new fields
-            admin.is_verified = True
-            if not admin.role:
-                admin.role = Role.ADMIN
-            if admin.two_factor_enabled is None:
-                admin.two_factor_enabled = False
-            db.session.commit()
-
-        # Update orphaned records
-        orphan_entries = TimeEntry.query.filter_by(user_id=None).all()
-        for entry in orphan_entries:
-            entry.user_id = admin.id
-
-        orphan_configs = WorkConfig.query.filter_by(user_id=None).all()
-        for config in orphan_configs:
-            config.user_id = admin.id
-
-        # Update existing users
-        users_to_update = User.query.filter_by(company_id=default_company.id).all()
-        for user in users_to_update:
-            if user.is_verified is None:
-                user.is_verified = True
-            if not user.role:
-                user.role = Role.TEAM_MEMBER
-            if user.two_factor_enabled is None:
-                user.two_factor_enabled = False
-        
-        # Check if any system admin users exist
-        system_admin_count = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
-        if system_admin_count == 0:
-            print("No system administrators found. SYSTEM_ADMIN role is now available for assignment.")
-            print("To promote a user: UPDATE user SET role = 'System Administrator' WHERE username = 'your_username';")
-        else:
-            print(f"Found {system_admin_count} system administrator(s)")
-
-        # Create sample projects if none exist for this company
-        existing_projects = Project.query.filter_by(company_id=default_company.id).count()
-        if existing_projects == 0:
-            sample_projects = [
-                {
-                    'name': 'General Administration',
-                    'code': 'ADMIN001',
-                    'description': 'General administrative tasks and meetings'
-                },
-                {
-                    'name': 'Development Project',
-                    'code': 'DEV001',
-                    'description': 'Software development and maintenance tasks'
-                },
-                {
-                    'name': 'Customer Support',
-                    'code': 'SUPPORT001',
-                    'description': 'Customer service and technical support activities'
-                }
-            ]
-
-            for proj_data in sample_projects:
-                project = Project(
-                    name=proj_data['name'],
-                    code=proj_data['code'],
-                    description=proj_data['description'],
-                    company_id=default_company.id,
-                    created_by_id=admin.id,
-                    is_active=True
-                )
-                db.session.add(project)
-
-            print(f"Created {len(sample_projects)} sample projects for {default_company.name}")
-
-        db.session.commit()
+    """Handle data migrations and setup (stub - handled by migrate_db)"""
+    try:
+        from migrate_db import migrate_data
+        migrate_data()
+    except ImportError:
+        print("migrate_db module not available - skipping data migration")
+    except Exception as e:
+        print(f"Error during data migration: {e}")
+        raise
 
 def migrate_work_config_data():
-    """Migrate existing WorkConfig data to new architecture"""
+    """Migrate existing WorkConfig data to new architecture (stub - handled by migrate_db)"""
     try:
-        # Create CompanyWorkConfig for each company that doesn't have one
-        companies = Company.query.all()
-        for company in companies:
-            existing_config = CompanyWorkConfig.query.filter_by(company_id=company.id).first()
-            if not existing_config:
-                print(f"Creating CompanyWorkConfig for {company.name}")
-                
-                # Use Germany defaults (existing system default)
-                preset = CompanyWorkConfig.get_regional_preset(WorkRegion.GERMANY)
-                
-                company_config = CompanyWorkConfig(
-                    company_id=company.id,
-                    work_hours_per_day=preset['work_hours_per_day'],
-                    mandatory_break_minutes=preset['mandatory_break_minutes'],
-                    break_threshold_hours=preset['break_threshold_hours'],
-                    additional_break_minutes=preset['additional_break_minutes'],
-                    additional_break_threshold_hours=preset['additional_break_threshold_hours'],
-                    region=WorkRegion.GERMANY,
-                    region_name=preset['region_name']
-                )
-                db.session.add(company_config)
-        
-        # Migrate existing WorkConfig user preferences to UserPreferences
-        old_configs = WorkConfig.query.filter(WorkConfig.user_id.isnot(None)).all()
-        for old_config in old_configs:
-            user = User.query.get(old_config.user_id)
-            if user:
-                existing_prefs = UserPreferences.query.filter_by(user_id=user.id).first()
-                if not existing_prefs:
-                    print(f"Migrating preferences for user {user.username}")
-                    
-                    user_prefs = UserPreferences(
-                        user_id=user.id,
-                        time_format_24h=getattr(old_config, 'time_format_24h', True),
-                        date_format=getattr(old_config, 'date_format', 'ISO'),
-                        time_rounding_minutes=getattr(old_config, 'time_rounding_minutes', 0),
-                        round_to_nearest=getattr(old_config, 'round_to_nearest', True)
-                    )
-                    db.session.add(user_prefs)
-        
-        db.session.commit()
-        print("Work config data migration completed successfully")
-        
+        from migrate_db import migrate_work_config_data, get_db_path
+        db_path = get_db_path()
+        migrate_work_config_data(db_path)
+    except ImportError:
+        print("migrate_db module not available - skipping work config data migration")
     except Exception as e:
         print(f"Error during work config migration: {e}")
-        db.session.rollback()
+        raise
+
+def migrate_task_system():
+    """Create tables for the task management system (stub - handled by migrate_db)"""
+    try:
+        from migrate_db import migrate_task_system, get_db_path
+        db_path = get_db_path()
+        migrate_task_system(db_path)
+    except ImportError:
+        print("migrate_db module not available - skipping task system migration")
+    except Exception as e:
+        print(f"Error during task system migration: {e}")
+        raise
 
 # Call this function during app initialization
 @app.before_first_request
 def initialize_app():
-    run_migrations()
-    migrate_work_config_data()
+    run_migrations()  # This handles all migrations including work config data
 
 # Add this after initializing the app but before defining routes
 @app.context_processor
@@ -720,6 +151,7 @@ def inject_globals():
     """Make certain variables available to all templates."""
     return {
         'Role': Role,
+        'AccountType': AccountType,
         'current_year': datetime.now().year
     }
 
@@ -729,7 +161,7 @@ def format_date_filter(dt):
     """Format date according to user preferences."""
     if not dt or not g.user:
         return dt.strftime('%Y-%m-%d') if dt else ''
-    
+
     from time_utils import format_date_by_preference, get_user_format_settings
     date_format, _ = get_user_format_settings(g.user)
     return format_date_by_preference(dt, date_format)
@@ -739,7 +171,7 @@ def format_time_filter(dt):
     """Format time according to user preferences."""
     if not dt or not g.user:
         return dt.strftime('%H:%M:%S') if dt else ''
-    
+
     from time_utils import format_time_by_preference, get_user_format_settings
     _, time_format_24h = get_user_format_settings(g.user)
     return format_time_by_preference(dt, time_format_24h)
@@ -749,7 +181,7 @@ def format_time_short_filter(dt):
     """Format time without seconds according to user preferences."""
     if not dt or not g.user:
         return dt.strftime('%H:%M') if dt else ''
-    
+
     from time_utils import format_time_short_by_preference, get_user_format_settings
     _, time_format_24h = get_user_format_settings(g.user)
     return format_time_short_by_preference(dt, time_format_24h)
@@ -759,7 +191,7 @@ def format_datetime_filter(dt):
     """Format datetime according to user preferences."""
     if not dt or not g.user:
         return dt.strftime('%Y-%m-%d %H:%M:%S') if dt else ''
-    
+
     from time_utils import format_datetime_by_preference, get_user_format_settings
     date_format, time_format_24h = get_user_format_settings(g.user)
     return format_datetime_by_preference(dt, date_format, time_format_24h)
@@ -769,7 +201,7 @@ def format_duration_filter(duration_seconds):
     """Format duration in readable format."""
     if duration_seconds is None:
         return '00:00:00'
-    
+
     from time_utils import format_duration_readable
     return format_duration_readable(duration_seconds)
 
@@ -820,14 +252,14 @@ def can_access_system_settings(user=None):
 def get_available_roles():
     """Get roles available for assignment, excluding SYSTEM_ADMIN unless one already exists"""
     roles = list(Role)
-    
+
     # Only show SYSTEM_ADMIN role if at least one system admin already exists
     # This prevents accidental creation of system admins
     system_admin_exists = User.query.filter_by(role=Role.SYSTEM_ADMIN).count() > 0
-    
+
     if not system_admin_exists:
         roles = [role for role in roles if role != Role.SYSTEM_ADMIN]
-    
+
     return roles
 
 # Add this decorator function after your existing decorators
@@ -875,7 +307,7 @@ def company_required(f):
         # System admins can access without company association
         if g.user.role == Role.SYSTEM_ADMIN:
             return f(*args, **kwargs)
-            
+
         if g.user.company_id is None:
             flash('You must be associated with a company to access this page.', 'error')
             return redirect(url_for('setup_company'))
@@ -1168,12 +600,12 @@ def register_freelancer():
             try:
                 # Create personal company for freelancer
                 company_name = business_name if business_name else f"{username}'s Workspace"
-                
+
                 # Generate unique company slug
                 import re
                 slug = re.sub(r'[^\w\s-]', '', company_name.lower())
                 slug = re.sub(r'[-\s]+', '-', slug).strip('-')
-                
+
                 # Ensure slug uniqueness
                 base_slug = slug
                 counter = 1
@@ -1189,7 +621,7 @@ def register_freelancer():
                     is_personal=True,
                     max_users=1  # Limit to single user
                 )
-                
+
                 db.session.add(personal_company)
                 db.session.flush()  # Get company ID
 
@@ -1210,9 +642,9 @@ def register_freelancer():
 
                 logger.info(f"Freelancer account created: {username} with personal company: {company_name}")
                 flash(f'Welcome {username}! Your freelancer account has been created successfully. You can now log in.', 'success')
-                
+
                 return redirect(url_for('login'))
-                
+
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Error during freelancer registration: {str(e)}")
@@ -1761,7 +1193,7 @@ def arrive():
     # Format response with user preferences
     from time_utils import format_datetime_by_preference, get_user_format_settings
     date_format, time_format_24h = get_user_format_settings(g.user)
-    
+
     return jsonify({
         'id': new_entry.id,
         'arrival_time': format_datetime_by_preference(new_entry.arrival_time, date_format, time_format_24h),
@@ -1781,7 +1213,7 @@ def leave(entry_id):
 
     # Set the departure time
     departure_time = datetime.now()
-    
+
     # Apply time rounding if enabled
     rounded_arrival, rounded_departure = apply_time_rounding(entry.arrival_time, departure_time, g.user)
     entry.arrival_time = rounded_arrival
@@ -1879,16 +1311,16 @@ def config():
 
     # Get company work policies for display (read-only)
     company_config = CompanyWorkConfig.query.filter_by(company_id=g.user.company_id).first()
-    
+
     # Import time utils for display options
     from time_utils import get_available_rounding_options, get_available_date_formats
     rounding_options = get_available_rounding_options()
     date_format_options = get_available_date_formats()
-    
-    return render_template('config.html', title='User Preferences', 
-                         preferences=preferences, 
+
+    return render_template('config.html', title='User Preferences',
+                         preferences=preferences,
                          company_config=company_config,
-                         rounding_options=rounding_options, 
+                         rounding_options=rounding_options,
                          date_format_options=date_format_options)
 
 @app.route('/api/delete/<int:entry_id>', methods=['DELETE'])
@@ -2027,7 +1459,7 @@ def resume_entry(entry_id):
 def manual_entry():
     try:
         data = request.get_json()
-        
+
         # Extract data from request
         project_id = data.get('project_id')
         start_date = data.get('start_date')
@@ -2036,11 +1468,11 @@ def manual_entry():
         end_time = data.get('end_time')
         break_minutes = int(data.get('break_minutes', 0))
         notes = data.get('notes', '')
-        
+
         # Validate required fields
         if not all([start_date, start_time, end_date, end_time]):
             return jsonify({'error': 'Start and end date/time are required'}), 400
-        
+
         # Parse datetime strings
         try:
             arrival_datetime = datetime.strptime(f"{start_date} {start_time}", '%Y-%m-%d %H:%M:%S')
@@ -2052,20 +1484,20 @@ def manual_entry():
                 departure_datetime = datetime.strptime(f"{end_date} {end_time}:00", '%Y-%m-%d %H:%M:%S')
             except ValueError:
                 return jsonify({'error': 'Invalid date/time format'}), 400
-        
+
         # Validate that end time is after start time
         if departure_datetime <= arrival_datetime:
             return jsonify({'error': 'End time must be after start time'}), 400
-        
+
         # Apply time rounding if enabled
         rounded_arrival, rounded_departure = apply_time_rounding(arrival_datetime, departure_datetime, g.user)
-        
+
         # Validate project access if project is specified
         if project_id:
             project = Project.query.get(project_id)
             if not project or not project.is_user_allowed(g.user):
                 return jsonify({'error': 'Invalid or unauthorized project'}), 403
-        
+
         # Check for overlapping entries for this user (using rounded times)
         overlapping_entry = TimeEntry.query.filter(
             TimeEntry.user_id == g.user.id,
@@ -2073,30 +1505,30 @@ def manual_entry():
             TimeEntry.arrival_time < rounded_departure,
             TimeEntry.departure_time > rounded_arrival
         ).first()
-        
+
         if overlapping_entry:
             return jsonify({
                 'error': 'This time entry overlaps with an existing entry'
             }), 400
-        
+
         # Calculate total duration in seconds (using rounded times)
         total_duration = int((rounded_departure - rounded_arrival).total_seconds())
         break_duration_seconds = break_minutes * 60
-        
+
         # Apply rounding to break duration if enabled
         interval_minutes, round_to_nearest = get_user_rounding_settings(g.user)
         if interval_minutes > 0:
             break_duration_seconds = round_duration_to_interval(
                 break_duration_seconds, interval_minutes, round_to_nearest
             )
-        
+
         # Validate break duration doesn't exceed total duration
         if break_duration_seconds >= total_duration:
             return jsonify({'error': 'Break duration cannot exceed total work duration'}), 400
-        
+
         # Calculate work duration (total duration minus breaks)
         work_duration = total_duration - break_duration_seconds
-        
+
         # Create the manual time entry (using rounded times)
         new_entry = TimeEntry(
             user_id=g.user.id,
@@ -2109,16 +1541,16 @@ def manual_entry():
             is_paused=False,
             pause_start_time=None
         )
-        
+
         db.session.add(new_entry)
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Manual time entry added successfully',
             'entry_id': new_entry.id
         })
-        
+
     except Exception as e:
         logger.error(f"Error creating manual time entry: {str(e)}")
         db.session.rollback()
@@ -2192,42 +1624,42 @@ def admin_settings():
 @system_admin_required
 def system_admin_dashboard():
     """System Administrator Dashboard - view all data across companies"""
-    
+
     # Global statistics
     total_companies = Company.query.count()
     total_users = User.query.count()
     total_teams = Team.query.count()
     total_projects = Project.query.count()
     total_time_entries = TimeEntry.query.count()
-    
+
     # System admin count
     system_admins = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
     regular_admins = User.query.filter_by(role=Role.ADMIN).count()
-    
+
     # Recent activity (last 7 days)
     from datetime import datetime, timedelta
     week_ago = datetime.now() - timedelta(days=7)
-    
+
     recent_users = User.query.filter(User.created_at >= week_ago).count()
     recent_companies = Company.query.filter(Company.created_at >= week_ago).count()
     recent_time_entries = TimeEntry.query.filter(TimeEntry.arrival_time >= week_ago).count()
-    
+
     # Top companies by user count
     top_companies = db.session.query(
-        Company.name, 
+        Company.name,
         Company.id,
         db.func.count(User.id).label('user_count')
     ).join(User).group_by(Company.id).order_by(db.func.count(User.id).desc()).limit(5).all()
-    
+
     # Recent companies
     recent_companies_list = Company.query.order_by(Company.created_at.desc()).limit(5).all()
-    
+
     # System health checks
     orphaned_users = User.query.filter_by(company_id=None).count()
     orphaned_time_entries = TimeEntry.query.filter_by(user_id=None).count()
     blocked_users = User.query.filter_by(is_blocked=True).count()
-    
-    return render_template('system_admin_dashboard.html', 
+
+    return render_template('system_admin_dashboard.html',
                          title='System Administrator Dashboard',
                          total_companies=total_companies,
                          total_users=total_users,
@@ -2252,10 +1684,10 @@ def system_admin_users():
     filter_type = request.args.get('filter', '')
     page = request.args.get('page', 1, type=int)
     per_page = 50
-    
+
     # Build query based on filter
     query = User.query
-    
+
     if filter_type == 'blocked':
         query = query.filter_by(is_blocked=True)
     elif filter_type == 'system_admins':
@@ -2266,17 +1698,17 @@ def system_admin_users():
         query = query.filter_by(is_verified=False)
     elif filter_type == 'freelancers':
         query = query.filter_by(account_type=AccountType.FREELANCER)
-    
+
     # Add company join for display
     query = query.join(Company).add_columns(Company.name.label('company_name'))
-    
+
     # Order by creation date (newest first)
     query = query.order_by(User.created_at.desc())
-    
+
     # Paginate results
     users = query.paginate(page=page, per_page=per_page, error_out=False)
-    
-    return render_template('system_admin_users.html', 
+
+    return render_template('system_admin_users.html',
                          title='System Admin - All Users',
                          users=users,
                          current_filter=filter_type)
@@ -2286,7 +1718,7 @@ def system_admin_users():
 def system_admin_edit_user(user_id):
     """System Admin: Edit any user across companies"""
     user = User.query.get_or_404(user_id)
-    
+
     if request.method == 'POST':
         # Get form data
         username = request.form.get('username')
@@ -2296,30 +1728,30 @@ def system_admin_edit_user(user_id):
         is_verified = request.form.get('is_verified') == 'on'
         company_id = request.form.get('company_id')
         team_id = request.form.get('team_id') or None
-        
+
         # Validation
         error = None
-        
+
         # Check if username is unique within the company
         existing_user = User.query.filter(
             User.username == username,
             User.company_id == company_id,
             User.id != user_id
         ).first()
-        
+
         if existing_user:
             error = f'Username "{username}" is already taken in this company.'
-        
-        # Check if email is unique within the company  
+
+        # Check if email is unique within the company
         existing_email = User.query.filter(
             User.email == email,
             User.company_id == company_id,
             User.id != user_id
         ).first()
-        
+
         if existing_email:
             error = f'Email "{email}" is already registered in this company.'
-        
+
         if not error:
             # Update user
             user.username = username
@@ -2329,18 +1761,18 @@ def system_admin_edit_user(user_id):
             user.is_verified = is_verified
             user.company_id = company_id
             user.team_id = team_id
-            
+
             db.session.commit()
             flash(f'User {username} updated successfully.', 'success')
             return redirect(url_for('system_admin_users'))
-        
+
         flash(error, 'error')
-    
+
     # Get all companies and teams for form dropdowns
     companies = Company.query.order_by(Company.name).all()
     teams = Team.query.filter_by(company_id=user.company_id).order_by(Team.name).all()
     roles = get_available_roles()
-    
+
     return render_template('system_admin_edit_user.html',
                          title=f'Edit User: {user.username}',
                          user=user,
@@ -2353,30 +1785,30 @@ def system_admin_edit_user(user_id):
 def system_admin_delete_user(user_id):
     """System Admin: Delete any user (with safety checks)"""
     user = User.query.get_or_404(user_id)
-    
+
     # Safety check: prevent deleting the last system admin
     if user.role == Role.SYSTEM_ADMIN:
         system_admin_count = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
         if system_admin_count <= 1:
             flash('Cannot delete the last system administrator.', 'error')
             return redirect(url_for('system_admin_users'))
-    
+
     # Safety check: prevent deleting yourself
     if user.id == g.user.id:
         flash('Cannot delete your own account.', 'error')
         return redirect(url_for('system_admin_users'))
-    
+
     username = user.username
     company_name = user.company.name if user.company else 'Unknown'
-    
+
     # Delete related data first
     TimeEntry.query.filter_by(user_id=user.id).delete()
     WorkConfig.query.filter_by(user_id=user.id).delete()
-    
+
     # Delete the user
     db.session.delete(user)
     db.session.commit()
-    
+
     flash(f'User "{username}" from company "{company_name}" has been deleted.', 'success')
     return redirect(url_for('system_admin_users'))
 
@@ -2386,10 +1818,10 @@ def system_admin_companies():
     """System Admin: View all companies"""
     page = request.args.get('page', 1, type=int)
     per_page = 20
-    
+
     companies = Company.query.order_by(Company.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False)
-    
+
     # Get user counts for each company
     company_stats = {}
     for company in companies.items:
@@ -2402,7 +1834,7 @@ def system_admin_companies():
             'user_count': user_count,
             'admin_count': admin_count
         }
-    
+
     return render_template('system_admin_companies.html',
                          title='System Admin - All Companies',
                          companies=companies,
@@ -2413,12 +1845,12 @@ def system_admin_companies():
 def system_admin_company_detail(company_id):
     """System Admin: View detailed company information"""
     company = Company.query.get_or_404(company_id)
-    
+
     # Get company statistics
     users = User.query.filter_by(company_id=company.id).all()
     teams = Team.query.filter_by(company_id=company.id).all()
     projects = Project.query.filter_by(company_id=company.id).all()
-    
+
     # Recent activity
     from datetime import datetime, timedelta
     week_ago = datetime.now() - timedelta(days=7)
@@ -2426,14 +1858,14 @@ def system_admin_company_detail(company_id):
         User.company_id == company.id,
         TimeEntry.arrival_time >= week_ago
     ).count()
-    
+
     # Role distribution
     role_counts = {}
     for role in Role:
         count = User.query.filter_by(company_id=company.id, role=role).count()
         if count > 0:
             role_counts[role.value] = count
-    
+
     return render_template('system_admin_company_detail.html',
                          title=f'Company: {company.name}',
                          company=company,
@@ -2450,29 +1882,29 @@ def system_admin_time_entries():
     page = request.args.get('page', 1, type=int)
     company_filter = request.args.get('company', '')
     per_page = 50
-    
+
     # Build query
     query = TimeEntry.query.join(User).join(Company)
-    
+
     if company_filter:
         query = query.filter(Company.id == company_filter)
-    
+
     # Add columns for display
     query = query.add_columns(
         User.username,
         Company.name.label('company_name'),
         Project.name.label('project_name')
     ).outerjoin(Project)
-    
+
     # Order by arrival time (newest first)
     query = query.order_by(TimeEntry.arrival_time.desc())
-    
+
     # Paginate
     entries = query.paginate(page=page, per_page=per_page, error_out=False)
-    
+
     # Get companies for filter dropdown
     companies = Company.query.order_by(Company.name).all()
-    
+
     return render_template('system_admin_time_entries.html',
                          title='System Admin - Time Entries',
                          entries=entries,
@@ -2487,7 +1919,7 @@ def system_admin_settings():
         # Update system settings
         registration_enabled = request.form.get('registration_enabled') == 'on'
         email_verification = request.form.get('email_verification_required') == 'on'
-        
+
         # Update or create settings
         reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
         if reg_setting:
@@ -2499,7 +1931,7 @@ def system_admin_settings():
                 description='Controls whether new user registration is allowed'
             )
             db.session.add(reg_setting)
-        
+
         email_setting = SystemSettings.query.filter_by(key='email_verification_required').first()
         if email_setting:
             email_setting.value = 'true' if email_verification else 'false'
@@ -2510,11 +1942,11 @@ def system_admin_settings():
                 description='Controls whether email verification is required for new accounts'
             )
             db.session.add(email_setting)
-        
+
         db.session.commit()
         flash('System settings updated successfully.', 'success')
         return redirect(url_for('system_admin_settings'))
-    
+
     # Get current settings
     settings = {}
     all_settings = SystemSettings.query.all()
@@ -2523,12 +1955,12 @@ def system_admin_settings():
             settings['registration_enabled'] = setting.value == 'true'
         elif setting.key == 'email_verification_required':
             settings['email_verification_required'] = setting.value == 'true'
-    
+
     # System statistics
     total_companies = Company.query.count()
     total_users = User.query.count()
     total_system_admins = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
-    
+
     return render_template('system_admin_settings.html',
                          title='System Administrator Settings',
                          settings=settings,
@@ -2558,7 +1990,7 @@ def admin_work_policies():
         )
         db.session.add(work_config)
         db.session.commit()
-    
+
     if request.method == 'POST':
         try:
             # Handle regional preset selection
@@ -2567,7 +1999,7 @@ def admin_work_policies():
                 if region_code:
                     region = WorkRegion(region_code)
                     preset = CompanyWorkConfig.get_regional_preset(region)
-                    
+
                     work_config.work_hours_per_day = preset['work_hours_per_day']
                     work_config.mandatory_break_minutes = preset['mandatory_break_minutes']
                     work_config.break_threshold_hours = preset['break_threshold_hours']
@@ -2575,11 +2007,11 @@ def admin_work_policies():
                     work_config.additional_break_threshold_hours = preset['additional_break_threshold_hours']
                     work_config.region = region
                     work_config.region_name = preset['region_name']
-                    
+
                     db.session.commit()
                     flash(f'Applied {preset["region_name"]} work policy preset', 'success')
                     return redirect(url_for('admin_work_policies'))
-            
+
             # Handle manual configuration update
             else:
                 work_config.work_hours_per_day = float(request.form.get('work_hours_per_day', 8.0))
@@ -2589,14 +2021,14 @@ def admin_work_policies():
                 work_config.additional_break_threshold_hours = float(request.form.get('additional_break_threshold_hours', 9.0))
                 work_config.region = WorkRegion.CUSTOM
                 work_config.region_name = 'Custom Configuration'
-                
+
                 db.session.commit()
                 flash('Work policies updated successfully!', 'success')
                 return redirect(url_for('admin_work_policies'))
-                
+
         except ValueError:
             flash('Please enter valid numbers for all fields', 'error')
-    
+
     # Get available regional presets
     regional_presets = []
     for region in WorkRegion:
@@ -2606,9 +2038,9 @@ def admin_work_policies():
             'name': preset['region_name'],
             'description': f"{preset['work_hours_per_day']}h/day, {preset['mandatory_break_minutes']}min break after {preset['break_threshold_hours']}h"
         })
-    
-    return render_template('admin_work_policies.html', 
-                         title='Work Policies', 
+
+    return render_template('admin_work_policies.html',
+                         title='Work Policies',
                          work_config=work_config,
                          regional_presets=regional_presets,
                          WorkRegion=WorkRegion)
@@ -2861,7 +2293,8 @@ def manage_team(team_id):
 @company_required
 def admin_projects():
     projects = Project.query.filter_by(company_id=g.user.company_id).order_by(Project.created_at.desc()).all()
-    return render_template('admin_projects.html', title='Project Management', projects=projects)
+    categories = ProjectCategory.query.filter_by(company_id=g.user.company_id).order_by(ProjectCategory.name).all()
+    return render_template('admin_projects.html', title='Project Management', projects=projects, categories=categories)
 
 @app.route('/admin/projects/create', methods=['GET', 'POST'])
 @role_required(Role.SUPERVISOR)
@@ -2872,6 +2305,7 @@ def create_project():
         description = request.form.get('description')
         code = request.form.get('code')
         team_id = request.form.get('team_id') or None
+        category_id = request.form.get('category_id') or None
         start_date_str = request.form.get('start_date')
         end_date_str = request.form.get('end_date')
 
@@ -2909,6 +2343,7 @@ def create_project():
                 code=code.upper(),
                 company_id=g.user.company_id,
                 team_id=int(team_id) if team_id else None,
+                category_id=int(category_id) if category_id else None,
                 start_date=start_date,
                 end_date=end_date,
                 created_by_id=g.user.id
@@ -2920,9 +2355,10 @@ def create_project():
         else:
             flash(error, 'error')
 
-    # Get available teams for the form (company-scoped)
+    # Get available teams and categories for the form (company-scoped)
     teams = Team.query.filter_by(company_id=g.user.company_id).order_by(Team.name).all()
-    return render_template('create_project.html', title='Create Project', teams=teams)
+    categories = ProjectCategory.query.filter_by(company_id=g.user.company_id).order_by(ProjectCategory.name).all()
+    return render_template('create_project.html', title='Create Project', teams=teams, categories=categories)
 
 @app.route('/admin/projects/edit/<int:project_id>', methods=['GET', 'POST'])
 @role_required(Role.SUPERVISOR)
@@ -2935,6 +2371,7 @@ def edit_project(project_id):
         description = request.form.get('description')
         code = request.form.get('code')
         team_id = request.form.get('team_id') or None
+        category_id = request.form.get('category_id') or None
         is_active = request.form.get('is_active') == 'on'
         start_date_str = request.form.get('start_date')
         end_date_str = request.form.get('end_date')
@@ -2971,6 +2408,7 @@ def edit_project(project_id):
             project.description = description
             project.code = code.upper()
             project.team_id = int(team_id) if team_id else None
+            project.category_id = int(category_id) if category_id else None
             project.is_active = is_active
             project.start_date = start_date
             project.end_date = end_date
@@ -2980,10 +2418,11 @@ def edit_project(project_id):
         else:
             flash(error, 'error')
 
-    # Get available teams for the form (company-scoped)
+    # Get available teams and categories for the form (company-scoped)
     teams = Team.query.filter_by(company_id=g.user.company_id).order_by(Team.name).all()
+    categories = ProjectCategory.query.filter_by(company_id=g.user.company_id).order_by(ProjectCategory.name).all()
 
-    return render_template('edit_project.html', title='Edit Project', project=project, teams=teams)
+    return render_template('edit_project.html', title='Edit Project', project=project, teams=teams, categories=categories)
 
 @app.route('/admin/projects/delete/<int:project_id>', methods=['POST'])
 @role_required(Role.ADMIN)  # Only admins can delete projects
@@ -3329,30 +2768,30 @@ def api_company_teams(company_id):
 def api_system_admin_stats():
     """API: Get real-time system statistics for dashboard"""
     from datetime import datetime, timedelta
-    
+
     # Get basic counts
     total_companies = Company.query.count()
     total_users = User.query.count()
     total_teams = Team.query.count()
     total_projects = Project.query.count()
     total_time_entries = TimeEntry.query.count()
-    
+
     # Active sessions
     active_sessions = TimeEntry.query.filter_by(departure_time=None, is_paused=False).count()
     paused_sessions = TimeEntry.query.filter_by(is_paused=True).count()
-    
+
     # Recent activity (last 24 hours)
     yesterday = datetime.now() - timedelta(days=1)
     recent_users = User.query.filter(User.created_at >= yesterday).count()
     recent_companies = Company.query.filter(Company.created_at >= yesterday).count()
     recent_time_entries = TimeEntry.query.filter(TimeEntry.arrival_time >= yesterday).count()
-    
+
     # System health
     orphaned_users = User.query.filter_by(company_id=None).count()
     orphaned_time_entries = TimeEntry.query.filter_by(user_id=None).count()
     blocked_users = User.query.filter_by(is_blocked=True).count()
     unverified_users = User.query.filter_by(is_verified=False).count()
-    
+
     return jsonify({
         'totals': {
             'companies': total_companies,
@@ -3384,7 +2823,7 @@ def api_company_users(company_id):
     """API: Get users for a specific company (System Admin only)"""
     company = Company.query.get_or_404(company_id)
     users = User.query.filter_by(company_id=company.id).order_by(User.username).all()
-    
+
     return jsonify({
         'company': {
             'id': company.id,
@@ -3408,20 +2847,20 @@ def api_company_users(company_id):
 def api_toggle_user_block(user_id):
     """API: Toggle user blocked status (System Admin only)"""
     user = User.query.get_or_404(user_id)
-    
+
     # Safety check: prevent blocking yourself
     if user.id == g.user.id:
         return jsonify({'error': 'Cannot block your own account'}), 400
-    
+
     # Safety check: prevent blocking the last system admin
     if user.role == Role.SYSTEM_ADMIN and not user.is_blocked:
         system_admin_count = User.query.filter_by(role=Role.SYSTEM_ADMIN, is_blocked=False).count()
         if system_admin_count <= 1:
             return jsonify({'error': 'Cannot block the last system administrator'}), 400
-    
+
     user.is_blocked = not user.is_blocked
     db.session.commit()
-    
+
     return jsonify({
         'id': user.id,
         'username': user.username,
@@ -3434,41 +2873,41 @@ def api_toggle_user_block(user_id):
 def api_company_stats(company_id):
     """API: Get detailed statistics for a specific company"""
     company = Company.query.get_or_404(company_id)
-    
+
     # User counts by role
     role_counts = {}
     for role in Role:
         count = User.query.filter_by(company_id=company.id, role=role).count()
         if count > 0:
             role_counts[role.value] = count
-    
+
     # Team and project counts
     team_count = Team.query.filter_by(company_id=company.id).count()
     project_count = Project.query.filter_by(company_id=company.id).count()
     active_projects = Project.query.filter_by(company_id=company.id, is_active=True).count()
-    
+
     # Time entries statistics
     from datetime import datetime, timedelta
     week_ago = datetime.now() - timedelta(days=7)
     month_ago = datetime.now() - timedelta(days=30)
-    
+
     weekly_entries = TimeEntry.query.join(User).filter(
         User.company_id == company.id,
         TimeEntry.arrival_time >= week_ago
     ).count()
-    
+
     monthly_entries = TimeEntry.query.join(User).filter(
         User.company_id == company.id,
         TimeEntry.arrival_time >= month_ago
     ).count()
-    
+
     # Active sessions
     active_sessions = TimeEntry.query.join(User).filter(
         User.company_id == company.id,
         TimeEntry.departure_time == None,
         TimeEntry.is_paused == False
     ).count()
-    
+
     return jsonify({
         'company': {
             'id': company.id,
@@ -3534,6 +2973,444 @@ def analytics_export():
         logger.error(f"Error in analytics export: {str(e)}")
         flash('Error generating export', 'error')
         return redirect(url_for('analytics'))
+
+# Task Management Routes
+@app.route('/admin/projects/<int:project_id>/tasks')
+@role_required(Role.TEAM_MEMBER)  # All authenticated users can view tasks
+@company_required
+def manage_project_tasks(project_id):
+    project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first_or_404()
+
+    # Check if user has access to this project
+    if not project.is_user_allowed(g.user):
+        flash('You do not have access to this project.', 'error')
+        return redirect(url_for('admin_projects'))
+
+    # Get all tasks for this project
+    tasks = Task.query.filter_by(project_id=project_id).order_by(Task.created_at.desc()).all()
+
+    # Get team members for assignment dropdown
+    if project.team_id:
+        # If project is assigned to a specific team, only show team members
+        team_members = User.query.filter_by(team_id=project.team_id, company_id=g.user.company_id).all()
+    else:
+        # If project is available to all teams, show all company users
+        team_members = User.query.filter_by(company_id=g.user.company_id).all()
+
+    return render_template('manage_project_tasks.html',
+                         title=f'Tasks - {project.name}',
+                         project=project,
+                         tasks=tasks,
+                         team_members=team_members)
+
+# Task API Routes
+@app.route('/api/tasks', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def create_task():
+    try:
+        data = request.get_json()
+        project_id = data.get('project_id')
+
+        # Verify project access
+        project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
+        if not project or not project.is_user_allowed(g.user):
+            return jsonify({'success': False, 'message': 'Project not found or access denied'})
+
+        # Validate required fields
+        name = data.get('name')
+        if not name:
+            return jsonify({'success': False, 'message': 'Task name is required'})
+
+        # Parse dates
+        start_date = None
+        due_date = None
+        if data.get('start_date'):
+            start_date = datetime.strptime(data.get('start_date'), '%Y-%m-%d').date()
+        if data.get('due_date'):
+            due_date = datetime.strptime(data.get('due_date'), '%Y-%m-%d').date()
+
+        # Create task
+        task = Task(
+            name=name,
+            description=data.get('description', ''),
+            status=TaskStatus(data.get('status', 'Not Started')),
+            priority=TaskPriority(data.get('priority', 'Medium')),
+            estimated_hours=float(data.get('estimated_hours')) if data.get('estimated_hours') else None,
+            project_id=project_id,
+            assigned_to_id=int(data.get('assigned_to_id')) if data.get('assigned_to_id') else None,
+            start_date=start_date,
+            due_date=due_date,
+            created_by_id=g.user.id
+        )
+
+        db.session.add(task)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Task created successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/tasks/<int:task_id>', methods=['GET'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_task(task_id):
+    try:
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not task or not task.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Task not found or access denied'})
+
+        task_data = {
+            'id': task.id,
+            'name': task.name,
+            'description': task.description,
+            'status': task.status.value,
+            'priority': task.priority.value,
+            'estimated_hours': task.estimated_hours,
+            'assigned_to_id': task.assigned_to_id,
+            'start_date': task.start_date.strftime('%Y-%m-%d') if task.start_date else None,
+            'due_date': task.due_date.strftime('%Y-%m-%d') if task.due_date else None
+        }
+
+        return jsonify({'success': True, 'task': task_data})
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/tasks/<int:task_id>', methods=['PUT'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def update_task(task_id):
+    try:
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not task or not task.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Task not found or access denied'})
+
+        data = request.get_json()
+
+        # Update task fields
+        if 'name' in data:
+            task.name = data['name']
+        if 'description' in data:
+            task.description = data['description']
+        if 'status' in data:
+            task.status = TaskStatus(data['status'])
+            if data['status'] == 'Completed':
+                task.completed_date = datetime.now().date()
+            else:
+                task.completed_date = None
+        if 'priority' in data:
+            task.priority = TaskPriority(data['priority'])
+        if 'estimated_hours' in data:
+            task.estimated_hours = float(data['estimated_hours']) if data['estimated_hours'] else None
+        if 'assigned_to_id' in data:
+            task.assigned_to_id = int(data['assigned_to_id']) if data['assigned_to_id'] else None
+        if 'start_date' in data:
+            task.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date() if data['start_date'] else None
+        if 'due_date' in data:
+            task.due_date = datetime.strptime(data['due_date'], '%Y-%m-%d').date() if data['due_date'] else None
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Task updated successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+@role_required(Role.TEAM_LEADER)  # Only team leaders and above can delete tasks
+@company_required
+def delete_task(task_id):
+    try:
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not task or not task.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Task not found or access denied'})
+
+        db.session.delete(task)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Task deleted successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+# Subtask API Routes
+@app.route('/api/subtasks', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def create_subtask():
+    try:
+        data = request.get_json()
+        task_id = data.get('task_id')
+
+        # Verify task access
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not task or not task.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Task not found or access denied'})
+
+        # Validate required fields
+        name = data.get('name')
+        if not name:
+            return jsonify({'success': False, 'message': 'Subtask name is required'})
+
+        # Parse dates
+        start_date = None
+        due_date = None
+        if data.get('start_date'):
+            start_date = datetime.strptime(data.get('start_date'), '%Y-%m-%d').date()
+        if data.get('due_date'):
+            due_date = datetime.strptime(data.get('due_date'), '%Y-%m-%d').date()
+
+        # Create subtask
+        subtask = SubTask(
+            name=name,
+            description=data.get('description', ''),
+            status=TaskStatus(data.get('status', 'Not Started')),
+            priority=TaskPriority(data.get('priority', 'Medium')),
+            estimated_hours=float(data.get('estimated_hours')) if data.get('estimated_hours') else None,
+            task_id=task_id,
+            assigned_to_id=int(data.get('assigned_to_id')) if data.get('assigned_to_id') else None,
+            start_date=start_date,
+            due_date=due_date,
+            created_by_id=g.user.id
+        )
+
+        db.session.add(subtask)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Subtask created successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/subtasks/<int:subtask_id>', methods=['GET'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_subtask(subtask_id):
+    try:
+        subtask = SubTask.query.join(Task).join(Project).filter(
+            SubTask.id == subtask_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not subtask or not subtask.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Subtask not found or access denied'})
+
+        subtask_data = {
+            'id': subtask.id,
+            'name': subtask.name,
+            'description': subtask.description,
+            'status': subtask.status.value,
+            'priority': subtask.priority.value,
+            'estimated_hours': subtask.estimated_hours,
+            'assigned_to_id': subtask.assigned_to_id,
+            'start_date': subtask.start_date.strftime('%Y-%m-%d') if subtask.start_date else None,
+            'due_date': subtask.due_date.strftime('%Y-%m-%d') if subtask.due_date else None
+        }
+
+        return jsonify({'success': True, 'subtask': subtask_data})
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/subtasks/<int:subtask_id>', methods=['PUT'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def update_subtask(subtask_id):
+    try:
+        subtask = SubTask.query.join(Task).join(Project).filter(
+            SubTask.id == subtask_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not subtask or not subtask.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Subtask not found or access denied'})
+
+        data = request.get_json()
+
+        # Update subtask fields
+        if 'name' in data:
+            subtask.name = data['name']
+        if 'description' in data:
+            subtask.description = data['description']
+        if 'status' in data:
+            subtask.status = TaskStatus(data['status'])
+            if data['status'] == 'Completed':
+                subtask.completed_date = datetime.now().date()
+            else:
+                subtask.completed_date = None
+        if 'priority' in data:
+            subtask.priority = TaskPriority(data['priority'])
+        if 'estimated_hours' in data:
+            subtask.estimated_hours = float(data['estimated_hours']) if data['estimated_hours'] else None
+        if 'assigned_to_id' in data:
+            subtask.assigned_to_id = int(data['assigned_to_id']) if data['assigned_to_id'] else None
+        if 'start_date' in data:
+            subtask.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date() if data['start_date'] else None
+        if 'due_date' in data:
+            subtask.due_date = datetime.strptime(data['due_date'], '%Y-%m-%d').date() if data['due_date'] else None
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Subtask updated successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/subtasks/<int:subtask_id>', methods=['DELETE'])
+@role_required(Role.TEAM_LEADER)  # Only team leaders and above can delete subtasks
+@company_required
+def delete_subtask(subtask_id):
+    try:
+        subtask = SubTask.query.join(Task).join(Project).filter(
+            SubTask.id == subtask_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not subtask or not subtask.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Subtask not found or access denied'})
+
+        db.session.delete(subtask)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Subtask deleted successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+# Category Management API Routes
+@app.route('/api/admin/categories', methods=['POST'])
+@role_required(Role.ADMIN)
+@company_required
+def create_category():
+    try:
+        data = request.get_json()
+        name = data.get('name')
+        description = data.get('description', '')
+        color = data.get('color', '#007bff')
+        icon = data.get('icon', '')
+
+        if not name:
+            return jsonify({'success': False, 'message': 'Category name is required'})
+
+        # Check if category already exists
+        existing = ProjectCategory.query.filter_by(
+            name=name,
+            company_id=g.user.company_id
+        ).first()
+
+        if existing:
+            return jsonify({'success': False, 'message': 'Category name already exists'})
+
+        category = ProjectCategory(
+            name=name,
+            description=description,
+            color=color,
+            icon=icon,
+            company_id=g.user.company_id,
+            created_by_id=g.user.id
+        )
+
+        db.session.add(category)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Category created successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/admin/categories/<int:category_id>', methods=['PUT'])
+@role_required(Role.ADMIN)
+@company_required
+def update_category(category_id):
+    try:
+        category = ProjectCategory.query.filter_by(
+            id=category_id,
+            company_id=g.user.company_id
+        ).first()
+
+        if not category:
+            return jsonify({'success': False, 'message': 'Category not found'})
+
+        data = request.get_json()
+        name = data.get('name')
+
+        if not name:
+            return jsonify({'success': False, 'message': 'Category name is required'})
+
+        # Check if name conflicts with another category
+        existing = ProjectCategory.query.filter(
+            ProjectCategory.name == name,
+            ProjectCategory.company_id == g.user.company_id,
+            ProjectCategory.id != category_id
+        ).first()
+
+        if existing:
+            return jsonify({'success': False, 'message': 'Category name already exists'})
+
+        category.name = name
+        category.description = data.get('description', '')
+        category.color = data.get('color', category.color)
+        category.icon = data.get('icon', '')
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Category updated successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/admin/categories/<int:category_id>', methods=['DELETE'])
+@role_required(Role.ADMIN)
+@company_required
+def delete_category(category_id):
+    try:
+        category = ProjectCategory.query.filter_by(
+            id=category_id,
+            company_id=g.user.company_id
+        ).first()
+
+        if not category:
+            return jsonify({'success': False, 'message': 'Category not found'})
+
+        # Unassign projects from this category
+        projects = Project.query.filter_by(category_id=category_id).all()
+        for project in projects:
+            project.category_id = None
+
+        db.session.delete(category)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Category deleted successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
