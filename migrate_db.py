@@ -13,9 +13,10 @@ from datetime import datetime
 # Try to import from Flask app context if available
 try:
     from app import app, db
-    from models import (User, TimeEntry, WorkConfig, SystemSettings, Team, Role, Project, 
-                       Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, 
-                       ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent)
+    from models import (User, TimeEntry, WorkConfig, SystemSettings, Team, Role, Project,
+                       Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType,
+                       ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent, KanbanBoard,
+                       KanbanColumn, KanbanCard)
     from werkzeug.security import generate_password_hash
     FLASK_AVAILABLE = True
 except ImportError:
@@ -23,14 +24,14 @@ except ImportError:
     FLASK_AVAILABLE = False
     # Define Role and AccountType enums for standalone mode
     import enum
-    
+
     class Role(enum.Enum):
         TEAM_MEMBER = "Team Member"
         TEAM_LEADER = "Team Leader"
         SUPERVISOR = "Supervisor"
         ADMIN = "Administrator"
         SYSTEM_ADMIN = "System Administrator"
-    
+
     class AccountType(enum.Enum):
         COMPANY_USER = "Company User"
         FREELANCER = "Freelancer"
@@ -40,11 +41,11 @@ def get_db_path(db_file=None):
     """Determine database path based on environment or provided file."""
     if db_file:
         return db_file
-    
+
     # Check for Docker environment
     if os.path.exists('/data'):
         return '/data/timetrack.db'
-    
+
     return 'timetrack.db'
 
 
@@ -52,7 +53,7 @@ def run_all_migrations(db_path=None):
     """Run all database migrations in sequence."""
     db_path = get_db_path(db_path)
     print(f"Running migrations on database: {db_path}")
-    
+
     # Check if database exists
     if not os.path.exists(db_path):
         print("Database doesn't exist. Creating new database.")
@@ -63,21 +64,22 @@ def run_all_migrations(db_path=None):
         else:
             create_new_database(db_path)
         return
-    
+
     print("Running database migrations...")
-    
+
     # Run migrations in sequence
     run_basic_migrations(db_path)
     migrate_to_company_model(db_path)
     migrate_work_config_data(db_path)
     migrate_task_system(db_path)
     migrate_system_events(db_path)
-    
+    migrate_kanban_system(db_path)
+
     if FLASK_AVAILABLE:
         with app.app_context():
             # Handle company migration and admin user setup
             migrate_data()
-    
+
     print("Database migrations completed successfully!")
 
 
@@ -85,7 +87,7 @@ def run_basic_migrations(db_path):
     """Run basic table structure migrations."""
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
+
     try:
         # Check if time_entry table exists first
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='time_entry'")
@@ -141,7 +143,7 @@ def run_basic_migrations(db_path):
         else:
             cursor.execute("PRAGMA table_info(work_config)")
             work_config_columns = [column[1] for column in cursor.fetchall()]
-            
+
             work_config_migrations = [
                 ('additional_break_minutes', "ALTER TABLE work_config ADD COLUMN additional_break_minutes INTEGER DEFAULT 15"),
                 ('additional_break_threshold_hours', "ALTER TABLE work_config ADD COLUMN additional_break_threshold_hours FLOAT DEFAULT 9.0"),
@@ -186,7 +188,7 @@ def run_basic_migrations(db_path):
         create_missing_tables(cursor)
 
         conn.commit()
-        
+
     except Exception as e:
         print(f"Error during basic migrations: {e}")
         conn.rollback()
@@ -197,7 +199,7 @@ def run_basic_migrations(db_path):
 
 def create_missing_tables(cursor):
     """Create missing tables."""
-    
+
     # Team table
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='team'")
     if not cursor.fetchone():
@@ -228,7 +230,7 @@ def create_missing_tables(cursor):
         )
         """)
 
-    # Project table  
+    # Project table
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='project'")
     if not cursor.fetchone():
         print("Creating project table...")
@@ -272,7 +274,7 @@ def create_missing_tables(cursor):
             UNIQUE(name)
         )
         """)
-    
+
     # Announcement table
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='announcement'")
     if not cursor.fetchone():
@@ -340,13 +342,13 @@ def migrate_to_company_model(db_path):
 
 def add_company_id_to_tables(cursor):
     """Add company_id columns to tables that need multi-tenancy."""
-    
+
     tables_needing_company = ['project', 'team']
-    
+
     for table_name in tables_needing_company:
         cursor.execute(f"PRAGMA table_info({table_name})")
         columns = [column[1] for column in cursor.fetchall()]
-        
+
         if 'company_id' not in columns:
             print(f"Adding company_id column to {table_name}...")
             cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN company_id INTEGER")
@@ -354,7 +356,7 @@ def add_company_id_to_tables(cursor):
 
 def migrate_user_roles(cursor):
     """Handle user role enum migration with constraint updates."""
-    
+
     cursor.execute("PRAGMA table_info(user)")
     user_columns = cursor.fetchall()
 
@@ -387,26 +389,26 @@ def migrate_user_roles(cursor):
                 print(f"Updated {updated_count} users from role '{old_role}' to '{new_role}'")
 
         # Set any NULL or invalid roles to defaults
-        cursor.execute("UPDATE user SET role = ? WHERE role IS NULL OR role NOT IN (?, ?, ?, ?, ?)", 
-                      (Role.TEAM_MEMBER.value, Role.TEAM_MEMBER.value, Role.TEAM_LEADER.value, 
+        cursor.execute("UPDATE user SET role = ? WHERE role IS NULL OR role NOT IN (?, ?, ?, ?, ?)",
+                      (Role.TEAM_MEMBER.value, Role.TEAM_MEMBER.value, Role.TEAM_LEADER.value,
                        Role.SUPERVISOR.value, Role.ADMIN.value, Role.SYSTEM_ADMIN.value))
         null_roles = cursor.rowcount
         if null_roles > 0:
             print(f"Set {null_roles} NULL/invalid roles to 'Team Member'")
-        
+
         # Ensure all users have a company_id before creating NOT NULL constraint
         print("Checking for users without company_id...")
         cursor.execute("SELECT COUNT(*) FROM user WHERE company_id IS NULL")
         null_company_count = cursor.fetchone()[0]
         print(f"Found {null_company_count} users without company_id")
-        
+
         if null_company_count > 0:
             print(f"Assigning {null_company_count} users to default company...")
-            
+
             # Get or create a default company
             cursor.execute("SELECT id FROM company ORDER BY id LIMIT 1")
             company_result = cursor.fetchone()
-            
+
             if company_result:
                 default_company_id = company_result[0]
                 print(f"Using existing company ID {default_company_id} as default")
@@ -419,12 +421,12 @@ def migrate_user_roles(cursor):
                 """, ("Default Company", "default-company", "Auto-created default company for migration"))
                 default_company_id = cursor.lastrowid
                 print(f"Created default company with ID {default_company_id}")
-            
+
             # Assign all users without company_id to the default company
             cursor.execute("UPDATE user SET company_id = ? WHERE company_id IS NULL", (default_company_id,))
             updated_users = cursor.rowcount
             print(f"Assigned {updated_users} users to default company")
-            
+
             # Verify the fix
             cursor.execute("SELECT COUNT(*) FROM user WHERE company_id IS NULL")
             remaining_null = cursor.fetchone()[0]
@@ -463,27 +465,27 @@ def migrate_user_roles(cursor):
         cursor.execute("SELECT id FROM company ORDER BY id LIMIT 1")
         company_result = cursor.fetchone()
         default_company_id = company_result[0] if company_result else 1
-        
+
         # Copy all data from old table to new table with validation
         cursor.execute("""
-        INSERT INTO user_new 
-        SELECT id, username, email, password_hash, created_at, 
+        INSERT INTO user_new
+        SELECT id, username, email, password_hash, created_at,
                COALESCE(company_id, ?) as company_id,
                is_verified, verification_token, token_expiry, is_blocked,
-               CASE 
+               CASE
                    WHEN role IN (?, ?, ?, ?, ?) THEN role
                    ELSE ?
                END as role,
                team_id,
-               CASE 
+               CASE
                    WHEN account_type IN (?, ?) THEN account_type
                    ELSE ?
                END as account_type,
                business_name, two_factor_enabled, two_factor_secret
         FROM user
-        """, (default_company_id, Role.TEAM_MEMBER.value, Role.TEAM_LEADER.value, Role.SUPERVISOR.value, 
+        """, (default_company_id, Role.TEAM_MEMBER.value, Role.TEAM_LEADER.value, Role.SUPERVISOR.value,
               Role.ADMIN.value, Role.SYSTEM_ADMIN.value, Role.TEAM_MEMBER.value,
-              AccountType.COMPANY_USER.value, AccountType.FREELANCER.value, 
+              AccountType.COMPANY_USER.value, AccountType.FREELANCER.value,
               AccountType.COMPANY_USER.value))
 
         # Drop the old table and rename the new one
@@ -517,7 +519,7 @@ def migrate_work_config_data(db_path):
     if not FLASK_AVAILABLE:
         print("Skipping work config data migration - Flask not available")
         return
-        
+
     with app.app_context():
         try:
             # Create CompanyWorkConfig for all companies that don't have one
@@ -526,10 +528,10 @@ def migrate_work_config_data(db_path):
                 existing_config = CompanyWorkConfig.query.filter_by(company_id=company.id).first()
                 if not existing_config:
                     print(f"Creating CompanyWorkConfig for {company.name}")
-                    
+
                     # Use Germany defaults (existing system default)
                     preset = CompanyWorkConfig.get_regional_preset(WorkRegion.GERMANY)
-                    
+
                     company_config = CompanyWorkConfig(
                         company_id=company.id,
                         work_hours_per_day=preset['work_hours_per_day'],
@@ -541,7 +543,7 @@ def migrate_work_config_data(db_path):
                         region_name=preset['region_name']
                     )
                     db.session.add(company_config)
-            
+
             # Migrate existing WorkConfig user preferences to UserPreferences
             old_configs = WorkConfig.query.filter(WorkConfig.user_id.isnot(None)).all()
             for old_config in old_configs:
@@ -550,7 +552,7 @@ def migrate_work_config_data(db_path):
                     existing_prefs = UserPreferences.query.filter_by(user_id=user.id).first()
                     if not existing_prefs:
                         print(f"Migrating preferences for user {user.username}")
-                        
+
                         user_prefs = UserPreferences(
                             user_id=user.id,
                             time_format_24h=getattr(old_config, 'time_format_24h', True),
@@ -559,10 +561,10 @@ def migrate_work_config_data(db_path):
                             round_to_nearest=getattr(old_config, 'round_to_nearest', True)
                         )
                         db.session.add(user_prefs)
-            
+
             db.session.commit()
             print("Work config data migration completed successfully")
-            
+
         except Exception as e:
             print(f"Error during work config migration: {e}")
             db.session.rollback()
@@ -706,7 +708,7 @@ def migrate_system_events(db_path):
                 FOREIGN KEY (company_id) REFERENCES company (id)
             )
             """)
-            
+
             # Add an initial system event if Flask is available
             if FLASK_AVAILABLE:
                 # We'll add the initial event after the table is created
@@ -732,7 +734,7 @@ def migrate_data():
     if not FLASK_AVAILABLE:
         print("Skipping data migration - Flask not available")
         return
-        
+
     try:
         # Update existing users with null/invalid data
         users = User.query.all()
@@ -741,7 +743,7 @@ def migrate_data():
                 user.role = Role.TEAM_MEMBER
             if user.two_factor_enabled is None:
                 user.two_factor_enabled = False
-        
+
         # Check if any system admin users exist
         system_admin_count = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
         if system_admin_count == 0:
@@ -749,10 +751,10 @@ def migrate_data():
             print(f"To promote a user: UPDATE user SET role = '{Role.SYSTEM_ADMIN.value}' WHERE username = 'your_username';")
         else:
             print(f"Found {system_admin_count} system administrator(s)")
-        
+
         db.session.commit()
         print("Data migration completed successfully")
-        
+
     except Exception as e:
         print(f"Error during data migration: {e}")
         db.session.rollback()
@@ -763,7 +765,7 @@ def init_system_settings():
     if not FLASK_AVAILABLE:
         print("Skipping system settings initialization - Flask not available")
         return
-        
+
     # Check if registration_enabled setting exists
     reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
     if not reg_setting:
@@ -776,7 +778,7 @@ def init_system_settings():
         db.session.add(reg_setting)
         db.session.commit()
         print("Registration setting initialized to enabled")
-    
+
     # Check if email_verification_required setting exists
     email_verification_setting = SystemSettings.query.filter_by(key='email_verification_required').first()
     if not email_verification_setting:
@@ -789,7 +791,7 @@ def init_system_settings():
         db.session.add(email_verification_setting)
         db.session.commit()
         print("Email verification setting initialized to enabled")
-    
+
     # Check if tracking_script_enabled setting exists
     tracking_script_setting = SystemSettings.query.filter_by(key='tracking_script_enabled').first()
     if not tracking_script_setting:
@@ -802,7 +804,7 @@ def init_system_settings():
         db.session.add(tracking_script_setting)
         db.session.commit()
         print("Tracking script setting initialized to disabled")
-    
+
     # Check if tracking_script_code setting exists
     tracking_script_code_setting = SystemSettings.query.filter_by(key='tracking_script_code').first()
     if not tracking_script_code_setting:
@@ -820,10 +822,10 @@ def init_system_settings():
 def create_new_database(db_path):
     """Create a new database with all tables."""
     print(f"Creating new database at {db_path}")
-    
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
+
     try:
         create_all_tables(cursor)
         conn.commit()
@@ -840,7 +842,7 @@ def create_all_tables(cursor):
     """Create all tables from scratch."""
     # This would contain all CREATE TABLE statements
     # For brevity, showing key tables only
-    
+
     cursor.execute("""
     CREATE TABLE company (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -854,7 +856,7 @@ def create_all_tables(cursor):
         UNIQUE(name)
     )
     """)
-    
+
     cursor.execute("""
     CREATE TABLE user (
         id INTEGER PRIMARY KEY,
@@ -877,18 +879,120 @@ def create_all_tables(cursor):
         FOREIGN KEY (team_id) REFERENCES team (id)
     )
     """)
-    
+
     # Add other table creation statements as needed
     print("All tables created")
+
+
+def migrate_kanban_system(db_file=None):
+    """Migrate to add Kanban board system."""
+    db_path = get_db_path(db_file)
+
+    print(f"Migrating Kanban system in {db_path}...")
+
+    if not os.path.exists(db_path):
+        print(f"Database file {db_path} does not exist. Run basic migration first.")
+        return False
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        # Check if kanban_board table already exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='kanban_board'")
+        if cursor.fetchone():
+            print("Kanban tables already exist. Skipping migration.")
+            return True
+
+        print("Creating Kanban board tables...")
+
+        # Create kanban_board table
+        cursor.execute("""
+        CREATE TABLE kanban_board (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) NOT NULL,
+            description TEXT,
+            project_id INTEGER NOT NULL,
+            is_active BOOLEAN DEFAULT 1,
+            is_default BOOLEAN DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_by_id INTEGER NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES project (id),
+            FOREIGN KEY (created_by_id) REFERENCES user (id),
+            UNIQUE(project_id, name)
+        )
+        """)
+
+        # Create kanban_column table
+        cursor.execute("""
+        CREATE TABLE kanban_column (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) NOT NULL,
+            description TEXT,
+            position INTEGER NOT NULL,
+            color VARCHAR(7) DEFAULT '#6c757d',
+            wip_limit INTEGER,
+            is_active BOOLEAN DEFAULT 1,
+            board_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (board_id) REFERENCES kanban_board (id),
+            UNIQUE(board_id, name)
+        )
+        """)
+
+        # Create kanban_card table
+        cursor.execute("""
+        CREATE TABLE kanban_card (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title VARCHAR(200) NOT NULL,
+            description TEXT,
+            position INTEGER NOT NULL,
+            color VARCHAR(7),
+            is_active BOOLEAN DEFAULT 1,
+            column_id INTEGER NOT NULL,
+            task_id INTEGER,
+            assigned_to_id INTEGER,
+            due_date DATE,
+            completed_date DATE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_by_id INTEGER NOT NULL,
+            FOREIGN KEY (column_id) REFERENCES kanban_column (id),
+            FOREIGN KEY (task_id) REFERENCES task (id),
+            FOREIGN KEY (assigned_to_id) REFERENCES user (id),
+            FOREIGN KEY (created_by_id) REFERENCES user (id)
+        )
+        """)
+
+        # Create indexes for better performance
+        cursor.execute("CREATE INDEX idx_kanban_board_project ON kanban_board(project_id)")
+        cursor.execute("CREATE INDEX idx_kanban_column_board ON kanban_column(board_id)")
+        cursor.execute("CREATE INDEX idx_kanban_card_column ON kanban_card(column_id)")
+        cursor.execute("CREATE INDEX idx_kanban_card_task ON kanban_card(task_id)")
+        cursor.execute("CREATE INDEX idx_kanban_card_assigned ON kanban_card(assigned_to_id)")
+
+        conn.commit()
+        print("Kanban system migration completed successfully!")
+        return True
+
+    except Exception as e:
+        print(f"Error during Kanban system migration: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 
 def main():
     """Main function with command line interface."""
     parser = argparse.ArgumentParser(description='TimeTrack Database Migration Tool')
     parser.add_argument('--db-file', '-d', help='Path to SQLite database file')
-    parser.add_argument('--create-new', '-c', action='store_true', 
+    parser.add_argument('--create-new', '-c', action='store_true',
                        help='Create a new database (will overwrite existing)')
-    parser.add_argument('--migrate-all', '-m', action='store_true', 
+    parser.add_argument('--migrate-all', '-m', action='store_true',
                        help='Run all migrations (default action)')
     parser.add_argument('--task-system', '-t', action='store_true',
                        help='Run only task system migration')
@@ -898,16 +1002,18 @@ def main():
                        help='Run only basic table migrations')
     parser.add_argument('--system-events', '-s', action='store_true',
                        help='Run only system events migration')
-    
+    parser.add_argument('--kanban', '-k', action='store_true',
+                       help='Run only Kanban system migration')
+
     args = parser.parse_args()
-    
+
     db_path = get_db_path(args.db_file)
-    
+
     print(f"TimeTrack Database Migration Tool")
     print(f"Database: {db_path}")
     print(f"Flask available: {FLASK_AVAILABLE}")
     print("-" * 50)
-    
+
     try:
         if args.create_new:
             if os.path.exists(db_path):
@@ -917,25 +1023,28 @@ def main():
                     return
                 os.remove(db_path)
             create_new_database(db_path)
-            
+
         elif args.task_system:
             migrate_task_system(db_path)
-            
+
         elif args.company_model:
             migrate_to_company_model(db_path)
-            
+
         elif args.basic:
             run_basic_migrations(db_path)
-            
+
         elif args.system_events:
             migrate_system_events(db_path)
-            
+
+        elif args.kanban:
+            migrate_kanban_system(db_path)
+
         else:
             # Default: run all migrations
             run_all_migrations(db_path)
-            
+
         print("\nMigration completed successfully!")
-        
+
     except Exception as e:
         print(f"\nError during migration: {e}")
         sys.exit(1)

@@ -41,6 +41,7 @@
             <ul>
                 {% if g.user %}
                     <li><a href="{{ url_for('home') }}" data-tooltip="Home"><i class="nav-icon">🏠</i><span class="nav-text">Home</span></a></li>
+                    <li><a href="{{ url_for('kanban_overview') }}" data-tooltip="Kanban Board"><i class="nav-icon">📋</i><span class="nav-text">Kanban Board</span></a></li>
                     <li><a href="{{ url_for('analytics') }}" data-tooltip="Time Analytics"><i class="nav-icon">📊</i><span class="nav-text">Analytics</span></a></li>
                     
                     <!-- Role-based menu items -->

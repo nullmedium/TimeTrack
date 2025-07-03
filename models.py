@@ -26,22 +26,22 @@ class Company(db.Model):
     slug = db.Column(db.String(50), unique=True, nullable=False)  # URL-friendly identifier
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.now)
-    
+
     # Freelancer support
     is_personal = db.Column(db.Boolean, default=False)  # True for auto-created freelancer companies
-    
+
     # Company settings
     is_active = db.Column(db.Boolean, default=True)
     max_users = db.Column(db.Integer, default=100)  # Optional user limit
-    
+
     # Relationships
     users = db.relationship('User', backref='company', lazy=True)
-    teams = db.relationship('Team', backref='company', lazy=True) 
+    teams = db.relationship('Team', backref='company', lazy=True)
     projects = db.relationship('Project', backref='company', lazy=True)
-    
+
     def __repr__(self):
         return f'<Company {self.name}>'
-    
+
     def generate_slug(self):
         """Generate URL-friendly slug from company name"""
         import re
@@ -55,16 +55,16 @@ class Team(db.Model):
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.now)
-    
+
     # Company association for multi-tenancy
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
-    
+
     # Relationship with users (one team has many users)
     users = db.relationship('User', backref='team', lazy=True)
-    
+
     # Unique constraint per company
     __table_args__ = (db.UniqueConstraint('company_id', 'name', name='uq_team_name_per_company'),)
-    
+
     def __repr__(self):
         return f'<Team {self.name}>'
 
@@ -76,52 +76,52 @@ class Project(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
-    
+
     # Company association for multi-tenancy
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
-    
+
     # Foreign key to user who created the project (Admin/Supervisor)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
+
     # Optional team assignment - if set, only team members can log time to this project
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
-    
+
     # Project categorization
     category_id = db.Column(db.Integer, db.ForeignKey('project_category.id'), nullable=True)
-    
+
     # Project dates
     start_date = db.Column(db.Date, nullable=True)
     end_date = db.Column(db.Date, nullable=True)
-    
+
     # Relationships
     created_by = db.relationship('User', foreign_keys=[created_by_id], backref='created_projects')
     team = db.relationship('Team', backref='projects')
     time_entries = db.relationship('TimeEntry', backref='project', lazy=True)
     category = db.relationship('ProjectCategory', back_populates='projects')
-    
+
     # Unique constraint per company
     __table_args__ = (db.UniqueConstraint('company_id', 'code', name='uq_project_code_per_company'),)
-    
+
     def __repr__(self):
         return f'<Project {self.code}: {self.name}>'
-    
+
     def is_user_allowed(self, user):
         """Check if a user is allowed to log time to this project"""
         if not self.is_active:
             return False
-        
+
         # Must be in same company
         if self.company_id != user.company_id:
             return False
-        
+
         # Admins and Supervisors can log time to any project in their company
         if user.role in [Role.ADMIN, Role.SUPERVISOR]:
             return True
-        
+
         # If project is team-specific, only team members can log time
         if self.team_id:
             return user.team_id == self.team_id
-        
+
         # If no team restriction, any user in the company can log time
         return True
 
@@ -132,52 +132,52 @@ class User(db.Model):
     email = db.Column(db.String(120), nullable=False)
     password_hash = db.Column(db.String(128))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Company association for multi-tenancy
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
-    
+
     # Email verification fields
     is_verified = db.Column(db.Boolean, default=False)
     verification_token = db.Column(db.String(100), unique=True, nullable=True)
     token_expiry = db.Column(db.DateTime, nullable=True)
-    
+
     # New field for blocking users
     is_blocked = db.Column(db.Boolean, default=False)
-    
+
     # New fields for role and team
     role = db.Column(db.Enum(Role, values_callable=lambda obj: [e.value for e in obj]), default=Role.TEAM_MEMBER)
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
-    
+
     # Freelancer support
     account_type = db.Column(db.Enum(AccountType, values_callable=lambda obj: [e.value for e in obj]), default=AccountType.COMPANY_USER)
     business_name = db.Column(db.String(100), nullable=True)  # Optional business name for freelancers
-    
+
     # Unique constraints per company
     __table_args__ = (
         db.UniqueConstraint('company_id', 'username', name='uq_user_username_per_company'),
         db.UniqueConstraint('company_id', 'email', name='uq_user_email_per_company'),
     )
-    
+
     # Two-Factor Authentication fields
     two_factor_enabled = db.Column(db.Boolean, default=False)
     two_factor_secret = db.Column(db.String(32), nullable=True)  # Base32 encoded secret
-    
+
     # Relationships
     time_entries = db.relationship('TimeEntry', backref='user', lazy=True)
     work_config = db.relationship('WorkConfig', backref='user', lazy=True, uselist=False)
-    
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
-        
+
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-    
+
     def generate_verification_token(self):
         """Generate a verification token that expires in 24 hours"""
         self.verification_token = secrets.token_urlsafe(32)
         self.token_expiry = datetime.utcnow() + timedelta(hours=24)
         return self.verification_token
-    
+
     def verify_token(self, token):
         """Verify the token and mark user as verified if valid"""
         if token == self.verification_token and self.token_expiry > datetime.utcnow():
@@ -186,13 +186,13 @@ class User(db.Model):
             self.token_expiry = None
             return True
         return False
-    
+
     def generate_2fa_secret(self):
         """Generate a new 2FA secret"""
         import pyotp
         self.two_factor_secret = pyotp.random_base32()
         return self.two_factor_secret
-    
+
     def get_2fa_uri(self):
         """Get the provisioning URI for QR code generation"""
         if not self.two_factor_secret:
@@ -203,7 +203,7 @@ class User(db.Model):
             name=self.email,
             issuer_name="TimeTrack"
         )
-    
+
     def verify_2fa_token(self, token, allow_setup=False):
         """Verify a 2FA token"""
         if not self.two_factor_secret:
@@ -214,7 +214,7 @@ class User(db.Model):
         import pyotp
         totp = pyotp.TOTP(self.two_factor_secret)
         return totp.verify(token, valid_window=1)  # Allow 1 window tolerance
-    
+
     def __repr__(self):
         return f'<User {self.username}>'
 
@@ -224,7 +224,7 @@ class SystemSettings(db.Model):
     value = db.Column(db.String(255), nullable=False)
     description = db.Column(db.String(255))
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     def __repr__(self):
         return f'<SystemSettings {self.key}={self.value}>'
 
@@ -237,14 +237,14 @@ class TimeEntry(db.Model):
     pause_start_time = db.Column(db.DateTime, nullable=True)
     total_break_duration = db.Column(db.Integer, default=0)  # Total break duration in seconds
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    
+
     # Project association - nullable for backward compatibility
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
-    
+
     # Task/SubTask associations - nullable for backward compatibility
     task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=True)
     subtask_id = db.Column(db.Integer, db.ForeignKey('sub_task.id'), nullable=True)
-    
+
     # Optional notes/description for the time entry
     notes = db.Column(db.Text, nullable=True)
 
@@ -259,15 +259,15 @@ class WorkConfig(db.Model):
     break_threshold_hours = db.Column(db.Float, default=6.0)  # Work hours that trigger mandatory break
     additional_break_minutes = db.Column(db.Integer, default=15)  # Default 15 minutes for additional break
     additional_break_threshold_hours = db.Column(db.Float, default=9.0)  # Work hours that trigger additional break
-    
+
     # Time rounding settings
     time_rounding_minutes = db.Column(db.Integer, default=0)  # 0 = no rounding, 15 = 15 min, 30 = 30 min
     round_to_nearest = db.Column(db.Boolean, default=True)  # True = round to nearest, False = round up
-    
+
     # Date/time format settings
     time_format_24h = db.Column(db.Boolean, default=True)  # True = 24h, False = 12h (AM/PM)
     date_format = db.Column(db.String(20), default='ISO')  # ISO, US, EU, etc.
-    
+
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
@@ -288,33 +288,33 @@ class WorkRegion(enum.Enum):
 class CompanyWorkConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
-    
+
     # Work policy settings (legal requirements)
     work_hours_per_day = db.Column(db.Float, default=8.0)  # Standard work hours per day
     mandatory_break_minutes = db.Column(db.Integer, default=30)  # Required break duration
     break_threshold_hours = db.Column(db.Float, default=6.0)  # Hours that trigger mandatory break
     additional_break_minutes = db.Column(db.Integer, default=15)  # Additional break duration
     additional_break_threshold_hours = db.Column(db.Float, default=9.0)  # Hours that trigger additional break
-    
+
     # Regional compliance
     region = db.Column(db.Enum(WorkRegion), default=WorkRegion.GERMANY)
     region_name = db.Column(db.String(50), default='Germany')
-    
+
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    
+
     # Relationships
     company = db.relationship('Company', backref='work_config')
     created_by = db.relationship('User', foreign_keys=[created_by_id])
-    
+
     # Unique constraint - one config per company
     __table_args__ = (db.UniqueConstraint('company_id', name='uq_company_work_config'),)
-    
+
     def __repr__(self):
         return f'<CompanyWorkConfig {self.company.name}: {self.region.value}, {self.work_hours_per_day}h/day>'
-    
+
     @classmethod
     def get_regional_preset(cls, region):
         """Get regional preset configuration."""
@@ -366,25 +366,25 @@ class CompanyWorkConfig(db.Model):
 class UserPreferences(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
+
     # Display format preferences
     time_format_24h = db.Column(db.Boolean, default=True)  # True = 24h, False = 12h (AM/PM)
     date_format = db.Column(db.String(20), default='ISO')  # ISO, US, EU, etc.
-    
+
     # Time rounding preferences
     time_rounding_minutes = db.Column(db.Integer, default=0)  # 0 = no rounding, 15 = 15 min, 30 = 30 min
     round_to_nearest = db.Column(db.Boolean, default=True)  # True = round to nearest, False = round up
-    
+
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
-    
-    # Relationships  
+
+    # Relationships
     user = db.relationship('User', backref=db.backref('preferences', uselist=False))
-    
+
     # Unique constraint - one preferences per user
     __table_args__ = (db.UniqueConstraint('user_id', name='uq_user_preferences'),)
-    
+
     def __repr__(self):
         return f'<UserPreferences {self.user.username}: {self.date_format}, {"24h" if self.time_format_24h else "12h"}>'
 
@@ -395,23 +395,23 @@ class ProjectCategory(db.Model):
     description = db.Column(db.Text, nullable=True)
     color = db.Column(db.String(7), default='#007bff')  # Hex color for UI
     icon = db.Column(db.String(50), nullable=True)  # Icon name/emoji
-    
+
     # Company association for multi-tenancy
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
-    
+
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
+
     # Relationships
     company = db.relationship('Company', backref='project_categories')
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     projects = db.relationship('Project', back_populates='category', lazy=True)
-    
+
     # Unique constraint per company
     __table_args__ = (db.UniqueConstraint('company_id', 'name', name='uq_category_name_per_company'),)
-    
+
     def __repr__(self):
         return f'<ProjectCategory {self.name}>'
 
@@ -435,52 +435,52 @@ class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    
+
     # Task properties
     status = db.Column(db.Enum(TaskStatus), default=TaskStatus.NOT_STARTED)
     priority = db.Column(db.Enum(TaskPriority), default=TaskPriority.MEDIUM)
     estimated_hours = db.Column(db.Float, nullable=True)  # Estimated time to complete
-    
+
     # Project association
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
-    
+
     # Task assignment
     assigned_to_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    
+
     # Task dates
     start_date = db.Column(db.Date, nullable=True)
     due_date = db.Column(db.Date, nullable=True)
     completed_date = db.Column(db.Date, nullable=True)
-    
+
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
+
     # Relationships
     project = db.relationship('Project', backref='tasks')
     assigned_to = db.relationship('User', foreign_keys=[assigned_to_id], backref='assigned_tasks')
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     subtasks = db.relationship('SubTask', backref='parent_task', lazy=True, cascade='all, delete-orphan')
     time_entries = db.relationship('TimeEntry', backref='task', lazy=True)
-    
+
     def __repr__(self):
         return f'<Task {self.name} ({self.status.value})>'
-    
+
     @property
     def progress_percentage(self):
         """Calculate task progress based on subtasks completion"""
         if not self.subtasks:
             return 100 if self.status == TaskStatus.COMPLETED else 0
-        
+
         completed_subtasks = sum(1 for subtask in self.subtasks if subtask.status == TaskStatus.COMPLETED)
         return int((completed_subtasks / len(self.subtasks)) * 100)
-    
+
     @property
     def total_time_logged(self):
         """Calculate total time logged to this task (in seconds)"""
         return sum(entry.duration or 0 for entry in self.time_entries if entry.duration)
-    
+
     def can_user_access(self, user):
         """Check if a user can access this task"""
         return self.project.is_user_allowed(user)
@@ -490,41 +490,41 @@ class SubTask(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    
+
     # SubTask properties
     status = db.Column(db.Enum(TaskStatus), default=TaskStatus.NOT_STARTED)
     priority = db.Column(db.Enum(TaskPriority), default=TaskPriority.MEDIUM)
     estimated_hours = db.Column(db.Float, nullable=True)
-    
+
     # Parent task association
     task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
-    
+
     # Assignment
     assigned_to_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    
+
     # Dates
     start_date = db.Column(db.Date, nullable=True)
     due_date = db.Column(db.Date, nullable=True)
     completed_date = db.Column(db.Date, nullable=True)
-    
+
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
+
     # Relationships
     assigned_to = db.relationship('User', foreign_keys=[assigned_to_id], backref='assigned_subtasks')
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     time_entries = db.relationship('TimeEntry', backref='subtask', lazy=True)
-    
+
     def __repr__(self):
         return f'<SubTask {self.name} ({self.status.value})>'
-    
+
     @property
     def total_time_logged(self):
         """Calculate total time logged to this subtask (in seconds)"""
         return sum(entry.duration or 0 for entry in self.time_entries if entry.duration)
-    
+
     def can_user_access(self, user):
         """Check if a user can access this subtask"""
         return self.parent_task.can_user_access(user)
@@ -534,58 +534,58 @@ class Announcement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    
+
     # Announcement properties
     is_active = db.Column(db.Boolean, default=True)
     is_urgent = db.Column(db.Boolean, default=False)  # For urgent announcements with different styling
     announcement_type = db.Column(db.String(20), default='info')  # info, warning, success, danger
-    
+
     # Scheduling
     start_date = db.Column(db.DateTime, nullable=True)  # When to start showing
     end_date = db.Column(db.DateTime, nullable=True)    # When to stop showing
-    
+
     # Targeting
     target_all_users = db.Column(db.Boolean, default=True)
     target_roles = db.Column(db.Text, nullable=True)  # JSON string of roles if not all users
     target_companies = db.Column(db.Text, nullable=True)  # JSON string of company IDs if not all companies
-    
+
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
+
     # Relationships
     created_by = db.relationship('User', foreign_keys=[created_by_id])
-    
+
     def __repr__(self):
         return f'<Announcement {self.title}>'
-    
+
     def is_visible_now(self):
         """Check if announcement should be visible at current time"""
         if not self.is_active:
             return False
-        
+
         now = datetime.now()
-        
+
         # Check start date
         if self.start_date and now < self.start_date:
             return False
-        
+
         # Check end date
         if self.end_date and now > self.end_date:
             return False
-        
+
         return True
-    
+
     def is_visible_to_user(self, user):
         """Check if announcement should be visible to specific user"""
         if not self.is_visible_now():
             return False
-        
+
         # If targeting all users, show to everyone
         if self.target_all_users:
             return True
-        
+
         # Check role targeting
         if self.target_roles:
             import json
@@ -595,7 +595,7 @@ class Announcement(db.Model):
                     return False
             except (json.JSONDecodeError, AttributeError):
                 pass
-        
+
         # Check company targeting
         if self.target_companies:
             import json
@@ -605,9 +605,9 @@ class Announcement(db.Model):
                     return False
             except (json.JSONDecodeError, AttributeError):
                 pass
-        
+
         return True
-    
+
     @staticmethod
     def get_active_announcements_for_user(user):
         """Get all active announcements visible to a specific user"""
@@ -622,27 +622,27 @@ class SystemEvent(db.Model):
     description = db.Column(db.Text, nullable=False)
     severity = db.Column(db.String(20), default='info')  # 'info', 'warning', 'error', 'critical'
     timestamp = db.Column(db.DateTime, default=datetime.now, nullable=False)
-    
+
     # Optional associations
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=True)
-    
+
     # Additional metadata (JSON string)
     event_metadata = db.Column(db.Text, nullable=True)  # Store additional event data as JSON
-    
+
     # IP address and user agent for security tracking
     ip_address = db.Column(db.String(45), nullable=True)  # IPv6 compatible
     user_agent = db.Column(db.Text, nullable=True)
-    
+
     # Relationships
     user = db.relationship('User', backref='system_events')
     company = db.relationship('Company', backref='system_events')
-    
+
     def __repr__(self):
         return f'<SystemEvent {self.event_type}: {self.description[:50]}>'
-    
+
     @staticmethod
-    def log_event(event_type, description, event_category='system', severity='info', 
+    def log_event(event_type, description, event_category='system', severity='info',
                   user_id=None, company_id=None, event_metadata=None, ip_address=None, user_agent=None):
         """Helper method to log system events"""
         event = SystemEvent(
@@ -664,7 +664,7 @@ class SystemEvent(db.Model):
             # Log to application logger if DB logging fails
             import logging
             logging.error(f"Failed to log system event: {e}")
-    
+
     @staticmethod
     def get_recent_events(days=7, limit=100):
         """Get recent system events from the last N days"""
@@ -673,7 +673,7 @@ class SystemEvent(db.Model):
         return SystemEvent.query.filter(
             SystemEvent.timestamp >= since
         ).order_by(SystemEvent.timestamp.desc()).limit(limit).all()
-    
+
     @staticmethod
     def get_events_by_severity(severity, days=7, limit=50):
         """Get events by severity level"""
@@ -683,38 +683,38 @@ class SystemEvent(db.Model):
             SystemEvent.timestamp >= since,
             SystemEvent.severity == severity
         ).order_by(SystemEvent.timestamp.desc()).limit(limit).all()
-    
+
     @staticmethod
     def get_system_health_summary():
         """Get a summary of system health based on recent events"""
         from datetime import datetime, timedelta
         from sqlalchemy import func
-        
+
         now = datetime.now()
         last_24h = now - timedelta(hours=24)
         last_week = now - timedelta(days=7)
-        
+
         # Count events by severity in last 24h
         recent_errors = SystemEvent.query.filter(
             SystemEvent.timestamp >= last_24h,
             SystemEvent.severity.in_(['error', 'critical'])
         ).count()
-        
+
         recent_warnings = SystemEvent.query.filter(
             SystemEvent.timestamp >= last_24h,
             SystemEvent.severity == 'warning'
         ).count()
-        
+
         # Count total events in last week
         weekly_events = SystemEvent.query.filter(
             SystemEvent.timestamp >= last_week
         ).count()
-        
+
         # Get most recent error
         last_error = SystemEvent.query.filter(
             SystemEvent.severity.in_(['error', 'critical'])
         ).order_by(SystemEvent.timestamp.desc()).first()
-        
+
         return {
             'errors_24h': recent_errors,
             'warnings_24h': recent_warnings,
@@ -722,3 +722,112 @@ class SystemEvent(db.Model):
             'last_error': last_error,
             'health_status': 'healthy' if recent_errors == 0 else 'issues' if recent_errors < 5 else 'critical'
         }
+
+# Kanban Board models
+class KanbanBoard(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+
+    # Project association
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+
+    # Board settings
+    is_active = db.Column(db.Boolean, default=True)
+    is_default = db.Column(db.Boolean, default=False)  # Default board for project
+
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    # Relationships
+    project = db.relationship('Project', backref='kanban_boards')
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    columns = db.relationship('KanbanColumn', backref='board', lazy=True, cascade='all, delete-orphan', order_by='KanbanColumn.position')
+
+    # Unique constraint per project
+    __table_args__ = (db.UniqueConstraint('project_id', 'name', name='uq_kanban_board_name_per_project'),)
+
+    def __repr__(self):
+        return f'<KanbanBoard {self.name}>'
+
+class KanbanColumn(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+
+    # Column settings
+    position = db.Column(db.Integer, nullable=False)  # Order in board
+    color = db.Column(db.String(7), default='#6c757d')  # Hex color
+    wip_limit = db.Column(db.Integer, nullable=True)  # Work in progress limit
+    is_active = db.Column(db.Boolean, default=True)
+
+    # Board association
+    board_id = db.Column(db.Integer, db.ForeignKey('kanban_board.id'), nullable=False)
+
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    # Relationships
+    cards = db.relationship('KanbanCard', backref='column', lazy=True, cascade='all, delete-orphan', order_by='KanbanCard.position')
+
+    # Unique constraint per board
+    __table_args__ = (db.UniqueConstraint('board_id', 'name', name='uq_kanban_column_name_per_board'),)
+
+    def __repr__(self):
+        return f'<KanbanColumn {self.name}>'
+
+    @property
+    def card_count(self):
+        """Get number of cards in this column"""
+        return len([card for card in self.cards if card.is_active])
+
+    @property
+    def is_over_wip_limit(self):
+        """Check if column is over WIP limit"""
+        if not self.wip_limit:
+            return False
+        return self.card_count > self.wip_limit
+
+class KanbanCard(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+
+    # Card settings
+    position = db.Column(db.Integer, nullable=False)  # Order in column
+    color = db.Column(db.String(7), nullable=True)  # Optional custom color
+    is_active = db.Column(db.Boolean, default=True)
+
+    # Column association
+    column_id = db.Column(db.Integer, db.ForeignKey('kanban_column.id'), nullable=False)
+
+    # Optional task association
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=True)
+
+    # Card assignment
+    assigned_to_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+
+    # Card dates
+    due_date = db.Column(db.Date, nullable=True)
+    completed_date = db.Column(db.Date, nullable=True)
+
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    # Relationships
+    task = db.relationship('Task', backref='kanban_cards')
+    assigned_to = db.relationship('User', foreign_keys=[assigned_to_id], backref='assigned_kanban_cards')
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+
+    def __repr__(self):
+        return f'<KanbanCard {self.title}>'
+
+    def can_user_access(self, user):
+        """Check if a user can access this card"""
+        # Check board's project permissions
+        return self.column.board.project.is_user_allowed(user)

@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent, KanbanBoard, KanbanColumn, KanbanCard
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data
@@ -60,10 +60,10 @@ def run_migrations():
     # Check if we're using PostgreSQL or SQLite
     database_url = app.config['SQLALCHEMY_DATABASE_URI']
     print(f"DEBUG: Database URL: {database_url}")
-    
+
     is_postgresql = 'postgresql://' in database_url or 'postgres://' in database_url
     print(f"DEBUG: Is PostgreSQL: {is_postgresql}")
-    
+
     if is_postgresql:
         print("Using PostgreSQL - skipping SQLite migrations, ensuring tables exist...")
         with app.app_context():
@@ -171,16 +171,16 @@ def inject_globals():
     active_announcements = []
     if g.user:
         active_announcements = Announcement.get_active_announcements_for_user(g.user)
-    
+
     # Get tracking script settings
     tracking_script_enabled = False
     tracking_script_code = ''
-    
+
     try:
         tracking_enabled_setting = SystemSettings.query.filter_by(key='tracking_script_enabled').first()
         if tracking_enabled_setting:
             tracking_script_enabled = tracking_enabled_setting.value == 'true'
-        
+
         tracking_code_setting = SystemSettings.query.filter_by(key='tracking_script_code').first()
         if tracking_code_setting:
             tracking_script_code = tracking_code_setting.value
@@ -505,7 +505,7 @@ def login():
             ip_address=request.remote_addr,
             user_agent=request.headers.get('User-Agent')
         )
-        
+
         flash('Invalid username or password', 'error')
 
     return render_template('login.html', title='Login')
@@ -526,7 +526,7 @@ def logout():
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get('User-Agent')
             )
-    
+
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
@@ -1258,7 +1258,7 @@ def verify_2fa():
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get('User-Agent')
             )
-            
+
             flash('Invalid verification code. Please try again.', 'error')
 
     return render_template('verify_2fa.html', title='Two-Factor Authentication')
@@ -1448,7 +1448,7 @@ def delete_entry(entry_id):
 def update_entry(entry_id):
     entry = TimeEntry.query.filter_by(id=entry_id, user_id=session['user_id']).first_or_404()
     data = request.json
-    
+
     if not data:
         return jsonify({'success': False, 'message': 'No JSON data provided'}), 400
 
@@ -1465,7 +1465,7 @@ def update_entry(entry_id):
             # Accept only ISO 8601 format
             departure_time_str = data['departure_time']
             entry.departure_time = datetime.fromisoformat(departure_time_str.replace('Z', '+00:00'))
-            
+
             # Recalculate duration if both times are present
             if entry.arrival_time and entry.departure_time:
                 # Calculate work duration considering breaks
@@ -2117,23 +2117,23 @@ def system_admin_settings():
                          total_system_admins=total_system_admins)
 
 @app.route('/system-admin/health')
-@system_admin_required  
+@system_admin_required
 def system_admin_health():
     """System Admin: System health check and event log"""
     # Get system health summary
     health_summary = SystemEvent.get_system_health_summary()
-    
+
     # Get recent events (last 7 days)
     recent_events = SystemEvent.get_recent_events(days=7, limit=100)
-    
+
     # Get events by severity for quick stats
     errors = SystemEvent.get_events_by_severity('error', days=7, limit=20)
     warnings = SystemEvent.get_events_by_severity('warning', days=7, limit=20)
-    
+
     # System metrics
     from datetime import datetime, timedelta
     now = datetime.now()
-    
+
     # Database connection test
     db_healthy = True
     db_error = None
@@ -2148,18 +2148,18 @@ def system_admin_health():
             'system',
             'error'
         )
-    
+
     # Application uptime (approximate based on first event)
     first_event = SystemEvent.query.order_by(SystemEvent.timestamp.asc()).first()
     uptime_start = first_event.timestamp if first_event else now
     uptime_duration = now - uptime_start
-    
+
     # Recent activity stats
     today = now.date()
     today_events = SystemEvent.query.filter(
         func.date(SystemEvent.timestamp) == today
     ).count()
-    
+
     # Log the health check
     SystemEvent.log_event(
         'system_health_check',
@@ -2170,7 +2170,7 @@ def system_admin_health():
         ip_address=request.remote_addr,
         user_agent=request.headers.get('User-Agent')
     )
-    
+
     return render_template('system_admin_health.html',
                          title='System Health Check',
                          health_summary=health_summary,
@@ -2188,10 +2188,10 @@ def system_admin_announcements():
     """System Admin: Manage announcements"""
     page = request.args.get('page', 1, type=int)
     per_page = 20
-    
+
     announcements = Announcement.query.order_by(Announcement.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False)
-    
+
     return render_template('system_admin_announcements.html',
                          title='System Admin - Announcements',
                          announcements=announcements)
@@ -2206,43 +2206,43 @@ def system_admin_announcement_new():
         announcement_type = request.form.get('announcement_type', 'info')
         is_urgent = request.form.get('is_urgent') == 'on'
         is_active = request.form.get('is_active') == 'on'
-        
+
         # Handle date fields
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
-        
+
         start_datetime = None
         end_datetime = None
-        
+
         if start_date:
             try:
                 start_datetime = datetime.strptime(start_date, '%Y-%m-%dT%H:%M')
             except ValueError:
                 pass
-        
+
         if end_date:
             try:
                 end_datetime = datetime.strptime(end_date, '%Y-%m-%dT%H:%M')
             except ValueError:
                 pass
-        
+
         # Handle targeting
         target_all_users = request.form.get('target_all_users') == 'on'
         target_roles = None
         target_companies = None
-        
+
         if not target_all_users:
             selected_roles = request.form.getlist('target_roles')
             selected_companies = request.form.getlist('target_companies')
-            
+
             if selected_roles:
                 import json
                 target_roles = json.dumps(selected_roles)
-            
+
             if selected_companies:
                 import json
                 target_companies = json.dumps([int(c) for c in selected_companies])
-        
+
         announcement = Announcement(
             title=title,
             content=content,
@@ -2256,17 +2256,17 @@ def system_admin_announcement_new():
             target_companies=target_companies,
             created_by_id=g.user.id
         )
-        
+
         db.session.add(announcement)
         db.session.commit()
-        
+
         flash('Announcement created successfully.', 'success')
         return redirect(url_for('system_admin_announcements'))
-    
+
     # Get roles and companies for targeting options
     roles = [role.value for role in Role]
     companies = Company.query.order_by(Company.name).all()
-    
+
     return render_template('system_admin_announcement_form.html',
                          title='Create Announcement',
                          announcement=None,
@@ -2278,18 +2278,18 @@ def system_admin_announcement_new():
 def system_admin_announcement_edit(id):
     """System Admin: Edit announcement"""
     announcement = Announcement.query.get_or_404(id)
-    
+
     if request.method == 'POST':
         announcement.title = request.form.get('title')
         announcement.content = request.form.get('content')
         announcement.announcement_type = request.form.get('announcement_type', 'info')
         announcement.is_urgent = request.form.get('is_urgent') == 'on'
         announcement.is_active = request.form.get('is_active') == 'on'
-        
+
         # Handle date fields
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
-        
+
         if start_date:
             try:
                 announcement.start_date = datetime.strptime(start_date, '%Y-%m-%dT%H:%M')
@@ -2297,7 +2297,7 @@ def system_admin_announcement_edit(id):
                 announcement.start_date = None
         else:
             announcement.start_date = None
-        
+
         if end_date:
             try:
                 announcement.end_date = datetime.strptime(end_date, '%Y-%m-%dT%H:%M')
@@ -2305,20 +2305,20 @@ def system_admin_announcement_edit(id):
                 announcement.end_date = None
         else:
             announcement.end_date = None
-        
+
         # Handle targeting
         announcement.target_all_users = request.form.get('target_all_users') == 'on'
-        
+
         if not announcement.target_all_users:
             selected_roles = request.form.getlist('target_roles')
             selected_companies = request.form.getlist('target_companies')
-            
+
             if selected_roles:
                 import json
                 announcement.target_roles = json.dumps(selected_roles)
             else:
                 announcement.target_roles = None
-            
+
             if selected_companies:
                 import json
                 announcement.target_companies = json.dumps([int(c) for c in selected_companies])
@@ -2327,18 +2327,18 @@ def system_admin_announcement_edit(id):
         else:
             announcement.target_roles = None
             announcement.target_companies = None
-        
+
         announcement.updated_at = datetime.now()
-        
+
         db.session.commit()
-        
+
         flash('Announcement updated successfully.', 'success')
         return redirect(url_for('system_admin_announcements'))
-    
+
     # Get roles and companies for targeting options
     roles = [role.value for role in Role]
     companies = Company.query.order_by(Company.name).all()
-    
+
     return render_template('system_admin_announcement_form.html',
                          title='Edit Announcement',
                          announcement=announcement,
@@ -2350,10 +2350,10 @@ def system_admin_announcement_edit(id):
 def system_admin_announcement_delete(id):
     """System Admin: Delete announcement"""
     announcement = Announcement.query.get_or_404(id)
-    
+
     db.session.delete(announcement)
     db.session.commit()
-    
+
     flash('Announcement deleted successfully.', 'success')
     return redirect(url_for('system_admin_announcements'))
 
@@ -3392,6 +3392,74 @@ def manage_project_tasks(project_id):
                          tasks=tasks,
                          team_members=team_members)
 
+@app.route('/admin/projects/<int:project_id>/kanban')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def project_kanban(project_id):
+    project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first_or_404()
+
+    # Check if user has access to this project
+    if not project.is_user_allowed(g.user):
+        flash('You do not have access to this project.', 'error')
+        return redirect(url_for('admin_projects'))
+
+    # Get all Kanban boards for this project
+    boards = KanbanBoard.query.filter_by(project_id=project_id, is_active=True).order_by(KanbanBoard.created_at.desc()).all()
+
+    # Get team members for assignment dropdown
+    if project.team_id:
+        team_members = User.query.filter_by(team_id=project.team_id, company_id=g.user.company_id).all()
+    else:
+        team_members = User.query.filter_by(company_id=g.user.company_id).all()
+
+    # Get tasks for task assignment dropdown
+    tasks = Task.query.filter_by(project_id=project_id).order_by(Task.name).all()
+
+    return render_template('project_kanban.html',
+                         title=f'Kanban - {project.name}',
+                         project=project,
+                         boards=boards,
+                         team_members=team_members,
+                         tasks=tasks)
+
+@app.route('/kanban')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def kanban_overview():
+    # Get all projects the user has access to
+    if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
+        # Admins and Supervisors can see all company projects
+        projects = Project.query.filter_by(company_id=g.user.company_id, is_active=True).order_by(Project.name).all()
+    elif g.user.team_id:
+        # Team members see team projects + unassigned projects
+        projects = Project.query.filter(
+            Project.company_id == g.user.company_id,
+            Project.is_active == True,
+            db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+        ).order_by(Project.name).all()
+    else:
+        # Unassigned users see only unassigned projects
+        projects = Project.query.filter_by(
+            company_id=g.user.company_id,
+            team_id=None,
+            is_active=True
+        ).order_by(Project.name).all()
+
+    # Get Kanban boards for each project
+    project_boards = {}
+    for project in projects:
+        boards = KanbanBoard.query.filter_by(
+            project_id=project.id,
+            is_active=True
+        ).order_by(KanbanBoard.created_at.desc()).all()
+
+        if boards:  # Only include projects that have Kanban boards
+            project_boards[project] = boards
+
+    return render_template('kanban_overview.html',
+                         title='Kanban Overview',
+                         project_boards=project_boards)
+
 # Task API Routes
 @app.route('/api/tasks', methods=['POST'])
 @role_required(Role.TEAM_MEMBER)
@@ -3796,6 +3864,604 @@ def delete_category(category_id):
         db.session.commit()
 
         return jsonify({'success': True, 'message': 'Category deleted successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+# Kanban API Routes
+@app.route('/api/kanban/stats')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_kanban_stats():
+    try:
+        # Get all projects the user has access to
+        if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
+            projects = Project.query.filter_by(company_id=g.user.company_id, is_active=True).all()
+        elif g.user.team_id:
+            projects = Project.query.filter(
+                Project.company_id == g.user.company_id,
+                Project.is_active == True,
+                db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+            ).all()
+        else:
+            projects = Project.query.filter_by(
+                company_id=g.user.company_id,
+                team_id=None,
+                is_active=True
+            ).all()
+
+        # Count boards and cards
+        total_boards = 0
+        total_cards = 0
+        projects_with_boards = 0
+
+        for project in projects:
+            boards = KanbanBoard.query.filter_by(project_id=project.id, is_active=True).all()
+            if boards:
+                projects_with_boards += 1
+                total_boards += len(boards)
+                for board in boards:
+                    for column in board.columns:
+                        total_cards += len([card for card in column.cards if card.is_active])
+
+        return jsonify({
+            'success': True,
+            'stats': {
+                'projects_with_boards': projects_with_boards,
+                'total_boards': total_boards,
+                'total_cards': total_cards
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/kanban/boards', methods=['GET'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_kanban_boards():
+    try:
+        project_id = request.args.get('project_id')
+
+        # Verify project access
+        project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
+        if not project or not project.is_user_allowed(g.user):
+            return jsonify({'success': False, 'message': 'Project not found or access denied'})
+
+        boards = KanbanBoard.query.filter_by(project_id=project_id, is_active=True).all()
+
+        boards_data = []
+        for board in boards:
+            boards_data.append({
+                'id': board.id,
+                'name': board.name,
+                'description': board.description,
+                'is_default': board.is_default,
+                'created_at': board.created_at.isoformat(),
+                'column_count': len(board.columns)
+            })
+
+        return jsonify({'success': True, 'boards': boards_data})
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/kanban/boards', methods=['POST'])
+@role_required(Role.TEAM_LEADER)
+@company_required
+def create_kanban_board():
+    try:
+        data = request.get_json()
+        project_id = int(data.get('project_id'))
+
+        # Verify project access
+        project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
+        if not project or not project.is_user_allowed(g.user):
+            return jsonify({'success': False, 'message': 'Project not found or access denied'})
+
+        name = data.get('name')
+        if not name:
+            return jsonify({'success': False, 'message': 'Board name is required'})
+
+        # Check if board name already exists in project
+        existing = KanbanBoard.query.filter_by(project_id=project_id, name=name).first()
+        if existing:
+            return jsonify({'success': False, 'message': 'Board name already exists in this project'})
+
+        # Create board
+        board = KanbanBoard(
+            name=name,
+            description=data.get('description', ''),
+            project_id=project_id,
+            is_default=data.get('is_default') in ['true', 'on', True],
+            created_by_id=g.user.id
+        )
+
+        db.session.add(board)
+        db.session.flush()  # Get board ID for columns
+
+        # Create default columns
+        default_columns = [
+            {'name': 'To Do', 'position': 1, 'color': '#6c757d'},
+            {'name': 'In Progress', 'position': 2, 'color': '#007bff'},
+            {'name': 'Done', 'position': 3, 'color': '#28a745'}
+        ]
+
+        for col_data in default_columns:
+            column = KanbanColumn(
+                name=col_data['name'],
+                position=col_data['position'],
+                color=col_data['color'],
+                board_id=board.id
+            )
+            db.session.add(column)
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Board created successfully', 'board_id': board.id})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/kanban/boards/<int:board_id>', methods=['GET'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_kanban_board(board_id):
+    try:
+        board = KanbanBoard.query.join(Project).filter(
+            KanbanBoard.id == board_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not board or not board.project.is_user_allowed(g.user):
+            return jsonify({'success': False, 'message': 'Board not found or access denied'})
+
+        columns_data = []
+        for column in board.columns:
+            if not column.is_active:
+                continue
+
+            cards_data = []
+            for card in column.cards:
+                if not card.is_active:
+                    continue
+
+                cards_data.append({
+                    'id': card.id,
+                    'title': card.title,
+                    'description': card.description,
+                    'position': card.position,
+                    'color': card.color,
+                    'assigned_to': {
+                        'id': card.assigned_to.id,
+                        'username': card.assigned_to.username
+                    } if card.assigned_to else None,
+                    'task_id': card.task_id,
+                    'task_name': card.task.name if card.task else None,
+                    'due_date': card.due_date.isoformat() if card.due_date else None,
+                    'created_at': card.created_at.isoformat()
+                })
+
+            columns_data.append({
+                'id': column.id,
+                'name': column.name,
+                'description': column.description,
+                'position': column.position,
+                'color': column.color,
+                'wip_limit': column.wip_limit,
+                'card_count': column.card_count,
+                'is_over_wip_limit': column.is_over_wip_limit,
+                'cards': cards_data
+            })
+
+        board_data = {
+            'id': board.id,
+            'name': board.name,
+            'description': board.description,
+            'project': {
+                'id': board.project.id,
+                'name': board.project.name,
+                'code': board.project.code
+            },
+            'columns': columns_data
+        }
+
+        return jsonify({'success': True, 'board': board_data})
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/kanban/cards', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def create_kanban_card():
+    try:
+        data = request.get_json()
+        column_id = data.get('column_id')
+
+        # Verify column access
+        column = KanbanColumn.query.join(KanbanBoard).join(Project).filter(
+            KanbanColumn.id == column_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not column or not column.board.project.is_user_allowed(g.user):
+            return jsonify({'success': False, 'message': 'Column not found or access denied'})
+
+        title = data.get('title')
+        if not title:
+            return jsonify({'success': False, 'message': 'Card title is required'})
+
+        # Calculate position (add to end of column)
+        max_position = db.session.query(func.max(KanbanCard.position)).filter_by(
+            column_id=column_id, is_active=True
+        ).scalar() or 0
+
+        # Parse due date
+        due_date = None
+        if data.get('due_date'):
+            due_date = datetime.strptime(data.get('due_date'), '%Y-%m-%d').date()
+
+        # Create card
+        card = KanbanCard(
+            title=title,
+            description=data.get('description', ''),
+            position=max_position + 1,
+            color=data.get('color'),
+            column_id=column_id,
+            task_id=int(data.get('task_id')) if data.get('task_id') else None,
+            assigned_to_id=int(data.get('assigned_to_id')) if data.get('assigned_to_id') else None,
+            due_date=due_date,
+            created_by_id=g.user.id
+        )
+
+        db.session.add(card)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Card created successfully', 'card_id': card.id})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/kanban/cards/<int:card_id>/move', methods=['PUT'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def move_kanban_card(card_id):
+    try:
+        data = request.get_json()
+        new_column_id = data.get('column_id')
+        new_position = data.get('position')
+
+        # Verify card access
+        card = KanbanCard.query.join(KanbanColumn).join(KanbanBoard).join(Project).filter(
+            KanbanCard.id == card_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not card or not card.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Card not found or access denied'})
+
+        # Verify new column access
+        new_column = KanbanColumn.query.join(KanbanBoard).join(Project).filter(
+            KanbanColumn.id == new_column_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not new_column or not new_column.board.project.is_user_allowed(g.user):
+            return jsonify({'success': False, 'message': 'Target column not found or access denied'})
+
+        old_column_id = card.column_id
+        old_position = card.position
+
+        # Update positions in old column (if moving to different column)
+        if old_column_id != new_column_id:
+            # Shift cards down in old column
+            cards_to_shift = KanbanCard.query.filter(
+                KanbanCard.column_id == old_column_id,
+                KanbanCard.position > old_position,
+                KanbanCard.is_active == True
+            ).all()
+
+            for c in cards_to_shift:
+                c.position -= 1
+
+        # Update positions in new column
+        cards_to_shift = KanbanCard.query.filter(
+            KanbanCard.column_id == new_column_id,
+            KanbanCard.position >= new_position,
+            KanbanCard.is_active == True,
+            KanbanCard.id != card_id
+        ).all()
+
+        for c in cards_to_shift:
+            c.position += 1
+
+        # Update card
+        card.column_id = new_column_id
+        card.position = new_position
+        card.updated_at = datetime.now()
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Card moved successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/kanban/cards/<int:card_id>', methods=['PUT'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def update_kanban_card(card_id):
+    try:
+        card = KanbanCard.query.join(KanbanColumn).join(KanbanBoard).join(Project).filter(
+            KanbanCard.id == card_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not card or not card.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Card not found or access denied'})
+
+        data = request.get_json()
+
+        # Update card fields
+        if 'title' in data:
+            card.title = data['title']
+        if 'description' in data:
+            card.description = data['description']
+        if 'color' in data:
+            card.color = data['color']
+        if 'assigned_to_id' in data:
+            card.assigned_to_id = int(data['assigned_to_id']) if data['assigned_to_id'] else None
+        if 'task_id' in data:
+            card.task_id = int(data['task_id']) if data['task_id'] else None
+        if 'due_date' in data:
+            card.due_date = datetime.strptime(data['due_date'], '%Y-%m-%d').date() if data['due_date'] else None
+
+        card.updated_at = datetime.now()
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Card updated successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/kanban/cards/<int:card_id>', methods=['DELETE'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def delete_kanban_card(card_id):
+    try:
+        card = KanbanCard.query.join(KanbanColumn).join(KanbanBoard).join(Project).filter(
+            KanbanCard.id == card_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not card or not card.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Card not found or access denied'})
+
+        column_id = card.column_id
+        position = card.position
+
+        # Soft delete
+        card.is_active = False
+        card.updated_at = datetime.now()
+
+        # Shift remaining cards up
+        cards_to_shift = KanbanCard.query.filter(
+            KanbanCard.column_id == column_id,
+            KanbanCard.position > position,
+            KanbanCard.is_active == True
+        ).all()
+
+        for c in cards_to_shift:
+            c.position -= 1
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Card deleted successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+# Kanban Column Management API
+@app.route('/api/kanban/columns', methods=['POST'])
+@role_required(Role.TEAM_LEADER)
+@company_required
+def create_kanban_column():
+    try:
+        data = request.get_json()
+        board_id = int(data.get('board_id'))
+
+        # Verify board access
+        board = KanbanBoard.query.join(Project).filter(
+            KanbanBoard.id == board_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not board or not board.project.is_user_allowed(g.user):
+            return jsonify({'success': False, 'message': 'Board not found or access denied'})
+
+        name = data.get('name')
+        if not name:
+            return jsonify({'success': False, 'message': 'Column name is required'})
+
+        # Check if column name already exists in board
+        existing = KanbanColumn.query.filter_by(board_id=board_id, name=name).first()
+        if existing:
+            return jsonify({'success': False, 'message': 'Column name already exists in this board'})
+
+        # Calculate position (add to end)
+        max_position = db.session.query(func.max(KanbanColumn.position)).filter_by(
+            board_id=board_id, is_active=True
+        ).scalar() or 0
+
+        # Create column
+        column = KanbanColumn(
+            name=name,
+            description=data.get('description', ''),
+            position=max_position + 1,
+            color=data.get('color', '#6c757d'),
+            wip_limit=int(data.get('wip_limit')) if data.get('wip_limit') else None,
+            board_id=board_id
+        )
+
+        db.session.add(column)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Column created successfully', 'column_id': column.id})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/kanban/columns/<int:column_id>', methods=['PUT'])
+@role_required(Role.TEAM_LEADER)
+@company_required
+def update_kanban_column(column_id):
+    try:
+        column = KanbanColumn.query.join(KanbanBoard).join(Project).filter(
+            KanbanColumn.id == column_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not column or not column.board.project.is_user_allowed(g.user):
+            return jsonify({'success': False, 'message': 'Column not found or access denied'})
+
+        data = request.get_json()
+
+        # Check for name conflicts (excluding current column)
+        if 'name' in data:
+            existing = KanbanColumn.query.filter(
+                KanbanColumn.board_id == column.board_id,
+                KanbanColumn.name == data['name'],
+                KanbanColumn.id != column_id
+            ).first()
+            if existing:
+                return jsonify({'success': False, 'message': 'Column name already exists in this board'})
+
+        # Update column fields
+        if 'name' in data:
+            column.name = data['name']
+        if 'description' in data:
+            column.description = data['description']
+        if 'color' in data:
+            column.color = data['color']
+        if 'wip_limit' in data:
+            column.wip_limit = int(data['wip_limit']) if data['wip_limit'] else None
+
+        column.updated_at = datetime.now()
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Column updated successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/kanban/columns/<int:column_id>/move', methods=['PUT'])
+@role_required(Role.TEAM_LEADER)
+@company_required
+def move_kanban_column(column_id):
+    try:
+        data = request.get_json()
+        new_position = int(data.get('position'))
+
+        # Verify column access
+        column = KanbanColumn.query.join(KanbanBoard).join(Project).filter(
+            KanbanColumn.id == column_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not column or not column.board.project.is_user_allowed(g.user):
+            return jsonify({'success': False, 'message': 'Column not found or access denied'})
+
+        old_position = column.position
+        board_id = column.board_id
+
+        if old_position == new_position:
+            return jsonify({'success': True, 'message': 'Column position unchanged'})
+
+        # Update positions of other columns
+        if old_position < new_position:
+            # Moving right: shift columns left
+            columns_to_shift = KanbanColumn.query.filter(
+                KanbanColumn.board_id == board_id,
+                KanbanColumn.position > old_position,
+                KanbanColumn.position <= new_position,
+                KanbanColumn.is_active == True,
+                KanbanColumn.id != column_id
+            ).all()
+
+            for c in columns_to_shift:
+                c.position -= 1
+        else:
+            # Moving left: shift columns right
+            columns_to_shift = KanbanColumn.query.filter(
+                KanbanColumn.board_id == board_id,
+                KanbanColumn.position >= new_position,
+                KanbanColumn.position < old_position,
+                KanbanColumn.is_active == True,
+                KanbanColumn.id != column_id
+            ).all()
+
+            for c in columns_to_shift:
+                c.position += 1
+
+        # Update the moved column
+        column.position = new_position
+        column.updated_at = datetime.now()
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Column moved successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/kanban/columns/<int:column_id>', methods=['DELETE'])
+@role_required(Role.TEAM_LEADER)
+@company_required
+def delete_kanban_column(column_id):
+    try:
+        column = KanbanColumn.query.join(KanbanBoard).join(Project).filter(
+            KanbanColumn.id == column_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not column or not column.board.project.is_user_allowed(g.user):
+            return jsonify({'success': False, 'message': 'Column not found or access denied'})
+
+        # Check if column has active cards
+        active_cards = KanbanCard.query.filter_by(column_id=column_id, is_active=True).count()
+        if active_cards > 0:
+            return jsonify({'success': False, 'message': f'Cannot delete column with {active_cards} active cards. Move or delete cards first.'})
+
+        board_id = column.board_id
+        position = column.position
+
+        # Soft delete the column
+        column.is_active = False
+        column.updated_at = datetime.now()
+
+        # Shift remaining columns left
+        columns_to_shift = KanbanColumn.query.filter(
+            KanbanColumn.board_id == board_id,
+            KanbanColumn.position > position,
+            KanbanColumn.is_active == True
+        ).all()
+
+        for c in columns_to_shift:
+            c.position -= 1
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Column deleted successfully'})
 
     except Exception as e:
         db.session.rollback()
