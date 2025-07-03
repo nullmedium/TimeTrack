@@ -381,6 +381,18 @@ def run_migrations():
                 if updated_count > 0:
                     print(f"Updated {updated_count} users from '{old_role}' to '{new_role}'")
             
+            # Also normalize account_type values
+            account_type_mapping = {
+                'COMPANY_USER': 'Company User',
+                'FREELANCER': 'Freelancer'
+            }
+            
+            for old_type, new_type in account_type_mapping.items():
+                cursor.execute("UPDATE user SET account_type = ? WHERE account_type = ?", (new_type, old_type))
+                updated_count = cursor.rowcount
+                if updated_count > 0:
+                    print(f"Updated {updated_count} users account_type from '{old_type}' to '{new_type}'")
+            
             # Set any NULL roles to default
             cursor.execute("UPDATE user SET role = 'Team Member' WHERE role IS NULL")
             null_updated = cursor.rowcount
@@ -405,7 +417,7 @@ def run_migrations():
                 is_blocked BOOLEAN DEFAULT 0,
                 role VARCHAR(50) DEFAULT 'Team Member' CHECK (role IN ('Team Member', 'Team Leader', 'Supervisor', 'Administrator', 'System Administrator')),
                 team_id INTEGER,
-                account_type VARCHAR(20) DEFAULT 'COMPANY_USER',
+                account_type VARCHAR(20) DEFAULT 'Company User' CHECK (account_type IN ('Company User', 'Freelancer')),
                 business_name VARCHAR(100),
                 two_factor_enabled BOOLEAN DEFAULT 0,
                 two_factor_secret VARCHAR(32),

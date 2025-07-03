@@ -141,11 +141,11 @@ class User(db.Model):
     is_blocked = db.Column(db.Boolean, default=False)
     
     # New fields for role and team
-    role = db.Column(db.Enum(Role), default=Role.TEAM_MEMBER)
+    role = db.Column(db.Enum(Role, values_callable=lambda obj: [e.value for e in obj]), default=Role.TEAM_MEMBER)
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
     
     # Freelancer support
-    account_type = db.Column(db.Enum(AccountType), default=AccountType.COMPANY_USER)
+    account_type = db.Column(db.Enum(AccountType, values_callable=lambda obj: [e.value for e in obj]), default=AccountType.COMPANY_USER)
     business_name = db.Column(db.String(100), nullable=True)  # Optional business name for freelancers
     
     # Unique constraints per company
