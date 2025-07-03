@@ -1,0 +1,398 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="header-section">
+        <h1>✏️ Edit User: {{ user.username }}</h1>
+        <p class="subtitle">System Administrator - Edit user across companies</p>
+        <a href="{{ url_for('system_admin_users') }}" class="btn btn-secondary">← Back to Users</a>
+    </div>
+
+    <div class="form-container">
+        <form method="POST">
+            <div class="form-grid">
+                <!-- Basic Information -->
+                <div class="form-section">
+                    <h3>Basic Information</h3>
+                    
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" 
+                               value="{{ user.username }}" required 
+                               class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" 
+                               value="{{ user.email }}" required 
+                               class="form-control">
+                    </div>
+                </div>
+
+                <!-- Company & Team Assignment -->
+                <div class="form-section">
+                    <h3>Company & Team</h3>
+                    
+                    <div class="form-group">
+                        <label for="company_id">Company</label>
+                        <select id="company_id" name="company_id" required class="form-control">
+                            {% for company in companies %}
+                            <option value="{{ company.id }}" 
+                                    {% if company.id == user.company_id %}selected{% endif %}>
+                                {{ company.name }}
+                                {% if company.is_personal %}(Personal){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="team_id">Team (Optional)</label>
+                        <select id="team_id" name="team_id" class="form-control">
+                            <option value="">No Team</option>
+                            {% for team in teams %}
+                            <option value="{{ team.id }}" 
+                                    {% if team.id == user.team_id %}selected{% endif %}>
+                                {{ team.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Role & Permissions -->
+                <div class="form-section">
+                    <h3>Role & Permissions</h3>
+                    
+                    <div class="form-group">
+                        <label for="role">Role</label>
+                        <select id="role" name="role" required class="form-control">
+                            {% for role in roles %}
+                            <option value="{{ role.name }}" 
+                                    {% if role == user.role %}selected{% endif %}>
+                                {{ role.value }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% if user.role == Role.SYSTEM_ADMIN %}
+                        <small class="form-text">⚠️ Warning: This user is a System Administrator</small>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Account Status -->
+                <div class="form-section">
+                    <h3>Account Status</h3>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="is_verified" 
+                                   {% if user.is_verified %}checked{% endif %}>
+                            <span class="checkmark"></span>
+                            Email Verified
+                        </label>
+                        <small class="form-text">Whether the user's email address has been verified</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="is_blocked" 
+                                   {% if user.is_blocked %}checked{% endif %}>
+                            <span class="checkmark"></span>
+                            Account Blocked
+                        </label>
+                        <small class="form-text">Blocked users cannot log in to the system</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Information Display -->
+            <div class="info-section">
+                <h3>User Information</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Account Type:</label>
+                        <span class="badge {% if user.account_type == AccountType.FREELANCER %}badge-freelancer{% else %}badge-company{% endif %}">
+                            {{ user.account_type.value }}
+                        </span>
+                    </div>
+                    
+                    <div class="info-item">
+                        <label>Created:</label>
+                        <span>{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </div>
+                    
+                    {% if user.business_name %}
+                    <div class="info-item">
+                        <label>Business Name:</label>
+                        <span>{{ user.business_name }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="info-item">
+                        <label>2FA Enabled:</label>
+                        <span class="{% if user.two_factor_enabled %}text-success{% else %}text-muted{% endif %}">
+                            {{ 'Yes' if user.two_factor_enabled else 'No' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <a href="{{ url_for('system_admin_users') }}" class="btn btn-secondary">Cancel</a>
+                
+                {% if user.id != g.user.id and not (user.role == Role.SYSTEM_ADMIN and user.id == g.user.id) %}
+                <div class="danger-zone">
+                    <h4>Danger Zone</h4>
+                    <p>Permanently delete this user account. This action cannot be undone.</p>
+                    <form method="POST" action="{{ url_for('system_admin_delete_user', user_id=user.id) }}" 
+                          style="display: inline;" 
+                          onsubmit="return confirm('Are you sure you want to delete user \'{{ user.username }}\'? This will also delete all their time entries and cannot be undone.')">
+                        <button type="submit" class="btn btn-danger">Delete User</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.header-section {
+    margin-bottom: 2rem;
+}
+
+.subtitle {
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.form-container {
+    max-width: 800px;
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.form-section {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.form-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #495057;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 0.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #495057;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-control:focus {
+    border-color: #007bff;
+    outline: 0;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.form-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: normal;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin-right: 0.5rem;
+    margin-bottom: 0;
+}
+
+.info-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.info-section h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #495057;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-item label {
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.badge-company {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.badge-freelancer {
+    background: #d4edda;
+    color: #155724;
+}
+
+.text-success {
+    color: #28a745;
+}
+
+.text-muted {
+    color: #6c757d;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+.danger-zone {
+    margin-left: auto;
+    padding: 1rem;
+    border: 2px solid #dc3545;
+    border-radius: 8px;
+    background: #f8d7da;
+    max-width: 300px;
+}
+
+.danger-zone h4 {
+    color: #721c24;
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+.danger-zone p {
+    color: #721c24;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+</style>
+
+<script>
+// Update teams when company changes
+document.getElementById('company_id').addEventListener('change', function() {
+    const companyId = this.value;
+    const teamSelect = document.getElementById('team_id');
+    
+    // Clear current options except "No Team"
+    teamSelect.innerHTML = '<option value="">No Team</option>';
+    
+    // Fetch teams for the selected company
+    if (companyId) {
+        fetch(`/api/companies/${companyId}/teams`)
+            .then(response => response.json())
+            .then(teams => {
+                teams.forEach(team => {
+                    const option = document.createElement('option');
+                    option.value = team.id;
+                    option.textContent = team.name;
+                    teamSelect.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching teams:', error);
+            });
+    }
+});
+</script>
+{% endblock %}

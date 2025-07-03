@@ -2188,6 +2188,354 @@ def admin_settings():
 
     return render_template('admin_settings.html', title='System Settings', settings=settings)
 
+@app.route('/system-admin/dashboard')
+@system_admin_required
+def system_admin_dashboard():
+    """System Administrator Dashboard - view all data across companies"""
+    
+    # Global statistics
+    total_companies = Company.query.count()
+    total_users = User.query.count()
+    total_teams = Team.query.count()
+    total_projects = Project.query.count()
+    total_time_entries = TimeEntry.query.count()
+    
+    # System admin count
+    system_admins = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
+    regular_admins = User.query.filter_by(role=Role.ADMIN).count()
+    
+    # Recent activity (last 7 days)
+    from datetime import datetime, timedelta
+    week_ago = datetime.now() - timedelta(days=7)
+    
+    recent_users = User.query.filter(User.created_at >= week_ago).count()
+    recent_companies = Company.query.filter(Company.created_at >= week_ago).count()
+    recent_time_entries = TimeEntry.query.filter(TimeEntry.start_time >= week_ago).count()
+    
+    # Top companies by user count
+    top_companies = db.session.query(
+        Company.name, 
+        Company.id,
+        db.func.count(User.id).label('user_count')
+    ).join(User).group_by(Company.id).order_by(db.func.count(User.id).desc()).limit(5).all()
+    
+    # Recent companies
+    recent_companies_list = Company.query.order_by(Company.created_at.desc()).limit(5).all()
+    
+    # System health checks
+    orphaned_users = User.query.filter_by(company_id=None).count()
+    orphaned_time_entries = TimeEntry.query.filter_by(user_id=None).count()
+    blocked_users = User.query.filter_by(is_blocked=True).count()
+    
+    return render_template('system_admin_dashboard.html', 
+                         title='System Administrator Dashboard',
+                         total_companies=total_companies,
+                         total_users=total_users,
+                         total_teams=total_teams,
+                         total_projects=total_projects,
+                         total_time_entries=total_time_entries,
+                         system_admins=system_admins,
+                         regular_admins=regular_admins,
+                         recent_users=recent_users,
+                         recent_companies=recent_companies,
+                         recent_time_entries=recent_time_entries,
+                         top_companies=top_companies,
+                         recent_companies_list=recent_companies_list,
+                         orphaned_users=orphaned_users,
+                         orphaned_time_entries=orphaned_time_entries,
+                         blocked_users=blocked_users)
+
+@app.route('/system-admin/users')
+@system_admin_required
+def system_admin_users():
+    """System Admin: View all users across all companies"""
+    filter_type = request.args.get('filter', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    # Build query based on filter
+    query = User.query
+    
+    if filter_type == 'blocked':
+        query = query.filter_by(is_blocked=True)
+    elif filter_type == 'system_admins':
+        query = query.filter_by(role=Role.SYSTEM_ADMIN)
+    elif filter_type == 'admins':
+        query = query.filter_by(role=Role.ADMIN)
+    elif filter_type == 'unverified':
+        query = query.filter_by(is_verified=False)
+    elif filter_type == 'freelancers':
+        query = query.filter_by(account_type=AccountType.FREELANCER)
+    
+    # Add company join for display
+    query = query.join(Company).add_columns(Company.name.label('company_name'))
+    
+    # Order by creation date (newest first)
+    query = query.order_by(User.created_at.desc())
+    
+    # Paginate results
+    users = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    return render_template('system_admin_users.html', 
+                         title='System Admin - All Users',
+                         users=users,
+                         current_filter=filter_type)
+
+@app.route('/system-admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@system_admin_required
+def system_admin_edit_user(user_id):
+    """System Admin: Edit any user across companies"""
+    user = User.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        # Get form data
+        username = request.form.get('username')
+        email = request.form.get('email')
+        role = request.form.get('role')
+        is_blocked = request.form.get('is_blocked') == 'on'
+        is_verified = request.form.get('is_verified') == 'on'
+        company_id = request.form.get('company_id')
+        team_id = request.form.get('team_id') or None
+        
+        # Validation
+        error = None
+        
+        # Check if username is unique within the company
+        existing_user = User.query.filter(
+            User.username == username,
+            User.company_id == company_id,
+            User.id != user_id
+        ).first()
+        
+        if existing_user:
+            error = f'Username "{username}" is already taken in this company.'
+        
+        # Check if email is unique within the company  
+        existing_email = User.query.filter(
+            User.email == email,
+            User.company_id == company_id,
+            User.id != user_id
+        ).first()
+        
+        if existing_email:
+            error = f'Email "{email}" is already registered in this company.'
+        
+        if not error:
+            # Update user
+            user.username = username
+            user.email = email
+            user.role = Role(role)
+            user.is_blocked = is_blocked
+            user.is_verified = is_verified
+            user.company_id = company_id
+            user.team_id = team_id
+            
+            db.session.commit()
+            flash(f'User {username} updated successfully.', 'success')
+            return redirect(url_for('system_admin_users'))
+        
+        flash(error, 'error')
+    
+    # Get all companies and teams for form dropdowns
+    companies = Company.query.order_by(Company.name).all()
+    teams = Team.query.filter_by(company_id=user.company_id).order_by(Team.name).all()
+    roles = get_available_roles()
+    
+    return render_template('system_admin_edit_user.html',
+                         title=f'Edit User: {user.username}',
+                         user=user,
+                         companies=companies,
+                         teams=teams,
+                         roles=roles)
+
+@app.route('/system-admin/users/<int:user_id>/delete', methods=['POST'])
+@system_admin_required
+def system_admin_delete_user(user_id):
+    """System Admin: Delete any user (with safety checks)"""
+    user = User.query.get_or_404(user_id)
+    
+    # Safety check: prevent deleting the last system admin
+    if user.role == Role.SYSTEM_ADMIN:
+        system_admin_count = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
+        if system_admin_count <= 1:
+            flash('Cannot delete the last system administrator.', 'error')
+            return redirect(url_for('system_admin_users'))
+    
+    # Safety check: prevent deleting yourself
+    if user.id == g.user.id:
+        flash('Cannot delete your own account.', 'error')
+        return redirect(url_for('system_admin_users'))
+    
+    username = user.username
+    company_name = user.company.name if user.company else 'Unknown'
+    
+    # Delete related data first
+    TimeEntry.query.filter_by(user_id=user.id).delete()
+    WorkConfig.query.filter_by(user_id=user.id).delete()
+    
+    # Delete the user
+    db.session.delete(user)
+    db.session.commit()
+    
+    flash(f'User "{username}" from company "{company_name}" has been deleted.', 'success')
+    return redirect(url_for('system_admin_users'))
+
+@app.route('/system-admin/companies')
+@system_admin_required
+def system_admin_companies():
+    """System Admin: View all companies"""
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    companies = Company.query.order_by(Company.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False)
+    
+    # Get user counts for each company
+    company_stats = {}
+    for company in companies.items:
+        user_count = User.query.filter_by(company_id=company.id).count()
+        admin_count = User.query.filter(
+            User.company_id == company.id,
+            User.role.in_([Role.ADMIN, Role.SYSTEM_ADMIN])
+        ).count()
+        company_stats[company.id] = {
+            'user_count': user_count,
+            'admin_count': admin_count
+        }
+    
+    return render_template('system_admin_companies.html',
+                         title='System Admin - All Companies',
+                         companies=companies,
+                         company_stats=company_stats)
+
+@app.route('/system-admin/companies/<int:company_id>')
+@system_admin_required
+def system_admin_company_detail(company_id):
+    """System Admin: View detailed company information"""
+    company = Company.query.get_or_404(company_id)
+    
+    # Get company statistics
+    users = User.query.filter_by(company_id=company.id).all()
+    teams = Team.query.filter_by(company_id=company.id).all()
+    projects = Project.query.filter_by(company_id=company.id).all()
+    
+    # Recent activity
+    from datetime import datetime, timedelta
+    week_ago = datetime.now() - timedelta(days=7)
+    recent_time_entries = TimeEntry.query.join(User).filter(
+        User.company_id == company.id,
+        TimeEntry.start_time >= week_ago
+    ).count()
+    
+    # Role distribution
+    role_counts = {}
+    for role in Role:
+        count = User.query.filter_by(company_id=company.id, role=role).count()
+        if count > 0:
+            role_counts[role.value] = count
+    
+    return render_template('system_admin_company_detail.html',
+                         title=f'Company: {company.name}',
+                         company=company,
+                         users=users,
+                         teams=teams,
+                         projects=projects,
+                         recent_time_entries=recent_time_entries,
+                         role_counts=role_counts)
+
+@app.route('/system-admin/time-entries')
+@system_admin_required
+def system_admin_time_entries():
+    """System Admin: View time entries across all companies"""
+    page = request.args.get('page', 1, type=int)
+    company_filter = request.args.get('company', '')
+    per_page = 50
+    
+    # Build query
+    query = TimeEntry.query.join(User).join(Company)
+    
+    if company_filter:
+        query = query.filter(Company.id == company_filter)
+    
+    # Add columns for display
+    query = query.add_columns(
+        User.username,
+        Company.name.label('company_name'),
+        Project.name.label('project_name')
+    ).outerjoin(Project)
+    
+    # Order by start time (newest first)
+    query = query.order_by(TimeEntry.start_time.desc())
+    
+    # Paginate
+    entries = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    # Get companies for filter dropdown
+    companies = Company.query.order_by(Company.name).all()
+    
+    return render_template('system_admin_time_entries.html',
+                         title='System Admin - Time Entries',
+                         entries=entries,
+                         companies=companies,
+                         current_company=company_filter)
+
+@app.route('/system-admin/settings', methods=['GET', 'POST'])
+@system_admin_required
+def system_admin_settings():
+    """System Admin: Global system settings"""
+    if request.method == 'POST':
+        # Update system settings
+        registration_enabled = request.form.get('registration_enabled') == 'on'
+        email_verification = request.form.get('email_verification_required') == 'on'
+        
+        # Update or create settings
+        reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
+        if reg_setting:
+            reg_setting.value = 'true' if registration_enabled else 'false'
+        else:
+            reg_setting = SystemSettings(
+                key='registration_enabled',
+                value='true' if registration_enabled else 'false',
+                description='Controls whether new user registration is allowed'
+            )
+            db.session.add(reg_setting)
+        
+        email_setting = SystemSettings.query.filter_by(key='email_verification_required').first()
+        if email_setting:
+            email_setting.value = 'true' if email_verification else 'false'
+        else:
+            email_setting = SystemSettings(
+                key='email_verification_required',
+                value='true' if email_verification else 'false',
+                description='Controls whether email verification is required for new accounts'
+            )
+            db.session.add(email_setting)
+        
+        db.session.commit()
+        flash('System settings updated successfully.', 'success')
+        return redirect(url_for('system_admin_settings'))
+    
+    # Get current settings
+    settings = {}
+    all_settings = SystemSettings.query.all()
+    for setting in all_settings:
+        if setting.key == 'registration_enabled':
+            settings['registration_enabled'] = setting.value == 'true'
+        elif setting.key == 'email_verification_required':
+            settings['email_verification_required'] = setting.value == 'true'
+    
+    # System statistics
+    total_companies = Company.query.count()
+    total_users = User.query.count()
+    total_system_admins = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
+    
+    return render_template('system_admin_settings.html',
+                         title='System Administrator Settings',
+                         settings=settings,
+                         total_companies=total_companies,
+                         total_users=total_users,
+                         total_system_admins=total_system_admins)
+
 @app.route('/admin/work-policies', methods=['GET', 'POST'])
 @admin_required
 @company_required

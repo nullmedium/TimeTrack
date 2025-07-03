@@ -55,6 +55,10 @@
                     <li><a href="{{ url_for('admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
                     <li><a href="{{ url_for('admin_work_policies') }}" data-tooltip="Work Policies"><i class="nav-icon">⚖️</i><span class="nav-text">Work Policies</span></a></li>
                     <li><a href="{{ url_for('admin_settings') }}" data-tooltip="System Settings"><i class="nav-icon">🔧</i><span class="nav-text">System Settings</span></a></li>
+                    {% if g.user.role == Role.SYSTEM_ADMIN %}
+                    <li class="nav-divider">System Admin</li>
+                    <li><a href="{{ url_for('system_admin_dashboard') }}" data-tooltip="System Dashboard"><i class="nav-icon">🌐</i><span class="nav-text">System Dashboard</span></a></li>
+                    {% endif %}
                     {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
                     <li class="nav-divider">{{ g.user.username }}</li>
                     <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>

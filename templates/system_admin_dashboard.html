@@ -1,0 +1,357 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>🔧 System Administrator Dashboard</h1>
+    <p class="subtitle">Global system overview and management tools</p>
+
+    <!-- System Overview Statistics -->
+    <div class="stats-section">
+        <h2>📊 System Overview</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>{{ total_companies }}</h3>
+                <p>Total Companies</p>
+                <a href="{{ url_for('system_admin_companies') }}" class="stat-link">Manage →</a>
+            </div>
+            <div class="stat-card">
+                <h3>{{ total_users }}</h3>
+                <p>Total Users</p>
+                <a href="{{ url_for('system_admin_users') }}" class="stat-link">Manage →</a>
+            </div>
+            <div class="stat-card">
+                <h3>{{ total_teams }}</h3>
+                <p>Total Teams</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ total_projects }}</h3>
+                <p>Total Projects</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ total_time_entries }}</h3>
+                <p>Time Entries</p>
+                <a href="{{ url_for('system_admin_time_entries') }}" class="stat-link">View →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Administrator Statistics -->
+    <div class="stats-section">
+        <h2>👤 Administrator Overview</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>{{ system_admins }}</h3>
+                <p>System Administrators</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ regular_admins }}</h3>
+                <p>Company Administrators</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ blocked_users }}</h3>
+                <p>Blocked Users</p>
+                {% if blocked_users > 0 %}
+                    <a href="{{ url_for('system_admin_users', filter='blocked') }}" class="stat-link">Review →</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="stats-section">
+        <h2>📈 Recent Activity (Last 7 Days)</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>{{ recent_users }}</h3>
+                <p>New Users</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ recent_companies }}</h3>
+                <p>New Companies</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ recent_time_entries }}</h3>
+                <p>Time Entries</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Health -->
+    {% if orphaned_users > 0 or orphaned_time_entries > 0 %}
+    <div class="stats-section alert-section">
+        <h2>⚠️ System Health Issues</h2>
+        <div class="stats-grid">
+            {% if orphaned_users > 0 %}
+            <div class="stat-card alert-card">
+                <h3>{{ orphaned_users }}</h3>
+                <p>Orphaned Users</p>
+                <small>Users without company assignment</small>
+            </div>
+            {% endif %}
+            {% if orphaned_time_entries > 0 %}
+            <div class="stat-card alert-card">
+                <h3>{{ orphaned_time_entries }}</h3>
+                <p>Orphaned Time Entries</p>
+                <small>Time entries without user assignment</small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="dashboard-grid">
+        <!-- Top Companies -->
+        <div class="dashboard-card">
+            <h3>🏢 Top Companies by Users</h3>
+            {% if top_companies %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Company</th>
+                            <th>Users</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for company in top_companies %}
+                        <tr>
+                            <td>{{ company.name }}</td>
+                            <td>{{ company.user_count }}</td>
+                            <td>
+                                <a href="{{ url_for('system_admin_company_detail', company_id=company.id) }}" class="btn btn-sm">View</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No companies found.</p>
+            {% endif %}
+        </div>
+
+        <!-- Recent Companies -->
+        <div class="dashboard-card">
+            <h3>🆕 Recent Companies</h3>
+            {% if recent_companies_list %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Company</th>
+                            <th>Created</th>
+                            <th>Type</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for company in recent_companies_list %}
+                        <tr>
+                            <td>{{ company.name }}</td>
+                            <td>{{ company.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                {% if company.is_personal %}
+                                    <span class="badge badge-freelancer">Freelancer</span>
+                                {% else %}
+                                    <span class="badge badge-company">Company</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('system_admin_company_detail', company_id=company.id) }}" class="btn btn-sm">View</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No recent companies found.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Management Actions -->
+    <div class="admin-panel">
+        <h2>🛠️ System Management</h2>
+        <div class="admin-actions">
+            <a href="{{ url_for('system_admin_users') }}" class="btn btn-primary">
+                👥 Manage All Users
+            </a>
+            <a href="{{ url_for('system_admin_companies') }}" class="btn btn-primary">
+                🏢 Manage Companies
+            </a>
+            <a href="{{ url_for('system_admin_time_entries') }}" class="btn btn-primary">
+                ⏱️ View Time Entries
+            </a>
+            <a href="{{ url_for('system_admin_settings') }}" class="btn btn-primary">
+                ⚙️ System Settings
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.stats-section {
+    margin-bottom: 2rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.stat-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    position: relative;
+}
+
+.stat-card h3 {
+    font-size: 2rem;
+    margin: 0 0 0.5rem 0;
+    color: #007bff;
+}
+
+.stat-card p {
+    margin: 0;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.stat-card small {
+    display: block;
+    color: #6c757d;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+.stat-link {
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.75rem;
+    font-size: 0.8rem;
+    color: #007bff;
+    text-decoration: none;
+}
+
+.stat-link:hover {
+    text-decoration: underline;
+}
+
+.alert-section {
+    border: 2px solid #dc3545;
+    border-radius: 8px;
+    padding: 1rem;
+    background: #f8d7da;
+}
+
+.alert-card {
+    background: #f5c6cb;
+    border-color: #dc3545;
+}
+
+.alert-card h3 {
+    color: #dc3545;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+    margin: 2rem 0;
+}
+
+.dashboard-card {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.dashboard-card h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #495057;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.table th,
+.table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.table th {
+    font-weight: 600;
+    background: #f8f9fa;
+}
+
+.badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.badge-company {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.badge-freelancer {
+    background: #d4edda;
+    color: #155724;
+}
+
+.admin-panel {
+    margin-top: 2rem;
+    padding: 2rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.admin-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.subtitle {
+    color: #6c757d;
+    margin-bottom: 2rem;
+}
+</style>
+{% endblock %}
