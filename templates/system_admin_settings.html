@@ -1,0 +1,504 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="header-section">
+        <h1>⚙️ System Administrator Settings</h1>
+        <p class="subtitle">Global system configuration and management</p>
+        <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+    </div>
+
+    <!-- System Statistics -->
+    <div class="stats-section">
+        <h3>📊 System Overview</h3>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4>{{ total_companies }}</h4>
+                <p>Total Companies</p>
+            </div>
+            <div class="stat-card">
+                <h4>{{ total_users }}</h4>
+                <p>Total Users</p>
+            </div>
+            <div class="stat-card">
+                <h4>{{ total_system_admins }}</h4>
+                <p>System Administrators</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Settings Form -->
+    <div class="settings-section">
+        <h3>🔧 System Configuration</h3>
+        <form method="POST" class="settings-form">
+            <div class="setting-group">
+                <div class="setting-header">
+                    <h4>User Registration</h4>
+                    <p>Control whether new users can register accounts</p>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="registration_enabled" 
+                               {% if settings.get('registration_enabled', True) %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-text">Allow new user registration</span>
+                    </label>
+                    <small class="setting-description">
+                        When enabled, new users can create accounts through the registration page. 
+                        When disabled, only administrators can create new user accounts.
+                    </small>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <div class="setting-header">
+                    <h4>Email Verification</h4>
+                    <p>Require email verification for new accounts</p>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="email_verification_required" 
+                               {% if settings.get('email_verification_required', True) %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-text">Require email verification</span>
+                    </label>
+                    <small class="setting-description">
+                        When enabled, new users must verify their email address before they can log in. 
+                        This helps ensure valid email addresses and improves security.
+                    </small>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+                <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- System Information -->
+    <div class="info-section">
+        <h3>ℹ️ System Information</h3>
+        <div class="info-grid">
+            <div class="info-card">
+                <h4>Application Version</h4>
+                <p>TimeTrack v1.0</p>
+            </div>
+            <div class="info-card">
+                <h4>Database</h4>
+                <p>SQLite</p>
+            </div>
+            <div class="info-card">
+                <h4>System Admin Access</h4>
+                <p>Full system control</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="danger-section">
+        <h3>⚠️ Danger Zone</h3>
+        <div class="danger-content">
+            <div class="danger-item">
+                <div class="danger-info">
+                    <h4>System Maintenance</h4>
+                    <p>Advanced system operations should be performed with caution. 
+                       Always backup the database before making significant changes.</p>
+                </div>
+                <div class="danger-actions">
+                    <button class="btn btn-danger" onclick="alert('Database backup functionality would be implemented here.')">
+                        Backup Database
+                    </button>
+                </div>
+            </div>
+            
+            <div class="danger-item">
+                <div class="danger-info">
+                    <h4>System Health Check</h4>
+                    <p>Run diagnostic checks to identify potential issues with the system.</p>
+                </div>
+                <div class="danger-actions">
+                    <button class="btn btn-warning" onclick="alert('System health check functionality would be implemented here.')">
+                        Run Health Check
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="actions-section">
+        <h3>🚀 Quick Actions</h3>
+        <div class="actions-grid">
+            <a href="{{ url_for('system_admin_users') }}" class="action-card">
+                <div class="action-icon">👥</div>
+                <div class="action-content">
+                    <h4>Manage All Users</h4>
+                    <p>View, edit, and manage users across all companies</p>
+                </div>
+            </a>
+            
+            <a href="{{ url_for('system_admin_companies') }}" class="action-card">
+                <div class="action-icon">🏢</div>
+                <div class="action-content">
+                    <h4>Manage Companies</h4>
+                    <p>View and manage all companies in the system</p>
+                </div>
+            </a>
+            
+            <a href="{{ url_for('system_admin_time_entries') }}" class="action-card">
+                <div class="action-icon">⏱️</div>
+                <div class="action-content">
+                    <h4>View Time Entries</h4>
+                    <p>Browse time tracking data across all companies</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.header-section {
+    margin-bottom: 2rem;
+}
+
+.subtitle {
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.stats-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.stats-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #495057;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.stat-card h4 {
+    font-size: 2rem;
+    margin: 0 0 0.5rem 0;
+    color: #007bff;
+}
+
+.stat-card p {
+    margin: 0;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.settings-section {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.settings-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #495057;
+}
+
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.setting-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    padding: 1.5rem;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+}
+
+.setting-header h4 {
+    margin: 0 0 0.5rem 0;
+    color: #495057;
+}
+
+.setting-header p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+}
+
+.toggle-label input[type="checkbox"] {
+    display: none;
+}
+
+.toggle-slider {
+    position: relative;
+    width: 50px;
+    height: 24px;
+    background: #ccc;
+    border-radius: 24px;
+    transition: background 0.3s;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s;
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider {
+    background: #007bff;
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider::before {
+    transform: translateX(26px);
+}
+
+.toggle-text {
+    font-weight: 500;
+    color: #495057;
+}
+
+.setting-description {
+    color: #6c757d;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.info-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.info-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #495057;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.info-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.info-card h4 {
+    margin: 0 0 0.5rem 0;
+    color: #495057;
+    font-size: 1rem;
+}
+
+.info-card p {
+    margin: 0;
+    color: #6c757d;
+}
+
+.danger-section {
+    background: #f8d7da;
+    border: 2px solid #dc3545;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.danger-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #721c24;
+}
+
+.danger-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.danger-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #dc3545;
+}
+
+.danger-info h4 {
+    margin: 0 0 0.5rem 0;
+    color: #721c24;
+}
+
+.danger-info p {
+    margin: 0;
+    color: #721c24;
+    font-size: 0.9rem;
+}
+
+.actions-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 2rem;
+}
+
+.actions-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #495057;
+}
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.action-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+}
+
+.action-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-decoration: none;
+    color: inherit;
+}
+
+.action-icon {
+    font-size: 2rem;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.action-content h4 {
+    margin: 0 0 0.5rem 0;
+    color: #495057;
+}
+
+.action-content p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #212529;
+}
+
+.btn-warning:hover {
+    background: #e0a800;
+}
+
+@media (max-width: 768px) {
+    .setting-group {
+        grid-template-columns: 1fr;
+    }
+    
+    .danger-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+}
+</style>
+{% endblock %}

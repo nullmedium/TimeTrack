@@ -3313,6 +3313,185 @@ def get_filtered_analytics_data(user, mode, start_date=None, end_date=None, proj
     return query.order_by(TimeEntry.arrival_time.desc()).all()
 
 
+@app.route('/api/companies/<int:company_id>/teams')
+@system_admin_required
+def api_company_teams(company_id):
+    """API: Get teams for a specific company (System Admin only)"""
+    teams = Team.query.filter_by(company_id=company_id).order_by(Team.name).all()
+    return jsonify([{
+        'id': team.id,
+        'name': team.name,
+        'description': team.description
+    } for team in teams])
+
+@app.route('/api/system-admin/stats')
+@system_admin_required
+def api_system_admin_stats():
+    """API: Get real-time system statistics for dashboard"""
+    from datetime import datetime, timedelta
+    
+    # Get basic counts
+    total_companies = Company.query.count()
+    total_users = User.query.count()
+    total_teams = Team.query.count()
+    total_projects = Project.query.count()
+    total_time_entries = TimeEntry.query.count()
+    
+    # Active sessions
+    active_sessions = TimeEntry.query.filter_by(departure_time=None, is_paused=False).count()
+    paused_sessions = TimeEntry.query.filter_by(is_paused=True).count()
+    
+    # Recent activity (last 24 hours)
+    yesterday = datetime.now() - timedelta(days=1)
+    recent_users = User.query.filter(User.created_at >= yesterday).count()
+    recent_companies = Company.query.filter(Company.created_at >= yesterday).count()
+    recent_time_entries = TimeEntry.query.filter(TimeEntry.arrival_time >= yesterday).count()
+    
+    # System health
+    orphaned_users = User.query.filter_by(company_id=None).count()
+    orphaned_time_entries = TimeEntry.query.filter_by(user_id=None).count()
+    blocked_users = User.query.filter_by(is_blocked=True).count()
+    unverified_users = User.query.filter_by(is_verified=False).count()
+    
+    return jsonify({
+        'totals': {
+            'companies': total_companies,
+            'users': total_users,
+            'teams': total_teams,
+            'projects': total_projects,
+            'time_entries': total_time_entries
+        },
+        'active': {
+            'sessions': active_sessions,
+            'paused_sessions': paused_sessions
+        },
+        'recent': {
+            'users': recent_users,
+            'companies': recent_companies,
+            'time_entries': recent_time_entries
+        },
+        'health': {
+            'orphaned_users': orphaned_users,
+            'orphaned_time_entries': orphaned_time_entries,
+            'blocked_users': blocked_users,
+            'unverified_users': unverified_users
+        }
+    })
+
+@app.route('/api/system-admin/companies/<int:company_id>/users')
+@system_admin_required
+def api_company_users(company_id):
+    """API: Get users for a specific company (System Admin only)"""
+    company = Company.query.get_or_404(company_id)
+    users = User.query.filter_by(company_id=company.id).order_by(User.username).all()
+    
+    return jsonify({
+        'company': {
+            'id': company.id,
+            'name': company.name,
+            'is_personal': company.is_personal
+        },
+        'users': [{
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role.value,
+            'is_blocked': user.is_blocked,
+            'is_verified': user.is_verified,
+            'created_at': user.created_at.isoformat(),
+            'team_id': user.team_id
+        } for user in users]
+    })
+
+@app.route('/api/system-admin/users/<int:user_id>/toggle-block', methods=['POST'])
+@system_admin_required
+def api_toggle_user_block(user_id):
+    """API: Toggle user blocked status (System Admin only)"""
+    user = User.query.get_or_404(user_id)
+    
+    # Safety check: prevent blocking yourself
+    if user.id == g.user.id:
+        return jsonify({'error': 'Cannot block your own account'}), 400
+    
+    # Safety check: prevent blocking the last system admin
+    if user.role == Role.SYSTEM_ADMIN and not user.is_blocked:
+        system_admin_count = User.query.filter_by(role=Role.SYSTEM_ADMIN, is_blocked=False).count()
+        if system_admin_count <= 1:
+            return jsonify({'error': 'Cannot block the last system administrator'}), 400
+    
+    user.is_blocked = not user.is_blocked
+    db.session.commit()
+    
+    return jsonify({
+        'id': user.id,
+        'username': user.username,
+        'is_blocked': user.is_blocked,
+        'message': f'User {"blocked" if user.is_blocked else "unblocked"} successfully'
+    })
+
+@app.route('/api/system-admin/companies/<int:company_id>/stats')
+@system_admin_required
+def api_company_stats(company_id):
+    """API: Get detailed statistics for a specific company"""
+    company = Company.query.get_or_404(company_id)
+    
+    # User counts by role
+    role_counts = {}
+    for role in Role:
+        count = User.query.filter_by(company_id=company.id, role=role).count()
+        if count > 0:
+            role_counts[role.value] = count
+    
+    # Team and project counts
+    team_count = Team.query.filter_by(company_id=company.id).count()
+    project_count = Project.query.filter_by(company_id=company.id).count()
+    active_projects = Project.query.filter_by(company_id=company.id, is_active=True).count()
+    
+    # Time entries statistics
+    from datetime import datetime, timedelta
+    week_ago = datetime.now() - timedelta(days=7)
+    month_ago = datetime.now() - timedelta(days=30)
+    
+    weekly_entries = TimeEntry.query.join(User).filter(
+        User.company_id == company.id,
+        TimeEntry.arrival_time >= week_ago
+    ).count()
+    
+    monthly_entries = TimeEntry.query.join(User).filter(
+        User.company_id == company.id,
+        TimeEntry.arrival_time >= month_ago
+    ).count()
+    
+    # Active sessions
+    active_sessions = TimeEntry.query.join(User).filter(
+        User.company_id == company.id,
+        TimeEntry.departure_time == None,
+        TimeEntry.is_paused == False
+    ).count()
+    
+    return jsonify({
+        'company': {
+            'id': company.id,
+            'name': company.name,
+            'is_personal': company.is_personal,
+            'is_active': company.is_active
+        },
+        'users': {
+            'total': sum(role_counts.values()),
+            'by_role': role_counts
+        },
+        'structure': {
+            'teams': team_count,
+            'projects': project_count,
+            'active_projects': active_projects
+        },
+        'activity': {
+            'weekly_entries': weekly_entries,
+            'monthly_entries': monthly_entries,
+            'active_sessions': active_sessions
+        }
+    })
+
 @app.route('/api/analytics/export')
 @login_required
 def analytics_export():

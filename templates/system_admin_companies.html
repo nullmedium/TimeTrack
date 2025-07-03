@@ -1,0 +1,342 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="header-section">
+        <h1>🏢 System Admin - All Companies</h1>
+        <p class="subtitle">Manage companies across the entire system</p>
+        <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+    </div>
+
+    <!-- Companies Table -->
+    {% if companies.items %}
+    <div class="table-section">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Company Name</th>
+                    <th>Type</th>
+                    <th>Users</th>
+                    <th>Admins</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for company in companies.items %}
+                <tr class="{% if not company.is_active %}inactive-company{% endif %}">
+                    <td>
+                        <strong>{{ company.name }}</strong>
+                        {% if company.slug %}
+                            <br><small class="text-muted">{{ company.slug }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if company.is_personal %}
+                            <span class="badge badge-freelancer">Freelancer</span>
+                        {% else %}
+                            <span class="badge badge-company">Company</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="stat-number">{{ company_stats[company.id]['user_count'] }}</span>
+                        <small>users</small>
+                    </td>
+                    <td>
+                        <span class="stat-number">{{ company_stats[company.id]['admin_count'] }}</span>
+                        <small>admins</small>
+                    </td>
+                    <td>
+                        {% if company.is_active %}
+                            <span class="status-badge status-active">Active</span>
+                        {% else %}
+                            <span class="status-badge status-inactive">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ company.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <a href="{{ url_for('system_admin_company_detail', company_id=company.id) }}" 
+                               class="btn btn-sm btn-primary">View Details</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if companies.pages > 1 %}
+    <div class="pagination-section">
+        <div class="pagination">
+            {% if companies.has_prev %}
+                <a href="{{ url_for('system_admin_companies', page=companies.prev_num) }}" class="page-link">← Previous</a>
+            {% endif %}
+            
+            {% for page_num in companies.iter_pages() %}
+                {% if page_num %}
+                    {% if page_num != companies.page %}
+                        <a href="{{ url_for('system_admin_companies', page=page_num) }}" class="page-link">{{ page_num }}</a>
+                    {% else %}
+                        <span class="page-link current">{{ page_num }}</span>
+                    {% endif %}
+                {% else %}
+                    <span class="page-link">…</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if companies.has_next %}
+                <a href="{{ url_for('system_admin_companies', page=companies.next_num) }}" class="page-link">Next →</a>
+            {% endif %}
+        </div>
+        
+        <p class="pagination-info">
+            Showing {{ companies.per_page * (companies.page - 1) + 1 }} - 
+            {{ companies.per_page * (companies.page - 1) + companies.items|length }} of {{ companies.total }} companies
+        </p>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <h3>No companies found</h3>
+        <p>No companies exist in the system yet.</p>
+    </div>
+    {% endif %}
+
+    <!-- Company Statistics Summary -->
+    <div class="summary-section">
+        <h3>📊 Company Summary</h3>
+        <div class="summary-grid">
+            <div class="summary-card">
+                <h4>Total Companies</h4>
+                <p class="summary-number">{{ companies.total }}</p>
+            </div>
+            <div class="summary-card">
+                <h4>Personal Companies</h4>
+                <p class="summary-number">{{ companies.items | selectattr('is_personal') | list | length }}</p>
+            </div>
+            <div class="summary-card">
+                <h4>Business Companies</h4>
+                <p class="summary-number">{{ companies.items | rejectattr('is_personal') | list | length }}</p>
+            </div>
+            <div class="summary-card">
+                <h4>Active Companies</h4>
+                <p class="summary-number">{{ companies.items | selectattr('is_active') | list | length }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.header-section {
+    margin-bottom: 2rem;
+}
+
+.subtitle {
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.table-section {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+.table th,
+.table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+}
+
+.inactive-company {
+    background-color: #f8f9fa !important;
+    opacity: 0.7;
+}
+
+.text-muted {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.badge-company {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.badge-freelancer {
+    background: #d4edda;
+    color: #155724;
+}
+
+.stat-number {
+    font-weight: 600;
+    color: #007bff;
+}
+
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.pagination-section {
+    margin: 2rem 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.pagination {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.page-link {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #dee2e6;
+    color: #007bff;
+    text-decoration: none;
+    border-radius: 4px;
+}
+
+.page-link:hover {
+    background: #e9ecef;
+}
+
+.page-link.current {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.pagination-info {
+    color: #6c757d;
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+}
+
+.summary-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 2rem;
+}
+
+.summary-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #495057;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.summary-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    border: 1px solid #dee2e6;
+}
+
+.summary-card h4 {
+    margin: 0 0 0.5rem 0;
+    color: #6c757d;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.summary-number {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #007bff;
+    margin: 0;
+}
+</style>
+{% endblock %}

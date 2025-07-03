@@ -1,0 +1,579 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="header-section">
+        <h1>🏢 {{ company.name }}</h1>
+        <p class="subtitle">Company Details - System Administrator View</p>
+        <div class="header-actions">
+            <a href="{{ url_for('system_admin_companies') }}" class="btn btn-secondary">← Back to Companies</a>
+            <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Company Information -->
+    <div class="info-section">
+        <h3>📋 Company Information</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <label>Company Name:</label>
+                <span>{{ company.name }}</span>
+            </div>
+            <div class="info-item">
+                <label>Slug:</label>
+                <span>{{ company.slug }}</span>
+            </div>
+            <div class="info-item">
+                <label>Type:</label>
+                {% if company.is_personal %}
+                    <span class="badge badge-freelancer">Personal/Freelancer</span>
+                {% else %}
+                    <span class="badge badge-company">Business Company</span>
+                {% endif %}
+            </div>
+            <div class="info-item">
+                <label>Status:</label>
+                {% if company.is_active %}
+                    <span class="status-badge status-active">Active</span>
+                {% else %}
+                    <span class="status-badge status-inactive">Inactive</span>
+                {% endif %}
+            </div>
+            <div class="info-item">
+                <label>Created:</label>
+                <span>{{ company.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            </div>
+            <div class="info-item">
+                <label>Max Users:</label>
+                <span>{{ company.max_users or 'Unlimited' }}</span>
+            </div>
+            {% if company.description %}
+            <div class="info-item full-width">
+                <label>Description:</label>
+                <span>{{ company.description }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Statistics Overview -->
+    <div class="stats-section">
+        <h3>📊 Company Statistics</h3>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4>{{ users|length }}</h4>
+                <p>Total Users</p>
+            </div>
+            <div class="stat-card">
+                <h4>{{ teams|length }}</h4>
+                <p>Teams</p>
+            </div>
+            <div class="stat-card">
+                <h4>{{ projects|length }}</h4>
+                <p>Projects</p>
+            </div>
+            <div class="stat-card">
+                <h4>{{ recent_time_entries }}</h4>
+                <p>Recent Time Entries</p>
+                <small>(Last 7 days)</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Role Distribution -->
+    {% if role_counts %}
+    <div class="role-section">
+        <h3>👥 Role Distribution</h3>
+        <div class="role-grid">
+            {% for role, count in role_counts.items() %}
+            <div class="role-card">
+                <span class="role-count">{{ count }}</span>
+                <span class="role-name">{{ role }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="content-grid">
+        <!-- Users List -->
+        <div class="content-card">
+            <h3>👤 Users ({{ users|length }})</h3>
+            {% if users %}
+                <div class="list-container">
+                    {% for user in users[:10] %}
+                    <div class="list-item">
+                        <div class="item-info">
+                            <strong>{{ user.username }}</strong>
+                            <small>{{ user.email }}</small>
+                        </div>
+                        <div class="item-meta">
+                            <span class="role-badge role-{{ user.role.name.lower() }}">
+                                {{ user.role.value }}
+                            </span>
+                            {% if user.is_blocked %}
+                                <span class="status-badge status-blocked">Blocked</span>
+                            {% elif not user.is_verified %}
+                                <span class="status-badge status-unverified">Unverified</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% if users|length > 10 %}
+                    <div class="list-more">
+                        <a href="{{ url_for('system_admin_users', company=company.id) }}" class="btn btn-sm btn-outline">
+                            View All {{ users|length }} Users →
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <p class="empty-message">No users in this company.</p>
+            {% endif %}
+        </div>
+
+        <!-- Teams List -->
+        <div class="content-card">
+            <h3>🏭 Teams ({{ teams|length }})</h3>
+            {% if teams %}
+                <div class="list-container">
+                    {% for team in teams %}
+                    <div class="list-item">
+                        <div class="item-info">
+                            <strong>{{ team.name }}</strong>
+                            {% if team.description %}
+                                <small>{{ team.description }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="item-meta">
+                            <small>{{ team.created_at.strftime('%Y-%m-%d') }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="empty-message">No teams in this company.</p>
+            {% endif %}
+        </div>
+
+        <!-- Projects List -->
+        <div class="content-card">
+            <h3>📝 Projects ({{ projects|length }})</h3>
+            {% if projects %}
+                <div class="list-container">
+                    {% for project in projects[:10] %}
+                    <div class="list-item">
+                        <div class="item-info">
+                            <strong>{{ project.name }}</strong>
+                            <small>{{ project.code }}</small>
+                            {% if project.description %}
+                                <small>{{ project.description[:50] }}{% if project.description|length > 50 %}...{% endif %}</small>
+                            {% endif %}
+                        </div>
+                        <div class="item-meta">
+                            {% if project.is_active %}
+                                <span class="status-badge status-active">Active</span>
+                            {% else %}
+                                <span class="status-badge status-inactive">Inactive</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% if projects|length > 10 %}
+                    <div class="list-more">
+                        <p class="text-muted">And {{ projects|length - 10 }} more projects...</p>
+                    </div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <p class="empty-message">No projects in this company.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Management Actions -->
+    <div class="actions-section">
+        <h3>🛠️ Management Actions</h3>
+        <div class="actions-grid">
+            <a href="{{ url_for('system_admin_users', company=company.id) }}" class="action-card">
+                <div class="action-icon">👥</div>
+                <div class="action-content">
+                    <h4>Manage Users</h4>
+                    <p>View and edit all users in this company</p>
+                </div>
+            </a>
+            <a href="{{ url_for('system_admin_time_entries', company=company.id) }}" class="action-card">
+                <div class="action-icon">⏱️</div>
+                <div class="action-content">
+                    <h4>View Time Entries</h4>
+                    <p>Browse time tracking data for this company</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.header-section {
+    margin-bottom: 2rem;
+}
+
+.subtitle {
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.info-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.info-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #495057;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.info-item label {
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.stats-section {
+    margin-bottom: 2rem;
+}
+
+.stats-section h3 {
+    margin-bottom: 1rem;
+    color: #495057;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.stat-card h4 {
+    font-size: 2rem;
+    margin: 0 0 0.5rem 0;
+    color: #007bff;
+}
+
+.stat-card p {
+    margin: 0;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.stat-card small {
+    display: block;
+    color: #6c757d;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.role-section {
+    margin-bottom: 2rem;
+}
+
+.role-section h3 {
+    margin-bottom: 1rem;
+    color: #495057;
+}
+
+.role-grid {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.role-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 120px;
+}
+
+.role-count {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #007bff;
+}
+
+.role-name {
+    font-size: 0.875rem;
+    color: #6c757d;
+    text-align: center;
+}
+
+.content-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.content-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.content-card h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #495057;
+}
+
+.list-container {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.list-item:last-child {
+    border-bottom: none;
+}
+
+.item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.item-info strong {
+    color: #495057;
+}
+
+.item-info small {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.item-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+}
+
+.list-more {
+    padding: 1rem 0;
+    text-align: center;
+    border-top: 1px solid #e9ecef;
+}
+
+.empty-message {
+    color: #6c757d;
+    font-style: italic;
+    text-align: center;
+    padding: 2rem;
+}
+
+.actions-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 2rem;
+}
+
+.actions-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #495057;
+}
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.action-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+}
+
+.action-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-decoration: none;
+    color: inherit;
+}
+
+.action-icon {
+    font-size: 2rem;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.action-content h4 {
+    margin: 0 0 0.5rem 0;
+    color: #495057;
+}
+
+.action-content p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.badge, .status-badge, .role-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.badge-company {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.badge-freelancer {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-blocked {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-unverified {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.role-team_member {
+    background: #e2e3e5;
+    color: #495057;
+}
+
+.role-team_leader {
+    background: #d4edda;
+    color: #155724;
+}
+
+.role-supervisor {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.role-admin {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.role-system_admin {
+    background: #f1c0e8;
+    color: #6a1b99;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #007bff;
+    border: 1px solid #007bff;
+}
+
+.btn-outline:hover {
+    background: #007bff;
+    color: white;
+}
+
+.text-muted {
+    color: #6c757d;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,429 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="header-section">
+        <h1>⏱️ System Admin - Time Entries</h1>
+        <p class="subtitle">View time entries across all companies</p>
+        <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <h3>Filter Time Entries</h3>
+        <form method="GET" class="filter-form">
+            <div class="filter-group">
+                <label for="company">Company:</label>
+                <select name="company" id="company" class="form-control" onchange="this.form.submit()">
+                    <option value="">All Companies</option>
+                    {% for company in companies %}
+                    <option value="{{ company.id }}" {% if current_company|string == company.id|string %}selected{% endif %}>
+                        {{ company.name }}
+                        {% if company.is_personal %}(Personal){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if current_company %}
+            <a href="{{ url_for('system_admin_time_entries') }}" class="btn btn-sm btn-outline">Clear Filter</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Time Entries Table -->
+    {% if entries.items %}
+    <div class="table-section">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Company</th>
+                    <th>Project</th>
+                    <th>Arrival</th>
+                    <th>Departure</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry_data in entries.items %}
+                {% set entry = entry_data[0] %}
+                {% set username = entry_data[1] %}
+                {% set company_name = entry_data[2] %}
+                {% set project_name = entry_data[3] %}
+                <tr class="{% if entry.is_paused %}paused-entry{% endif %}">
+                    <td>
+                        <strong>{{ username }}</strong>
+                    </td>
+                    <td>
+                        <span class="company-name">{{ company_name }}</span>
+                    </td>
+                    <td>
+                        {% if project_name %}
+                            <span class="project-name">{{ project_name }}</span>
+                        {% else %}
+                            <span class="text-muted">No project</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ entry.arrival_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        {% if entry.departure_time %}
+                            {{ entry.departure_time.strftime('%Y-%m-%d %H:%M') }}
+                        {% else %}
+                            <span class="text-muted">Still working</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if entry.duration %}
+                            {% set hours = entry.duration // 3600 %}
+                            {% set minutes = (entry.duration % 3600) // 60 %}
+                            <span class="duration">{{ hours }}h {{ minutes }}m</span>
+                        {% else %}
+                            <span class="text-muted">Ongoing</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if entry.is_paused %}
+                            <span class="status-badge status-paused">Paused</span>
+                        {% elif not entry.departure_time %}
+                            <span class="status-badge status-active">Active</span>
+                        {% else %}
+                            <span class="status-badge status-completed">Completed</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if entry.notes %}
+                            <span class="notes" title="{{ entry.notes }}">
+                                {{ entry.notes[:30] }}{% if entry.notes|length > 30 %}...{% endif %}
+                            </span>
+                        {% else %}
+                            <span class="text-muted">No notes</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if entries.pages > 1 %}
+    <div class="pagination-section">
+        <div class="pagination">
+            {% if entries.has_prev %}
+                <a href="{{ url_for('system_admin_time_entries', page=entries.prev_num, company=current_company) }}" class="page-link">← Previous</a>
+            {% endif %}
+            
+            {% for page_num in entries.iter_pages() %}
+                {% if page_num %}
+                    {% if page_num != entries.page %}
+                        <a href="{{ url_for('system_admin_time_entries', page=page_num, company=current_company) }}" class="page-link">{{ page_num }}</a>
+                    {% else %}
+                        <span class="page-link current">{{ page_num }}</span>
+                    {% endif %}
+                {% else %}
+                    <span class="page-link">…</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if entries.has_next %}
+                <a href="{{ url_for('system_admin_time_entries', page=entries.next_num, company=current_company) }}" class="page-link">Next →</a>
+            {% endif %}
+        </div>
+        
+        <p class="pagination-info">
+            Showing {{ entries.per_page * (entries.page - 1) + 1 }} - 
+            {{ entries.per_page * (entries.page - 1) + entries.items|length }} of {{ entries.total }} time entries
+        </p>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <h3>No time entries found</h3>
+        {% if current_company %}
+            <p>No time entries found for the selected company.</p>
+        {% else %}
+            <p>No time entries exist in the system yet.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Summary Statistics -->
+    {% if entries.items %}
+    <div class="summary-section">
+        <h3>📊 Summary Statistics</h3>
+        <div class="summary-grid">
+            <div class="summary-card">
+                <h4>Total Entries</h4>
+                <p class="summary-number">{{ entries.total }}</p>
+            </div>
+            <div class="summary-card">
+                <h4>Active Sessions</h4>
+                <p class="summary-number">{{ entries.items | selectattr('0.departure_time', 'equalto', None) | list | length }}</p>
+            </div>
+            <div class="summary-card">
+                <h4>Paused Sessions</h4>
+                <p class="summary-number">{{ entries.items | selectattr('0.is_paused', 'equalto', True) | list | length }}</p>
+            </div>
+            <div class="summary-card">
+                <h4>Completed Today</h4>
+                <p class="summary-number">
+                    {% set today = moment().date() %}
+                    {{ entries.items | selectattr('0.arrival_time') | selectattr('0.departure_time', 'defined') | 
+                       list | length }}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.header-section {
+    margin-bottom: 2rem;
+}
+
+.subtitle {
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.filter-section {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.filter-section h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.filter-form {
+    display: flex;
+    align-items: end;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.filter-group label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.form-control {
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 1rem;
+    min-width: 200px;
+}
+
+.table-section {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+.table th,
+.table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+    font-size: 0.875rem;
+}
+
+.table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+}
+
+.paused-entry {
+    background-color: #fff3cd !important;
+}
+
+.company-name {
+    font-weight: 500;
+    color: #495057;
+}
+
+.project-name {
+    color: #007bff;
+    font-weight: 500;
+}
+
+.duration {
+    font-weight: 600;
+    color: #28a745;
+}
+
+.notes {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.text-muted {
+    color: #6c757d;
+}
+
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-paused {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-completed {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.pagination-section {
+    margin: 2rem 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.pagination {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.page-link {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #dee2e6;
+    color: #007bff;
+    text-decoration: none;
+    border-radius: 4px;
+}
+
+.page-link:hover {
+    background: #e9ecef;
+}
+
+.page-link.current {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.pagination-info {
+    color: #6c757d;
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+}
+
+.summary-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 2rem;
+}
+
+.summary-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #495057;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.summary-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    border: 1px solid #dee2e6;
+}
+
+.summary-card h4 {
+    margin: 0 0 0.5rem 0;
+    color: #6c757d;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.summary-number {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #007bff;
+    margin: 0;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #007bff;
+    border: 1px solid #007bff;
+}
+
+.btn-outline:hover {
+    background: #007bff;
+    color: white;
+}
+</style>
+{% endblock %}
