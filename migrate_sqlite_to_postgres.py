@@ -158,8 +158,8 @@ class SQLiteToPostgresMigration:
             
             # Prepare insert statement
             placeholders = ', '.join(['%s'] * len(column_names))
-            columns = ', '.join(column_names)
-            insert_sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+            columns = ', '.join([f'"{col}"' for col in column_names])  # Quote column names
+            insert_sql = f'INSERT INTO "{table_name}" ({columns}) VALUES ({placeholders})'  # Quote table name
             
             # Convert rows to list of tuples
             data_rows = []
@@ -216,12 +216,12 @@ class SQLiteToPostgresMigration:
                 
                 for seq_name, col_name, table_name in sequences:
                     # Get the maximum value for each sequence
-                    cursor.execute(f"SELECT MAX({col_name}) FROM {table_name}")
+                    cursor.execute(f'SELECT MAX("{col_name}") FROM "{table_name}"')
                     max_val = cursor.fetchone()[0]
                     
                     if max_val is not None:
                         # Update sequence to start from max_val + 1
-                        cursor.execute(f"ALTER SEQUENCE {seq_name} RESTART WITH {max_val + 1}")
+                        cursor.execute(f'ALTER SEQUENCE "{seq_name}" RESTART WITH {max_val + 1}')
                         logger.info(f"Updated sequence {seq_name} to start from {max_val + 1}")
                 
                 self.postgres_conn.commit()
@@ -283,7 +283,7 @@ class SQLiteToPostgresMigration:
                 sqlite_count = sqlite_cursor.fetchone()[0]
                 
                 # Count rows in PostgreSQL
-                postgres_cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                postgres_cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"')
                 postgres_count = postgres_cursor.fetchone()[0]
                 
                 verification_results[table_name] = {
