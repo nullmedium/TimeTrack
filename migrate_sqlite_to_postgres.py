@@ -104,7 +104,7 @@ class SQLiteToPostgresMigration:
             logger.error(f"Error checking SQLite database: {e}")
             return False
     
-    def create_postgres_tables(self):
+    def create_postgres_tables(self, clear_existing=False):
         """Create PostgreSQL tables using Flask-SQLAlchemy models"""
         try:
             # Import Flask app and create tables
@@ -113,6 +113,11 @@ class SQLiteToPostgresMigration:
             with app.app_context():
                 # Set the database URI to PostgreSQL
                 app.config['SQLALCHEMY_DATABASE_URI'] = self.postgres_url
+                
+                if clear_existing:
+                    logger.info("Clearing existing PostgreSQL data...")
+                    db.drop_all()
+                    logger.info("Dropped all existing tables")
                 
                 # Create all tables
                 db.create_all()
@@ -298,7 +303,7 @@ class SQLiteToPostgresMigration:
             logger.error(f"Verification failed: {e}")
             return None
     
-    def run_migration(self):
+    def run_migration(self, clear_existing=False):
         """Run the complete migration process"""
         logger.info("Starting SQLite to PostgreSQL migration...")
         
@@ -315,7 +320,7 @@ class SQLiteToPostgresMigration:
             backup_file = self.backup_postgres()
             
             # Create PostgreSQL tables
-            if not self.create_postgres_tables():
+            if not self.create_postgres_tables(clear_existing=clear_existing):
                 return False
             
             # Migrate data
@@ -343,8 +348,17 @@ class SQLiteToPostgresMigration:
 
 def main():
     """Main migration function"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Migrate SQLite to PostgreSQL')
+    parser.add_argument('--clear-existing', action='store_true', 
+                       help='Clear existing PostgreSQL data before migration')
+    parser.add_argument('--sqlite-path', default=os.environ.get('SQLITE_PATH', '/data/timetrack.db'),
+                       help='Path to SQLite database')
+    args = parser.parse_args()
+    
     # Get database paths from environment variables
-    sqlite_path = os.environ.get('SQLITE_PATH', '/data/timetrack.db')
+    sqlite_path = args.sqlite_path
     postgres_url = os.environ.get('DATABASE_URL')
     
     if not postgres_url:
@@ -358,7 +372,7 @@ def main():
     
     # Run migration
     migration = SQLiteToPostgresMigration(sqlite_path, postgres_url)
-    success = migration.run_migration()
+    success = migration.run_migration(clear_existing=args.clear_existing)
     
     return 0 if success else 1
 
