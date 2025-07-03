@@ -360,44 +360,10 @@ def run_migrations():
         if create_table_sql and 'System Administrator' not in create_table_sql[0]:
             print("Updating role enum constraint to include SYSTEM_ADMIN...")
             
-            # First, check and normalize existing role values
+            # Check existing role values
             cursor.execute("SELECT DISTINCT role FROM user WHERE role IS NOT NULL")
             existing_roles = [row[0] for row in cursor.fetchall()]
             print(f"Found existing roles: {existing_roles}")
-            
-            # Map old role values to new standardized values
-            role_mapping = {
-                'TEAM_MEMBER': 'Team Member',
-                'TEAM_LEADER': 'Team Leader', 
-                'SUPERVISOR': 'Supervisor',
-                'ADMIN': 'Administrator',
-                'SYSTEM_ADMIN': 'System Administrator'
-            }
-            
-            # Update any enum-style role values to display values
-            for old_role, new_role in role_mapping.items():
-                cursor.execute("UPDATE user SET role = ? WHERE role = ?", (new_role, old_role))
-                updated_count = cursor.rowcount
-                if updated_count > 0:
-                    print(f"Updated {updated_count} users from '{old_role}' to '{new_role}'")
-            
-            # Also normalize account_type values
-            account_type_mapping = {
-                'COMPANY_USER': 'Company User',
-                'FREELANCER': 'Freelancer'
-            }
-            
-            for old_type, new_type in account_type_mapping.items():
-                cursor.execute("UPDATE user SET account_type = ? WHERE account_type = ?", (new_type, old_type))
-                updated_count = cursor.rowcount
-                if updated_count > 0:
-                    print(f"Updated {updated_count} users account_type from '{old_type}' to '{new_type}'")
-            
-            # Set any NULL roles to default
-            cursor.execute("UPDATE user SET role = 'Team Member' WHERE role IS NULL")
-            null_updated = cursor.rowcount
-            if null_updated > 0:
-                print(f"Set {null_updated} NULL roles to 'Team Member'")
             
             # Drop user_new table if it exists from previous failed migration
             cursor.execute("DROP TABLE IF EXISTS user_new")
@@ -436,6 +402,47 @@ def run_migrations():
             cursor.execute("ALTER TABLE user_new RENAME TO user")
             
             print("✓ Role enum constraint updated successfully")
+
+        # Normalize all enum values before SQLAlchemy operations
+        print("Normalizing all enum values...")
+        
+        # Normalize role values
+        role_mapping = {
+            'TEAM_MEMBER': 'Team Member',
+            'TEAM_LEADER': 'Team Leader', 
+            'SUPERVISOR': 'Supervisor',
+            'ADMIN': 'Administrator',
+            'SYSTEM_ADMIN': 'System Administrator'
+        }
+        
+        for old_role, new_role in role_mapping.items():
+            cursor.execute("UPDATE user SET role = ? WHERE role = ?", (new_role, old_role))
+            updated_count = cursor.rowcount
+            if updated_count > 0:
+                print(f"Updated {updated_count} users from role '{old_role}' to '{new_role}'")
+        
+        # Normalize account_type values
+        account_type_mapping = {
+            'COMPANY_USER': 'Company User',
+            'FREELANCER': 'Freelancer'
+        }
+        
+        for old_type, new_type in account_type_mapping.items():
+            cursor.execute("UPDATE user SET account_type = ? WHERE account_type = ?", (new_type, old_type))
+            updated_count = cursor.rowcount
+            if updated_count > 0:
+                print(f"Updated {updated_count} users account_type from '{old_type}' to '{new_type}'")
+        
+        # Set any NULL values to defaults
+        cursor.execute("UPDATE user SET role = 'Team Member' WHERE role IS NULL")
+        null_roles = cursor.rowcount
+        if null_roles > 0:
+            print(f"Set {null_roles} NULL roles to 'Team Member'")
+            
+        cursor.execute("UPDATE user SET account_type = 'Company User' WHERE account_type IS NULL")
+        null_accounts = cursor.rowcount
+        if null_accounts > 0:
+            print(f"Set {null_accounts} NULL account_types to 'Company User'")
 
         # Commit all schema changes
         conn.commit()
