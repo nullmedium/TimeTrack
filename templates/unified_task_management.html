@@ -811,6 +811,7 @@ class UnifiedTaskManager {
             const data = await response.json();
             
             if (data.success) {
+                // Update sprint filter dropdown
                 const sprintFilter = document.getElementById('sprint-filter');
                 
                 // Clear existing options except the default ones
@@ -818,12 +819,24 @@ class UnifiedTaskManager {
                 sprintFilter.innerHTML = '';
                 defaultOptions.forEach(option => sprintFilter.appendChild(option));
                 
-                // Add sprint options
+                // Update task modal sprint dropdown
+                const taskSprintSelect = document.getElementById('task-sprint');
+                // Clear existing options except the default "No Sprint" option
+                taskSprintSelect.innerHTML = '<option value="">No Sprint</option>';
+                
+                // Add sprint options to both dropdowns
                 data.sprints.forEach(sprint => {
-                    const option = document.createElement('option');
-                    option.value = sprint.id;
-                    option.textContent = `${sprint.name} (${sprint.status})`;
-                    sprintFilter.appendChild(option);
+                    // Add to filter dropdown
+                    const filterOption = document.createElement('option');
+                    filterOption.value = sprint.id;
+                    filterOption.textContent = `${sprint.name} (${sprint.status})`;
+                    sprintFilter.appendChild(filterOption);
+                    
+                    // Add to task modal dropdown
+                    const modalOption = document.createElement('option');
+                    modalOption.value = sprint.id;
+                    modalOption.textContent = `${sprint.name} (${sprint.status})`;
+                    taskSprintSelect.appendChild(modalOption);
                 });
             }
         } catch (error) {
@@ -1062,6 +1075,7 @@ class UnifiedTaskManager {
             document.getElementById('task-due-date').value = formatDateForInput(task.due_date) || '';
             document.getElementById('task-estimated-hours').value = task.estimated_hours || '';
             document.getElementById('task-status').value = task.status;
+            document.getElementById('task-sprint').value = task.sprint_id || '';
             document.getElementById('delete-task-btn').style.display = 'inline-block';
         } else {
             document.getElementById('modal-title').textContent = 'Add New Task';
@@ -1091,7 +1105,8 @@ class UnifiedTaskManager {
             assigned_to_id: document.getElementById('task-assignee').value || null,
             due_date: parseUserDate(document.getElementById('task-due-date').value) || null,
             estimated_hours: document.getElementById('task-estimated-hours').value || null,
-            status: document.getElementById('task-status').value
+            status: document.getElementById('task-status').value,
+            sprint_id: document.getElementById('task-sprint').value || null
         };
 
         const taskId = document.getElementById('task-id').value;

@@ -3772,6 +3772,7 @@ def create_task():
             estimated_hours=float(data.get('estimated_hours')) if data.get('estimated_hours') else None,
             project_id=project_id,
             assigned_to_id=int(data.get('assigned_to_id')) if data.get('assigned_to_id') else None,
+            sprint_id=int(data.get('sprint_id')) if data.get('sprint_id') else None,
             start_date=start_date,
             due_date=due_date,
             created_by_id=g.user.id
@@ -3848,6 +3849,8 @@ def update_task(task_id):
             task.estimated_hours = float(data['estimated_hours']) if data['estimated_hours'] else None
         if 'assigned_to_id' in data:
             task.assigned_to_id = int(data['assigned_to_id']) if data['assigned_to_id'] else None
+        if 'sprint_id' in data:
+            task.sprint_id = int(data['sprint_id']) if data['sprint_id'] else None
         if 'start_date' in data:
             task.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date() if data['start_date'] else None
         if 'due_date' in data:
