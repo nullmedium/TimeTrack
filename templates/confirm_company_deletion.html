@@ -1,0 +1,269 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="header-section">
+        <h1>⚠️ Confirm Company Deletion</h1>
+        <p class="subtitle">Critical Action Required - Review All Data Before Proceeding</p>
+        <a href="{{ url_for('admin_users') if g.user.role != Role.SYSTEM_ADMIN else url_for('system_admin_users') }}" 
+           class="btn btn-secondary">← Back to User Management</a>
+    </div>
+    
+    <div class="alert alert-danger">
+        <h3>Critical Warning!</h3>
+        <p>You are about to delete user <strong>{{ user.username }}</strong> who is the last administrator/supervisor in company <strong>{{ company.name }}</strong>.</p>
+        <p><strong>This action will permanently delete the entire company and ALL associated data.</strong></p>
+        <p>This action cannot be undone!</p>
+    </div>
+
+    <div class="content-section">
+        <h2>The following data will be permanently deleted:</h2>
+                    
+        <!-- Company Information -->
+        <div class="table-section">
+            <h3>🏢 Company Information</h3>
+            <table class="data-table">
+                <tr>
+                    <th>Company Name:</th>
+                    <td>{{ company.name }}</td>
+                </tr>
+                <tr>
+                    <th>Company Slug:</th>
+                    <td>{{ company.slug }}</td>
+                </tr>
+                <tr>
+                    <th>Created:</th>
+                    <td>{{ company.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                <tr>
+                    <th>Description:</th>
+                    <td>{{ company.description or 'None' }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Users -->
+        {% if users %}
+        <div class="table-section">
+            <h3>👥 Users ({{ users|length }})</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Team</th>
+                        <th>Joined</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr {% if u.id == user.id %}class="highlight-row"{% endif %}>
+                        <td>
+                            {{ u.username }}
+                            {% if u.id == user.id %}<span class="status-badge status-warning">Target User</span>{% endif %}
+                        </td>
+                        <td>{{ u.email }}</td>
+                        <td>{{ u.role.value }}</td>
+                        <td>{{ u.team.name if u.team else 'None' }}</td>
+                        <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            <span class="status-badge {% if u.is_blocked %}status-blocked{% else %}status-active{% endif %}">
+                                {% if u.is_blocked %}Blocked{% else %}Active{% endif %}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Teams -->
+        {% if teams %}
+        <div class="table-section">
+            <h3>🏭 Teams ({{ teams|length }})</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Team Name</th>
+                        <th>Description</th>
+                        <th>Members</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for team in teams %}
+                    <tr>
+                        <td>{{ team.name }}</td>
+                        <td>{{ team.description or 'None' }}</td>
+                        <td>{{ team.users|length }}</td>
+                        <td>{{ team.created_at.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Projects -->
+        {% if projects %}
+        <div class="table-section">
+            <h3>📝 Projects ({{ projects|length }})</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Project Code</th>
+                        <th>Project Name</th>
+                        <th>Team</th>
+                        <th>Tasks</th>
+                        <th>Time Entries</th>
+                        <th>Created By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for project in projects %}
+                    <tr>
+                        <td>{{ project.code }}</td>
+                        <td>{{ project.name }}</td>
+                        <td>{{ project.team.name if project.team else 'None' }}</td>
+                        <td>{{ project.tasks|length }}</td>
+                        <td>{{ project.time_entries|length }}</td>
+                        <td>{{ project.created_by.username }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Tasks -->
+        {% if tasks %}
+        <div class="table-section">
+            <h3>✅ Tasks ({{ tasks|length }})</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Task Name</th>
+                        <th>Project</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Assigned To</th>
+                        <th>Subtasks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td>{{ task.name }}</td>
+                        <td>{{ task.project.code }}</td>
+                        <td>{{ task.status.value }}</td>
+                        <td>{{ task.priority.value }}</td>
+                        <td>{{ task.assigned_to.username if task.assigned_to else 'None' }}</td>
+                        <td>{{ task.subtasks|length }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Kanban Boards -->
+        {% if kanban_boards %}
+        <div class="table-section">
+            <h3>📋 Kanban Boards ({{ kanban_boards|length }})</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Board Name</th>
+                        <th>Columns</th>
+                        <th>Cards</th>
+                        <th>Created By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for board in kanban_boards %}
+                    <tr>
+                        <td>{{ board.name }}</td>
+                        <td>{{ board.columns|length }}</td>
+                        <td>{{ board.columns|map(attribute='cards')|map('length')|sum }}</td>
+                        <td>{{ board.created_by.username }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Time Entries -->
+        {% if time_entries_count > 0 %}
+        <div class="table-section">
+            <h3>⏱️ Time Entries ({{ time_entries_count }})</h3>
+            <div class="info-card">
+                <p>{{ time_entries_count }} time tracking entries will be permanently deleted.</p>
+                <p><strong>Total Hours Tracked:</strong> {{ total_hours_tracked }} hours</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Categories -->
+        {% if categories %}
+        <div class="table-section">
+            <h3>🏷️ Project Categories ({{ categories|length }})</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Category Name</th>
+                        <th>Projects</th>
+                        <th>Created By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for category in categories %}
+                    <tr>
+                        <td>{{ category.name }}</td>
+                        <td>{{ category.projects|length }}</td>
+                        <td>{{ category.created_by.username }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Confirmation Form -->
+    <div class="form-section">
+        <div class="alert alert-danger">
+            <h3>Final Confirmation Required</h3>
+        </div>
+        
+        <form method="POST" action="{{ url_for('confirm_company_deletion', user_id=user.id) }}" class="user-form">
+            <div class="form-group">
+                <label for="company_name_confirm">
+                    To confirm deletion, please type the company name: <strong>{{ company.name }}</strong>
+                </label>
+                <input type="text" class="form-control" id="company_name_confirm" 
+                       name="company_name_confirm" required 
+                       placeholder="Enter company name exactly as shown above">
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="understand_deletion" name="understand_deletion" required>
+                    I understand that this action will permanently delete the company and ALL associated data, and this cannot be undone.
+                </label>
+            </div>
+
+            <div class="form-group">
+                <a href="{{ url_for('admin_users') if g.user.role != Role.SYSTEM_ADMIN else url_for('system_admin_users') }}" 
+                   class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-danger">
+                    Delete Company and All Data
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

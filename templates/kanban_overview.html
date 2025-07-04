@@ -3,76 +3,98 @@
 {% block content %}
 <div class="kanban-overview-container">
     <div class="overview-header">
-        <h2>Kanban Board Overview</h2>
-        <p class="overview-description">Manage your tasks visually across all projects</p>
+        <h2>Unified Kanban Boards</h2>
+        <p class="overview-description">Organize tasks from any project on shared company-wide boards</p>
     </div>
 
-    {% if project_boards %}
-    <div class="projects-grid">
-        {% for project, boards in project_boards.items() %}
-        <div class="project-card">
-            <div class="project-header">
-                <div class="project-info">
-                    <h3 class="project-name">
-                        <span class="project-code">{{ project.code }}</span>
-                        {{ project.name }}
+    {% if create_board %}
+    <!-- Create Board Form -->
+    <div class="create-board-form">
+        <div class="form-header">
+            <h3>Create New Kanban Board</h3>
+            <button type="button" id="cancel-create-board" class="btn btn-secondary">Cancel</button>
+        </div>
+        <form id="create-board-form" class="board-form">
+            <div class="form-group">
+                <label for="board-name">Board Name <span class="required">*</span></label>
+                <input type="text" id="board-name" name="name" required placeholder="Enter board name">
+            </div>
+            <div class="form-group">
+                <label for="board-description">Description</label>
+                <textarea id="board-description" name="description" placeholder="Optional description"></textarea>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="board-is-default" name="is_default">
+                    Set as default board
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Create Board</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if boards %}
+    <div class="boards-grid">
+        {% for board in boards %}
+        <div class="board-card">
+            <div class="board-header">
+                <div class="board-info">
+                    <h3 class="board-name">
+                        {{ board.name }}
+                        {% if board.is_default %}
+                        <span class="default-badge">Default</span>
+                        {% endif %}
                     </h3>
-                    {% if project.category %}
-                    <span class="category-badge" style="background-color: {{ project.category.color }}20; color: {{ project.category.color }};">
-                        {{ project.category.icon or '📁' }} {{ project.category.name }}
-                    </span>
-                    {% endif %}
-                    {% if project.description %}
-                    <p class="project-description">{{ project.description }}</p>
+                    {% if board.description %}
+                    <p class="board-description">{{ board.description }}</p>
                     {% endif %}
                 </div>
-                <div class="project-actions">
-                    <a href="{{ url_for('project_kanban', project_id=project.id) }}" class="btn btn-primary">Open Kanban</a>
-                    <a href="{{ url_for('manage_project_tasks', project_id=project.id) }}" class="btn btn-secondary">Task List</a>
+                <div class="board-actions">
+                    <a href="{{ url_for('kanban_overview') }}?board={{ board.id }}" class="btn btn-primary">Open Board</a>
+                    {% if g.user.role.value in ['Team Leader', 'Supervisor', 'Administrator', 'System Administrator'] %}
+                    <button class="btn btn-secondary" onclick="editBoard({{ board.id }})">Edit</button>
+                    {% endif %}
                 </div>
             </div>
 
-            <div class="boards-section">
-                <h4>Kanban Boards ({{ boards|length }})</h4>
-                <div class="boards-list">
-                    {% for board in boards %}
-                    <div class="board-item" onclick="openBoard({{ project.id }}, {{ board.id }})">
-                        <div class="board-info">
-                            <div class="board-name">
-                                {{ board.name }}
-                                {% if board.is_default %}
-                                <span class="default-badge">Default</span>
-                                {% endif %}
-                            </div>
-                            {% if board.description %}
-                            <div class="board-description">{{ board.description }}</div>
-                            {% endif %}
-                        </div>
-                        <div class="board-stats">
-                            <span class="column-count">{{ board.columns|length }} columns</span>
-                            <span class="card-count">
-                                {% set board_cards = 0 %}
-                                {% for column in board.columns %}
-                                    {% set board_cards = board_cards + column.cards|selectattr('is_active')|list|length %}
-                                {% endfor %}
-                                {{ board_cards }} cards
-                            </span>
-                        </div>
+            <div class="board-stats-section">
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <span class="stat-number">{{ board.columns|length }}</span>
+                        <span class="stat-label">Columns</span>
                     </div>
-                    {% endfor %}
+                    <div class="stat-item">
+                        {% set board_cards = 0 %}
+                        {% for column in board.columns %}
+                            {% set board_cards = board_cards + column.cards|selectattr('is_active')|list|length %}
+                        {% endfor %}
+                        <span class="stat-number">{{ board_cards }}</span>
+                        <span class="stat-label">Cards</span>
+                    </div>
+                    <div class="stat-item">
+                        {% set project_contexts = [] %}
+                        {% for column in board.columns %}
+                            {% for card in column.cards %}
+                                {% if card.is_active and card.project_id and card.project_id not in project_contexts %}
+                                    {% set _ = project_contexts.append(card.project_id) %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                        <span class="stat-number">{{ project_contexts|length }}</span>
+                        <span class="stat-label">Projects</span>
+                    </div>
                 </div>
             </div>
 
             <!-- Quick Board Preview -->
             <div class="board-preview">
-                {% set default_board = boards|selectattr('is_default')|first %}
-                {% if not default_board %}
-                    {% set default_board = boards|first %}
-                {% endif %}
-                {% if default_board and default_board.columns %}
-                <h5>{{ default_board.name }} Preview</h5>
+                {% if board.columns %}
+                <h5>Board Preview</h5>
                 <div class="preview-columns">
-                    {% for column in default_board.columns %}
+                    {% for column in board.columns %}
                     {% if loop.index <= 4 %}
                     <div class="preview-column" style="border-top: 3px solid {{ column.color }};">
                         <div class="preview-column-header">
@@ -85,8 +107,11 @@
                             {% if loop.index <= 3 %}
                             <div class="preview-card" {% if card.color %}style="background-color: {{ card.color }};"{% endif %}>
                                 <div class="preview-card-title">
-                                    {% if card.title|length > 30 %}
-                                        {{ card.title|truncate(30, True) }}
+                                    {% if card.project %}
+                                    <span class="preview-card-project">[{{ card.project.code }}]</span>
+                                    {% endif %}
+                                    {% if card.title|length > 25 %}
+                                        {{ card.title|truncate(25, True) }}
                                     {% else %}
                                         {{ card.title }}
                                     {% endif %}
@@ -104,9 +129,9 @@
                     </div>
                     {% endif %}
                     {% endfor %}
-                    {% if default_board.columns|length > 4 %}
+                    {% if board.columns|length > 4 %}
                     <div class="preview-more-columns">
-                        +{{ default_board.columns|length - 4 }} more columns
+                        +{{ board.columns|length - 4 }} more columns
                     </div>
                     {% endif %}
                 </div>
@@ -119,28 +144,32 @@
     <!-- Quick Stats -->
     <div class="quick-stats">
         <div class="stat-card">
-            <h3>{{ project_boards.keys()|list|length }}</h3>
-            <p>Projects with Kanban</p>
-        </div>
-        <div class="stat-card">
-            {% set total_boards = 0 %}
-            {% for project, boards in project_boards.items() %}
-                {% set total_boards = total_boards + boards|length %}
-            {% endfor %}
-            <h3>{{ total_boards }}</h3>
-            <p>Total Boards</p>
+            <h3>{{ boards|length }}</h3>
+            <p>Company Boards</p>
         </div>
         <div class="stat-card">
             {% set total_cards = 0 %}
-            {% for project, boards in project_boards.items() %}
-                {% for board in boards %}
-                    {% for column in board.columns %}
-                        {% set total_cards = total_cards + column.cards|selectattr('is_active')|list|length %}
-                    {% endfor %}
+            {% for board in boards %}
+                {% for column in board.columns %}
+                    {% set total_cards = total_cards + column.cards|selectattr('is_active')|list|length %}
                 {% endfor %}
             {% endfor %}
             <h3>{{ total_cards }}</h3>
             <p>Total Cards</p>
+        </div>
+        <div class="stat-card">
+            {% set total_projects = [] %}
+            {% for board in boards %}
+                {% for column in board.columns %}
+                    {% for card in column.cards %}
+                        {% if card.is_active and card.project_id and card.project_id not in total_projects %}
+                            {% set _ = total_projects.append(card.project_id) %}
+                        {% endif %}
+                    {% endfor %}
+                {% endfor %}
+            {% endfor %}
+            <h3>{{ total_projects|length }}</h3>
+            <p>Active Projects</p>
         </div>
     </div>
 
@@ -150,17 +179,17 @@
         <div class="no-kanban-content">
             <div class="no-kanban-icon">📋</div>
             <h3>No Kanban Boards Yet</h3>
-            <p>Start organizing your projects with visual Kanban boards.</p>
+            <p>Create unified boards to organize tasks from any project.</p>
             <div class="getting-started">
                 <h4>Getting Started:</h4>
                 <ol>
-                    <li>Go to a project from <a href="{{ url_for('admin_projects') }}">Project Management</a></li>
-                    <li>Click the <strong>"Kanban"</strong> button</li>
-                    <li>Create your first board and start organizing tasks</li>
+                    <li>Click the <strong>"Create Board"</strong> button</li>
+                    <li>Set up columns for your workflow (To Do, In Progress, Done)</li>
+                    <li>Add cards from any project to organize your work</li>
                 </ol>
             </div>
             {% if g.user.role.value in ['Team Leader', 'Supervisor', 'Administrator', 'System Administrator'] %}
-            <a href="{{ url_for('admin_projects') }}" class="btn btn-primary">Go to Projects</a>
+            <button id="create-first-unified-board" class="btn btn-primary">Create First Board</button>
             {% endif %}
         </div>
     </div>
@@ -187,13 +216,13 @@
     margin: 0;
 }
 
-.projects-grid {
+.boards-grid {
     display: grid;
     gap: 2rem;
     margin-bottom: 2rem;
 }
 
-.project-card {
+.board-card {
     background: white;
     border: 1px solid #dee2e6;
     border-radius: 12px;
@@ -202,11 +231,11 @@
     transition: box-shadow 0.2s ease;
 }
 
-.project-card:hover {
+.board-card:hover {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-.project-header {
+.board-header {
     padding: 1.5rem;
     background: #f8f9fa;
     border-bottom: 1px solid #dee2e6;
@@ -215,41 +244,63 @@
     align-items: flex-start;
 }
 
-.project-info {
+.board-info {
     flex: 1;
 }
 
-.project-name {
+.board-name {
     margin: 0 0 0.5rem 0;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-}
-
-.project-code {
-    background: #007bff;
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
+    font-size: 1.2rem;
     font-weight: 600;
+    color: #333;
 }
 
-.project-description {
+.board-description {
     color: #666;
     margin: 0.5rem 0 0 0;
     font-size: 0.9rem;
 }
 
-.project-actions {
+.board-actions {
     display: flex;
     gap: 0.5rem;
     align-items: flex-start;
 }
 
-.boards-section {
+.board-stats-section {
     padding: 1.5rem;
     border-bottom: 1px solid #dee2e6;
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 1rem;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.stat-number {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #007bff;
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: #666;
+    font-weight: 500;
 }
 
 .boards-section h4 {
@@ -380,6 +431,16 @@
     margin-bottom: 0.25rem;
 }
 
+.preview-card-project {
+    background: #f3e8ff;
+    color: #7c3aed;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    margin-right: 0.25rem;
+}
+
 .preview-card-assignee {
     color: #666;
     font-size: 0.7rem;
@@ -480,6 +541,76 @@
     color: #666;
 }
 
+.create-board-form {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.form-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.board-form {
+    max-width: 600px;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.form-group input[type="text"],
+.form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+}
+
+.form-group input[type="text"]:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.form-group textarea {
+    height: 80px;
+    resize: vertical;
+}
+
+.form-group input[type="checkbox"] {
+    margin-right: 0.5rem;
+}
+
+.form-actions {
+    margin-top: 1.5rem;
+}
+
+.required {
+    color: #dc3545;
+}
+
 .category-badge {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
@@ -488,12 +619,12 @@
 }
 
 @media (max-width: 768px) {
-    .project-header {
+    .board-header {
         flex-direction: column;
         gap: 1rem;
     }
     
-    .project-actions {
+    .board-actions {
         width: 100%;
         justify-content: flex-start;
     }
@@ -505,13 +636,77 @@
     .quick-stats {
         grid-template-columns: 1fr;
     }
+    
+    .stat-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 </style>
 
 <script>
-function openBoard(projectId, boardId) {
-    window.location.href = `/admin/projects/${projectId}/kanban?board=${boardId}`;
+function openBoard(boardId) {
+    window.location.href = `/kanban?board=${boardId}`;
 }
+
+function editBoard(boardId) {
+    // Implement board editing functionality
+    alert('Board editing functionality to be implemented');
+}
+
+// Handle create first board button
+document.addEventListener('DOMContentLoaded', function() {
+    const createFirstBoardBtn = document.getElementById('create-first-unified-board');
+    if (createFirstBoardBtn) {
+        createFirstBoardBtn.addEventListener('click', function() {
+            // Redirect to a page where they can create a board
+            window.location.href = '/kanban?create=true';
+        });
+    }
+
+    // Handle cancel create board
+    const cancelCreateBoardBtn = document.getElementById('cancel-create-board');
+    if (cancelCreateBoardBtn) {
+        cancelCreateBoardBtn.addEventListener('click', function() {
+            window.location.href = '/kanban';
+        });
+    }
+
+    // Handle create board form submission
+    const createBoardForm = document.getElementById('create-board-form');
+    if (createBoardForm) {
+        createBoardForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(createBoardForm);
+            const data = {
+                name: formData.get('name'),
+                description: formData.get('description'),
+                is_default: formData.get('is_default') === 'on'
+            };
+
+            fetch('/api/kanban/boards', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Redirect to the kanban overview page
+                    window.location.href = '/kanban';
+                } else {
+                    alert('Error creating board: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error creating board. Please try again.');
+            });
+        });
+    }
+});
 </script>
 
 {% endblock %}

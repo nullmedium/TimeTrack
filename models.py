@@ -729,12 +729,12 @@ class KanbanBoard(db.Model):
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)
 
-    # Project association
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    # Company association for multi-tenancy (removed project-specific constraint)
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
 
     # Board settings
     is_active = db.Column(db.Boolean, default=True)
-    is_default = db.Column(db.Boolean, default=False)  # Default board for project
+    is_default = db.Column(db.Boolean, default=False)  # Default board for company
 
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.now)
@@ -742,12 +742,12 @@ class KanbanBoard(db.Model):
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     # Relationships
-    project = db.relationship('Project', backref='kanban_boards')
+    company = db.relationship('Company', backref='kanban_boards')
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     columns = db.relationship('KanbanColumn', backref='board', lazy=True, cascade='all, delete-orphan', order_by='KanbanColumn.position')
 
-    # Unique constraint per project
-    __table_args__ = (db.UniqueConstraint('project_id', 'name', name='uq_kanban_board_name_per_project'),)
+    # Unique constraint per company
+    __table_args__ = (db.UniqueConstraint('company_id', 'name', name='uq_kanban_board_name_per_company'),)
 
     def __repr__(self):
         return f'<KanbanBoard {self.name}>'
@@ -804,6 +804,9 @@ class KanbanCard(db.Model):
     # Column association
     column_id = db.Column(db.Integer, db.ForeignKey('kanban_column.id'), nullable=False)
 
+    # Project context for cross-project support
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+
     # Optional task association
     task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=True)
 
@@ -820,6 +823,7 @@ class KanbanCard(db.Model):
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     # Relationships
+    project = db.relationship('Project', backref='kanban_cards')
     task = db.relationship('Task', backref='kanban_cards')
     assigned_to = db.relationship('User', foreign_keys=[assigned_to_id], backref='assigned_kanban_cards')
     created_by = db.relationship('User', foreign_keys=[created_by_id])
@@ -829,8 +833,26 @@ class KanbanCard(db.Model):
 
     def can_user_access(self, user):
         """Check if a user can access this card"""
-        # Check board's project permissions
-        return self.column.board.project.is_user_allowed(user)
+        # Check company membership first
+        if self.column.board.company_id != user.company_id:
+            return False
+        
+        # If card has project context, check project permissions
+        if self.project_id:
+            return self.project.is_user_allowed(user)
+        
+        # If no project context, allow access to anyone in the company
+        return True
+    
+    @property
+    def project_code(self):
+        """Get project code for display purposes"""
+        return self.project.code if self.project else None
+    
+    @property
+    def project_name(self):
+        """Get project name for display purposes"""
+        return self.project.name if self.project else None
 
 # Dashboard Widget System
 class WidgetType(enum.Enum):

@@ -4,12 +4,19 @@
 <div class="kanban-container">
     <div class="kanban-header">
         <div class="project-info">
-            <h2>Kanban Board: {{ project.code }} - {{ project.name }}</h2>
-            <p class="project-description">{{ project.description or 'No description available' }}</p>
-            {% if project.category %}
-            <span class="category-badge" style="background-color: {{ project.category.color }}20; color: {{ project.category.color }};">
-                {{ project.category.icon or '📁' }} {{ project.category.name }}
-            </span>
+            <h2>Unified Kanban Board</h2>
+            <p class="project-description">Organize tasks from any project on shared boards</p>
+            {% if project %}
+            <div class="project-context">
+                <span class="context-label">Project Context:</span>
+                <span class="project-code">{{ project.code }}</span>
+                <span class="project-name">{{ project.name }}</span>
+                {% if project.category %}
+                <span class="category-badge" style="background-color: {{ project.category.color }}20; color: {{ project.category.color }};">
+                    {{ project.category.icon or '📁' }} {{ project.category.name }}
+                </span>
+                {% endif %}
+            </div>
             {% endif %}
         </div>
         <div class="kanban-actions">
@@ -17,8 +24,12 @@
             <button id="create-board-btn" class="btn btn-md btn-success">Create Board</button>
             <button id="manage-columns-btn" class="btn btn-md btn-warning" style="display: none;">Manage Columns</button>
             {% endif %}
+            {% if project %}
             <a href="{{ url_for('admin_projects') }}" class="btn btn-md btn-secondary">Back to Projects</a>
             <a href="{{ url_for('manage_project_tasks', project_id=project.id) }}" class="btn btn-md btn-info">Task View</a>
+            {% else %}
+            <a href="{{ url_for('kanban_overview') }}" class="btn btn-md btn-secondary">Back to Kanban Overview</a>
+            {% endif %}
         </div>
     </div>
 
@@ -29,7 +40,7 @@
         <select id="board-select" class="form-control">
             <option value="">Choose a board...</option>
             {% for board in boards %}
-            <option value="{{ board.id }}" {% if board.is_default %}selected{% endif %}>
+            <option value="{{ board.id }}" {% if selected_board_id and board.id == selected_board_id %}selected{% elif not selected_board_id and board.is_default %}selected{% endif %}>
                 {{ board.name }} {% if board.is_default %}(Default){% endif %}
             </option>
             {% endfor %}
@@ -64,7 +75,9 @@
         <span class="close">&times;</span>
         <h3>Create Kanban Board</h3>
         <form id="board-form">
-            <input type="hidden" name="project_id" value="{{ project.id }}">
+            {% if project %}
+            <input type="hidden" name="project_context" value="{{ project.id }}">
+            {% endif %}
 
             <div class="form-group">
                 <label for="board-name">Board Name *</label>
@@ -79,7 +92,7 @@
             <div class="form-group">
                 <label>
                     <input type="checkbox" id="board-is-default" name="is_default">
-                    Set as default board for this project
+                    Set as default board for your company
                 </label>
             </div>
 
@@ -122,11 +135,13 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="card-task">Link to Task</label>
-                    <select id="card-task" name="task_id">
-                        <option value="">No task linked</option>
-                        {% for task in tasks %}
-                        <option value="{{ task.id }}">{{ task.name }}</option>
+                    <label for="card-project">Project Context</label>
+                    <select id="card-project" name="project_id">
+                        <option value="">No project context</option>
+                        {% for project_option in available_projects %}
+                        <option value="{{ project_option.id }}" {% if project and project_option.id == project.id %}selected{% endif %}>
+                            [{{ project_option.code }}] {{ project_option.name }}
+                        </option>
                         {% endfor %}
                     </select>
                 </div>
@@ -134,10 +149,24 @@
 
             <div class="form-row">
                 <div class="form-group">
+                    <label for="card-task">Link to Task</label>
+                    <select id="card-task" name="task_id">
+                        <option value="">No task linked</option>
+                        {% for task in tasks %}
+                        <option value="{{ task.id }}" data-project-id="{{ task.project_id }}">
+                            [{{ task.project.code }}] {{ task.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <label for="card-due-date">Due Date</label>
                     <input type="date" id="card-due-date" name="due_date">
                 </div>
+            </div>
 
+            <div class="form-row">
                 <div class="form-group">
                     <label for="card-color">Card Color</label>
                     <input type="color" id="card-color" name="color" value="#ffffff">
@@ -231,6 +260,36 @@
     margin: 0 0 0.5rem 0;
 }
 
+.project-context {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #007bff;
+}
+
+.context-label {
+    font-weight: 600;
+    color: #333;
+    margin-right: 0.5rem;
+}
+
+.project-code {
+    background: #007bff;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+}
+
+.project-name {
+    font-weight: 500;
+    color: #333;
+    margin-right: 0.5rem;
+}
+
 .kanban-actions {
     display: flex;
     gap: 0.75rem;
@@ -238,91 +297,7 @@
     flex-wrap: wrap;
 }
 
-/* Consistent button sizing */
-.btn-md {
-    padding: 0.5rem 1rem;
-    font-size: 0.9rem;
-    font-weight: 500;
-    line-height: 1.5;
-    border-radius: 6px;
-    border: 1px solid transparent;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-    vertical-align: middle;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-md:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.btn-md:active {
-    transform: translateY(0);
-}
-
-/* Button colors */
-.btn-primary {
-    background-color: #007bff;
-    border-color: #007bff;
-    color: white;
-}
-
-.btn-primary:hover {
-    background-color: #0056b3;
-    border-color: #004085;
-    color: white;
-}
-
-.btn-success {
-    background-color: #28a745;
-    border-color: #28a745;
-    color: white;
-}
-
-.btn-success:hover {
-    background-color: #1e7e34;
-    border-color: #1c7430;
-    color: white;
-}
-
-.btn-warning {
-    background-color: #ffc107;
-    border-color: #ffc107;
-    color: #212529;
-}
-
-.btn-warning:hover {
-    background-color: #e0a800;
-    border-color: #d39e00;
-    color: #212529;
-}
-
-.btn-info {
-    background-color: #17a2b8;
-    border-color: #17a2b8;
-    color: white;
-}
-
-.btn-info:hover {
-    background-color: #117a8b;
-    border-color: #10707f;
-    color: white;
-}
-
-.btn-secondary {
-    background-color: #6c757d;
-    border-color: #6c757d;
-    color: white;
-}
-
-.btn-secondary:hover {
-    background-color: #545b62;
-    border-color: #4e555b;
-    color: white;
-}
+/* Button styles now centralized in main style.css */
 
 .board-selection {
     margin-bottom: 2rem;
@@ -436,6 +411,14 @@
     flex-wrap: wrap;
     gap: 0.25rem;
     font-size: 0.8rem;
+}
+
+.card-project {
+    background: #f3e8ff;
+    color: #7c3aed;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-weight: 600;
 }
 
 .card-assignee {
@@ -716,11 +699,12 @@
 <script>
 let currentBoard = null;
 let sortableInstances = [];
+const userRole = '{{ g.user.role.value }}';
+const canManageColumns = ['Team Leader', 'Supervisor', 'Administrator', 'System Administrator'].includes(userRole);
 
 document.addEventListener('DOMContentLoaded', function() {
     const boardSelect = document.getElementById('board-select');
     const kanbanBoard = document.getElementById('kanban-board');
-    const addCardBtn = document.getElementById('add-card-btn');
 
     // Board selection handler
     if (boardSelect) {
@@ -728,39 +712,37 @@ document.addEventListener('DOMContentLoaded', function() {
             const boardId = this.value;
             if (boardId) {
                 loadKanbanBoard(boardId);
-                addCardBtn.style.display = 'inline-block';
-                {% if g.user.role.value in ['Team Leader', 'Supervisor', 'Administrator', 'System Administrator'] %}
-                document.getElementById('manage-columns-btn').style.display = 'inline-block';
-                {% endif %}
+                if (canManageColumns) {
+                    const manageBoardBtn = document.getElementById('manage-columns-btn');
+                    if (manageBoardBtn) manageBoardBtn.style.display = 'inline-block';
+                }
             } else {
                 kanbanBoard.style.display = 'none';
-                addCardBtn.style.display = 'none';
-                {% if g.user.role.value in ['Team Leader', 'Supervisor', 'Administrator', 'System Administrator'] %}
-                document.getElementById('manage-columns-btn').style.display = 'none';
-                {% endif %}
+                if (canManageColumns) {
+                    const manageBoardBtn = document.getElementById('manage-columns-btn');
+                    if (manageBoardBtn) manageBoardBtn.style.display = 'none';
+                }
             }
         });
 
-        // Check URL for board parameter
+        // Check URL for board parameter or if a board is pre-selected
         const urlParams = new URLSearchParams(window.location.search);
         const boardFromUrl = urlParams.get('board');
+        const selectedOption = boardSelect.querySelector('option[selected]');
 
         if (boardFromUrl) {
             boardSelect.value = boardFromUrl;
             loadKanbanBoard(boardFromUrl);
-            addCardBtn.style.display = 'inline-block';
-            {% if g.user.role.value in ['Team Leader', 'Supervisor', 'Administrator', 'System Administrator'] %}
-            document.getElementById('manage-columns-btn').style.display = 'inline-block';
-            {% endif %}
-        } else {
-            // Load default board if exists
-            const defaultOption = boardSelect.querySelector('option[selected]');
-            if (defaultOption && defaultOption.value) {
-                loadKanbanBoard(defaultOption.value);
-                addCardBtn.style.display = 'inline-block';
-                {% if g.user.role.value in ['Team Leader', 'Supervisor', 'Administrator', 'System Administrator'] %}
-                document.getElementById('manage-columns-btn').style.display = 'inline-block';
-                {% endif %}
+            if (canManageColumns) {
+                const manageBoardBtn = document.getElementById('manage-columns-btn');
+                if (manageBoardBtn) manageBoardBtn.style.display = 'inline-block';
+            }
+        } else if (selectedOption && selectedOption.value) {
+            // Load pre-selected board (either from selected_board_id or default)
+            loadKanbanBoard(selectedOption.value);
+            if (canManageColumns) {
+                const manageBoardBtn = document.getElementById('manage-columns-btn');
+                if (manageBoardBtn) manageBoardBtn.style.display = 'inline-block';
             }
         }
     }
@@ -770,14 +752,18 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadKanbanBoard(boardId) {
+    console.log('Loading board:', boardId);
     fetch(`/api/kanban/boards/${boardId}`)
         .then(response => response.json())
         .then(data => {
+            console.log('Board data received:', data);
             if (data.success) {
                 currentBoard = data.board;
+                console.log('Current board set to:', currentBoard);
                 renderKanbanBoard(data.board);
                 document.getElementById('kanban-board').style.display = 'block';
             } else {
+                console.error('Error loading board:', data.message);
                 alert('Error loading board: ' + data.message);
             }
         })
@@ -855,6 +841,7 @@ function createCardHTML(card) {
             <div class="card-title">${card.title}</div>
             ${card.description ? `<div class="card-description">${card.description}</div>` : ''}
             <div class="card-meta">
+                ${card.project_code ? `<span class="card-project">[${card.project_code}]</span>` : ''}
                 ${card.assigned_to ? `<span class="card-assignee">${card.assigned_to.username}</span>` : ''}
                 ${card.task_name ? `<span class="card-task-link">${card.task_name}</span>` : ''}
                 ${card.due_date ? `<span class="card-due-date ${dueDateClass}">${formatDate(card.due_date)}</span>` : ''}
@@ -868,6 +855,16 @@ function setupModals() {
     const cardModal = document.getElementById('card-modal');
     const boardForm = document.getElementById('board-form');
     const cardForm = document.getElementById('card-form');
+
+    // Check if required elements exist
+    if (!cardModal) {
+        console.error('Card modal not found');
+        return;
+    }
+    if (!boardModal) {
+        console.error('Board modal not found');
+        return;
+    }
 
     // Board modal
     document.getElementById('create-board-btn')?.addEventListener('click', () => {
@@ -891,66 +888,93 @@ function setupModals() {
     });
 
     // Form submissions
-    boardForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        const data = Object.fromEntries(formData);
+    if (boardForm) {
+        boardForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
 
-        // Convert checkbox to boolean
-        data.is_default = document.getElementById('board-is-default').checked;
+            // Convert checkbox to boolean
+            const isDefaultCheckbox = document.getElementById('board-is-default');
+            data.is_default = isDefaultCheckbox ? isDefaultCheckbox.checked : false;
 
-        fetch('/api/kanban/boards', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                boardModal.style.display = 'none';
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        });
-    });
-
-    cardForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        const cardId = formData.get('card_id');
-        const isEdit = cardId !== '';
-
-        const url = isEdit ? `/api/kanban/cards/${cardId}` : '/api/kanban/cards';
-        const method = isEdit ? 'PUT' : 'POST';
-
-        fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(Object.fromEntries(formData))
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                cardModal.style.display = 'none';
-                if (isEdit) {
-                    // For edits, just reload the board to be safe
-                    loadKanbanBoard(currentBoard.id);
+            fetch('/api/kanban/boards', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    boardModal.style.display = 'none';
+                    location.reload();
                 } else {
-                    // For new cards, update the count immediately
-                    const columnId = formData.get('column_id');
-                    updateColumnCardCountAfterAdd(columnId);
-                    loadKanbanBoard(currentBoard.id); // Still reload for the new card content
+                    alert('Error: ' + data.message);
                 }
-            } else {
-                alert('Error: ' + data.message);
-            }
+            });
         });
-    });
+    }
+
+    if (cardForm) {
+        cardForm.addEventListener('submit', function(e){
+            e.preventDefault();
+            const formData = new FormData(this);
+            const cardId = formData.get('card_id');
+            const isEdit = cardId !== '';
+
+            const url = isEdit ? `/api/kanban/cards/${cardId}` : '/api/kanban/cards';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(Object.fromEntries(formData))
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Card creation response:', data);
+                console.log('Current board at card creation:', currentBoard);
+                if (data.success) {
+                    cardModal.style.display = 'none';
+                    if (isEdit) {
+                        // For edits, just reload the board to be safe
+                        if (currentBoard && currentBoard.id) {
+                            console.log('Reloading board after edit:', currentBoard.id);
+                            loadKanbanBoard(currentBoard.id);
+                        } else {
+                            // Fallback: reload the currently selected board
+                            const boardSelect = document.getElementById('board-select');
+                            if (boardSelect && boardSelect.value) {
+                                console.log('Fallback: reloading selected board after edit:', boardSelect.value);
+                                loadKanbanBoard(boardSelect.value);
+                            }
+                        }
+                    } else {
+                        // For new cards, update the count immediately
+                        const columnId = formData.get('column_id');
+                        updateColumnCardCountAfterAdd(columnId);
+                        if (currentBoard && currentBoard.id) {
+                            console.log('Reloading board after new card:', currentBoard.id);
+                            loadKanbanBoard(currentBoard.id);
+                        } else {
+                            // Fallback: reload the currently selected board
+                            const boardSelect = document.getElementById('board-select');
+                            if (boardSelect && boardSelect.value) {
+                                console.log('Fallback: reloading selected board after new card:', boardSelect.value);
+                                loadKanbanBoard(boardSelect.value);
+                            }
+                        }
+                    }
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            });
+        });
+    }
 
     // Column form submission
     const columnForm = document.getElementById('column-form');
@@ -997,17 +1021,26 @@ function setupModals() {
     // Close buttons
     document.querySelectorAll('.close').forEach(btn => {
         btn.addEventListener('click', function() {
-            this.closest('.modal').style.display = 'none';
+            const modal = this.closest('.modal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
         });
     });
 
-    document.getElementById('cancel-board').addEventListener('click', () => {
-        boardModal.style.display = 'none';
-    });
+    const cancelBoardBtn = document.getElementById('cancel-board');
+    if (cancelBoardBtn) {
+        cancelBoardBtn.addEventListener('click', () => {
+            boardModal.style.display = 'none';
+        });
+    }
 
-    document.getElementById('cancel-card').addEventListener('click', () => {
-        cardModal.style.display = 'none';
-    });
+    const cancelCardBtn = document.getElementById('cancel-card');
+    if (cancelCardBtn) {
+        cancelCardBtn.addEventListener('click', () => {
+            cardModal.style.display = 'none';
+        });
+    }
 
     // Close modals when clicking outside
     const columnModal = document.getElementById('column-modal');
@@ -1099,7 +1132,7 @@ function moveCard(cardId, columnId, position) {
     // Find the card in the current board data
     let movedCard = null;
     let oldColumnId = null;
-    
+
     currentBoard.columns.forEach(column => {
         const cardIndex = column.cards.findIndex(c => c.id == cardId);
         if (cardIndex !== -1) {
@@ -1140,7 +1173,7 @@ function updateColumnCardCounts(oldColumnId, newColumnId) {
                 const oldCount = parseInt(oldCountElement.textContent.split('/')[0]);
                 const wipLimit = oldCountElement.textContent.includes('/') ? '/' + oldCountElement.textContent.split('/')[1] : '';
                 oldCountElement.textContent = (oldCount - 1) + wipLimit;
-                
+
                 // Update the current board data
                 const oldColumn = currentBoard.columns.find(c => c.id == oldColumnId);
                 if (oldColumn) {
@@ -1153,7 +1186,7 @@ function updateColumnCardCounts(oldColumnId, newColumnId) {
             }
         }
     }
-    
+
     // Update the new column count (increase by 1)
     const newColumnElement = document.querySelector(`[data-column-id="${newColumnId}"]`);
     if (newColumnElement) {
@@ -1162,7 +1195,7 @@ function updateColumnCardCounts(oldColumnId, newColumnId) {
             const newCount = parseInt(newCountElement.textContent.split('/')[0]);
             const wipLimit = newCountElement.textContent.includes('/') ? '/' + newCountElement.textContent.split('/')[1] : '';
             newCountElement.textContent = (newCount + 1) + wipLimit;
-            
+
             // Update the current board data
             const newColumn = currentBoard.columns.find(c => c.id == newColumnId);
             if (newColumn) {
@@ -1184,7 +1217,7 @@ function updateColumnCardCountAfterAdd(columnId) {
             const currentCount = parseInt(countElement.textContent.split('/')[0]);
             const wipLimit = countElement.textContent.includes('/') ? '/' + countElement.textContent.split('/')[1] : '';
             countElement.textContent = (currentCount + 1) + wipLimit;
-            
+
             // Update the current board data
             const column = currentBoard.columns.find(c => c.id == columnId);
             if (column) {
@@ -1206,7 +1239,7 @@ function updateColumnCardCountAfterDelete(columnId) {
             const currentCount = parseInt(countElement.textContent.split('/')[0]);
             const wipLimit = countElement.textContent.includes('/') ? '/' + countElement.textContent.split('/')[1] : '';
             countElement.textContent = (currentCount - 1) + wipLimit;
-            
+
             // Update the current board data
             const column = currentBoard.columns.find(c => c.id == columnId);
             if (column) {
