@@ -116,15 +116,6 @@
                             </div>
                         </div>
                     </div>
-                    <div class="widget-option" data-type="kanban_summary">
-                        <div class="widget-preview">
-                            <i class="fas fa-th-large"></i>
-                            <div class="widget-info">
-                                <h5>Kanban Summary</h5>
-                                <p>Mini kanban board for quick task management</p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
             
@@ -535,33 +526,6 @@
     color: #333;
 }
 
-/* Kanban Summary Widget */
-.kanban-summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-    gap: 0.5rem;
-    padding: 0.5rem;
-}
-
-.kanban-column-summary {
-    text-align: center;
-    padding: 0.5rem;
-    background: #f8f9fa;
-    border-radius: 4px;
-    border-left: 3px solid #007bff;
-}
-
-.column-name {
-    font-size: 0.8rem;
-    color: #666;
-    margin-bottom: 0.25rem;
-}
-
-.column-count {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #333;
-}
 
 /* Project Progress Widget */
 .project-progress-list {
@@ -887,7 +851,6 @@ const widgetSizes = {
     'break_reminder': 'large',
     'project_progress': 'wide',
     'task_priority': 'medium',
-    'kanban_summary': 'large',
     'productivity_metrics': 'medium',
     'time_distribution': 'wide',
     'team_activity': 'wide',
@@ -1034,8 +997,6 @@ function renderWidgetContent(widget) {
             return renderAssignedTasksWidget(widget);
         case 'task_priority':
             return renderTaskPriorityWidget(widget);
-        case 'kanban_summary':
-            return renderKanbanSummaryWidget(widget);
         case 'productivity_metrics':
             return renderProductivityMetricsWidget(widget);
         case 'time_distribution':
@@ -1154,14 +1115,6 @@ function renderTaskPriorityWidget(widget) {
     `;
 }
 
-function renderKanbanSummaryWidget(widget) {
-    loadWidgetData(widget.id);
-    return `
-        <div class="kanban-summary-widget" id="widget-content-${widget.id}">
-            <div class="widget-loading">Loading kanban...</div>
-        </div>
-    `;
-}
 
 function renderProductivityMetricsWidget(widget) {
     loadWidgetData(widget.id);
@@ -1294,7 +1247,6 @@ function showConfigurationModal() {
         'project_progress': 'Project Progress',
         'assigned_tasks': 'Assigned Tasks',
         'task_priority': 'Task Priority',
-        'kanban_summary': 'Kanban Summary',
         'productivity_metrics': 'Productivity Metrics',
         'time_distribution': 'Time Distribution'
     };
@@ -1536,9 +1488,6 @@ function updateWidgetContent(widgetId, data) {
     } else if (data.priority_tasks) {
         // Update task priority widget
         updateTaskPriorityWidget(widgetId, data.priority_tasks);
-    } else if (data.kanban_boards) {
-        // Update kanban summary widget
-        updateKanbanSummaryWidget(widgetId, data.kanban_boards);
     } else if (data.project_progress) {
         // Update project progress widget
         updateProjectProgressWidget(widgetId, data.project_progress);
@@ -1698,26 +1647,6 @@ function updateTaskPriorityWidget(widgetId, priorityTasks) {
     contentElement.innerHTML = tasksHtml;
 }
 
-function updateKanbanSummaryWidget(widgetId, kanbanBoards) {
-    const contentElement = document.getElementById(`widget-content-${widgetId}`);
-    if (!contentElement) return;
-    
-    let kanbanHtml = '<div class="kanban-summary-list">';
-    kanbanBoards.forEach(board => {
-        kanbanHtml += `
-            <div class="kanban-board-item">
-                <div class="board-name">${board.name}</div>
-                <div class="board-project">${board.project_name}</div>
-                <div class="board-stats">
-                    <span class="stat">${board.total_cards} cards</span>
-                    <span class="stat">${board.columns} columns</span>
-                </div>
-            </div>
-        `;
-    });
-    kanbanHtml += '</div>';
-    contentElement.innerHTML = kanbanHtml;
-}
 
 function updateProjectProgressWidget(widgetId, projectProgress) {
     const contentElement = document.getElementById(`widget-content-${widgetId}`);

@@ -169,32 +169,6 @@
         </div>
         {% endif %}
 
-        <!-- Kanban Boards -->
-        {% if kanban_boards %}
-        <div class="table-section">
-            <h3>📋 Kanban Boards ({{ kanban_boards|length }})</h3>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Board Name</th>
-                        <th>Columns</th>
-                        <th>Cards</th>
-                        <th>Created By</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for board in kanban_boards %}
-                    <tr>
-                        <td>{{ board.name }}</td>
-                        <td>{{ board.columns|length }}</td>
-                        <td>{{ board.columns|map(attribute='cards')|map('length')|sum }}</td>
-                        <td>{{ board.created_by.username }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
 
         <!-- Time Entries -->
         {% if time_entries_count > 0 %}

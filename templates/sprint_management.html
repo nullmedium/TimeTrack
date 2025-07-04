@@ -109,11 +109,21 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="sprint-start-date">Start Date *</label>
-                        <input type="date" id="sprint-start-date" required>
+                        <div class="hybrid-date-input">
+                            <input type="date" id="sprint-start-date-native" class="date-input-native" required>
+                            <input type="text" id="sprint-start-date" class="date-input-formatted" required placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
+                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('sprint-start-date')" title="Open calendar">📅</button>
+                        </div>
+                        <div class="date-error" id="sprint-start-date-error" style="display: none; color: #dc3545; font-size: 0.8rem; margin-top: 0.25rem;"></div>
                     </div>
                     <div class="form-group">
                         <label for="sprint-end-date">End Date *</label>
-                        <input type="date" id="sprint-end-date" required>
+                        <div class="hybrid-date-input">
+                            <input type="date" id="sprint-end-date-native" class="date-input-native" required>
+                            <input type="text" id="sprint-end-date" class="date-input-formatted" required placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
+                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('sprint-end-date')" title="Open calendar">📅</button>
+                        </div>
+                        <div class="date-error" id="sprint-end-date-error" style="display: none; color: #dc3545; font-size: 0.8rem; margin-top: 0.25rem;"></div>
                     </div>
                 </div>
                 
@@ -227,9 +237,6 @@
     margin-bottom: 2rem;
 }
 
-.sprint-card {
-    /* Sprint card inherits from .management-card */
-}
 
 .sprint-card-header {
     display: flex;
@@ -294,6 +301,69 @@
 
 
 
+/* Hybrid Date Input Styles */
+.hybrid-date-input {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.hybrid-date-input.compact {
+    display: inline-flex;
+}
+
+.date-input-native {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: calc(100% - 35px); /* Leave space for calendar button */
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+    pointer-events: auto;
+}
+
+.date-input-formatted {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+    position: relative;
+    z-index: 2;
+}
+
+.calendar-picker-btn {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.5rem;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+    z-index: 3;
+    position: relative;
+}
+
+.calendar-picker-btn:hover {
+    background: #e9ecef;
+}
+
+.calendar-picker-btn.compact {
+    padding: 0.375rem 0.5rem;
+    font-size: 12px;
+}
+
+.hybrid-date-input.compact .date-input-formatted {
+    padding: 0.375rem;
+    font-size: 12px;
+    width: 100px;
+    flex: none;
+}
+
 @media (max-width: 768px) {
     .sprint-metrics {
         grid-template-columns: repeat(2, 1fr);
@@ -302,6 +372,206 @@
 </style>
 
 <script>
+// User preferences for date formatting
+const USER_DATE_FORMAT = '{{ g.user.preferences.date_format if g.user.preferences else "ISO" }}';
+
+// Date formatting utility function
+function formatUserDate(dateString) {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    
+    switch (USER_DATE_FORMAT) {
+        case 'US':
+            return date.toLocaleDateString('en-US'); // MM/DD/YYYY
+        case 'EU':
+        case 'UK':
+            return date.toLocaleDateString('en-GB'); // DD/MM/YYYY
+        case 'Readable':
+            return date.toLocaleDateString('en-US', { 
+                weekday: 'short', 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            }); // Mon, Dec 25, 2024
+        case 'ISO':
+        default:
+            return date.toISOString().split('T')[0]; // YYYY-MM-DD
+    }
+}
+
+// Date input formatting function - formats ISO date for user input
+function formatDateForInput(isoDateString) {
+    if (!isoDateString) return '';
+    
+    const date = new Date(isoDateString);
+    if (isNaN(date.getTime())) return '';
+    
+    return formatUserDate(isoDateString);
+}
+
+// Date parsing function - converts user-formatted date to ISO format
+function parseUserDate(dateString) {
+    if (!dateString || dateString.trim() === '') return null;
+    
+    const trimmed = dateString.trim();
+    let date;
+    
+    switch (USER_DATE_FORMAT) {
+        case 'US': // MM/DD/YYYY
+            const usParts = trimmed.split('/');
+            if (usParts.length === 3) {
+                const month = parseInt(usParts[0], 10);
+                const day = parseInt(usParts[1], 10);
+                const year = parseInt(usParts[2], 10);
+                if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year > 1900) {
+                    date = new Date(year, month - 1, day);
+                }
+            }
+            break;
+            
+        case 'EU':
+        case 'UK': // DD/MM/YYYY
+            const euParts = trimmed.split('/');
+            if (euParts.length === 3) {
+                const day = parseInt(euParts[0], 10);
+                const month = parseInt(euParts[1], 10);
+                const year = parseInt(euParts[2], 10);
+                if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year > 1900) {
+                    date = new Date(year, month - 1, day);
+                }
+            }
+            break;
+            
+        case 'Readable': // Mon, Dec 25, 2024
+            date = new Date(trimmed);
+            break;
+            
+        case 'ISO': // YYYY-MM-DD
+        default:
+            if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+                date = new Date(trimmed);
+            }
+            break;
+    }
+    
+    if (!date || isNaN(date.getTime())) {
+        return null;
+    }
+    
+    return date.toISOString().split('T')[0];
+}
+
+// Date validation function
+function validateDateInput(inputElement, errorElement) {
+    const value = inputElement.value.trim();
+    if (!value) {
+        errorElement.style.display = 'none';
+        return true;
+    }
+    
+    const parsedDate = parseUserDate(value);
+    if (!parsedDate) {
+        let expectedFormat;
+        switch (USER_DATE_FORMAT) {
+            case 'US': expectedFormat = 'MM/DD/YYYY'; break;
+            case 'EU':
+            case 'UK': expectedFormat = 'DD/MM/YYYY'; break;
+            case 'Readable': expectedFormat = 'Mon, Dec 25, 2024'; break;
+            case 'ISO':
+            default: expectedFormat = 'YYYY-MM-DD'; break;
+        }
+        errorElement.textContent = `Invalid date format. Expected: ${expectedFormat}`;
+        errorElement.style.display = 'block';
+        return false;
+    }
+    
+    errorElement.style.display = 'none';
+    return true;
+}
+
+// Date range validation function
+function validateDateRange(startElement, endElement, startErrorElement, endErrorElement) {
+    const startValid = validateDateInput(startElement, startErrorElement);
+    const endValid = validateDateInput(endElement, endErrorElement);
+    
+    if (!startValid || !endValid) {
+        return false;
+    }
+    
+    const startDate = parseUserDate(startElement.value);
+    const endDate = parseUserDate(endElement.value);
+    
+    if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        if (start >= end) {
+            endErrorElement.textContent = 'End date must be after start date';
+            endErrorElement.style.display = 'block';
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Hybrid Date Input Functions
+function setupHybridDateInput(inputId) {
+    const formattedInput = document.getElementById(inputId);
+    const nativeInput = document.getElementById(inputId + '-native');
+    
+    if (!formattedInput || !nativeInput) return;
+    
+    // Sync from native input to formatted input
+    nativeInput.addEventListener('change', function() {
+        if (this.value) {
+            formattedInput.value = formatDateForInput(this.value);
+            // Trigger change event on formatted input
+            formattedInput.dispatchEvent(new Event('change'));
+        }
+    });
+    
+    // Sync from formatted input to native input
+    formattedInput.addEventListener('change', function() {
+        const isoDate = parseUserDate(this.value);
+        if (isoDate) {
+            nativeInput.value = isoDate;
+        } else {
+            nativeInput.value = '';
+        }
+    });
+    
+    // Clear both inputs when formatted input is cleared
+    formattedInput.addEventListener('input', function() {
+        if (this.value === '') {
+            nativeInput.value = '';
+        }
+    });
+}
+
+function openCalendarPicker(inputId) {
+    const nativeInput = document.getElementById(inputId + '-native');
+    if (nativeInput) {
+        // Try multiple methods to open the date picker
+        nativeInput.focus();
+        
+        // For modern browsers
+        if (nativeInput.showPicker) {
+            try {
+                nativeInput.showPicker();
+            } catch (e) {
+                // Fallback to click if showPicker fails
+                nativeInput.click();
+            }
+        } else {
+            // Fallback for older browsers
+            nativeInput.click();
+        }
+    }
+}
+
 // Sprint Management Controller
 class SprintManager {
     constructor() {
@@ -331,6 +601,27 @@ class SprintManager {
         document.getElementById('refresh-sprints').addEventListener('click', () => {
             this.loadSprints();
         });
+        
+        // Date validation
+        document.getElementById('sprint-start-date').addEventListener('blur', () => {
+            const startInput = document.getElementById('sprint-start-date');
+            const endInput = document.getElementById('sprint-end-date');
+            const startError = document.getElementById('sprint-start-date-error');
+            const endError = document.getElementById('sprint-end-date-error');
+            validateDateRange(startInput, endInput, startError, endError);
+        });
+        
+        document.getElementById('sprint-end-date').addEventListener('blur', () => {
+            const startInput = document.getElementById('sprint-start-date');
+            const endInput = document.getElementById('sprint-end-date');
+            const startError = document.getElementById('sprint-start-date-error');
+            const endError = document.getElementById('sprint-end-date-error');
+            validateDateRange(startInput, endInput, startError, endError);
+        });
+        
+        // Setup hybrid date inputs
+        setupHybridDateInput('sprint-start-date');
+        setupHybridDateInput('sprint-end-date');
 
         // Modal close handlers
         document.querySelectorAll('.close').forEach(closeBtn => {
@@ -440,7 +731,7 @@ class SprintManager {
             </div>
             
             <div class="sprint-dates">
-                📅 ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}
+                📅 ${formatUserDate(sprint.start_date)} - ${formatUserDate(sprint.end_date)}
                 ${sprint.days_remaining > 0 ? `(${sprint.days_remaining} days left)` : ''}
             </div>
             
@@ -500,8 +791,8 @@ class SprintManager {
             document.getElementById('sprint-status').value = sprint.status;
             document.getElementById('sprint-project').value = sprint.project_id || '';
             document.getElementById('sprint-capacity').value = sprint.capacity_hours || '';
-            document.getElementById('sprint-start-date').value = sprint.start_date;
-            document.getElementById('sprint-end-date').value = sprint.end_date;
+            document.getElementById('sprint-start-date').value = formatDateForInput(sprint.start_date);
+            document.getElementById('sprint-end-date').value = formatDateForInput(sprint.end_date);
             document.getElementById('sprint-goal').value = sprint.goal || '';
             document.getElementById('delete-sprint-btn').style.display = 'inline-block';
         } else {
@@ -512,8 +803,8 @@ class SprintManager {
             // Set default dates (next 2 weeks)
             const today = new Date();
             const twoWeeksLater = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
-            document.getElementById('sprint-start-date').value = today.toISOString().split('T')[0];
-            document.getElementById('sprint-end-date').value = twoWeeksLater.toISOString().split('T')[0];
+            document.getElementById('sprint-start-date').value = formatDateForInput(today.toISOString().split('T')[0]);
+            document.getElementById('sprint-end-date').value = formatDateForInput(twoWeeksLater.toISOString().split('T')[0]);
             
             document.getElementById('delete-sprint-btn').style.display = 'none';
         }
@@ -522,14 +813,29 @@ class SprintManager {
     }
 
     async saveSprint() {
+        // Validate date inputs before saving
+        const startInput = document.getElementById('sprint-start-date');
+        const endInput = document.getElementById('sprint-end-date');
+        const startError = document.getElementById('sprint-start-date-error');
+        const endError = document.getElementById('sprint-end-date-error');
+        
+        if (!validateDateRange(startInput, endInput, startError, endError)) {
+            if (startError.style.display !== 'none') {
+                startInput.focus();
+            } else {
+                endInput.focus();
+            }
+            return;
+        }
+        
         const sprintData = {
             name: document.getElementById('sprint-name').value,
             description: document.getElementById('sprint-description').value,
             status: document.getElementById('sprint-status').value,
             project_id: document.getElementById('sprint-project').value || null,
             capacity_hours: document.getElementById('sprint-capacity').value || null,
-            start_date: document.getElementById('sprint-start-date').value,
-            end_date: document.getElementById('sprint-end-date').value,
+            start_date: parseUserDate(document.getElementById('sprint-start-date').value),
+            end_date: parseUserDate(document.getElementById('sprint-end-date').value),
             goal: document.getElementById('sprint-goal').value || null
         };
 

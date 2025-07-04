@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Sprint, SprintStatus, Announcement, SystemEvent, KanbanBoard, KanbanColumn, KanbanCard, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data, format_burndown_data
@@ -1061,12 +1061,6 @@ def delete_user(user_id):
             
             # Transfer ownership of project categories to alternative admin
             ProjectCategory.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-            
-            # Transfer ownership of kanban boards to alternative admin
-            KanbanBoard.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-            
-            # Transfer ownership of kanban cards to alternative admin
-            KanbanCard.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
         else:
             # No alternative admin found - redirect to company deletion confirmation
             flash('No other administrator or supervisor found. Company deletion required.', 'warning')
@@ -1083,7 +1077,6 @@ def delete_user(user_id):
         # Clear task and subtask assignments
         Task.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
         SubTask.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
-        KanbanCard.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
         
         # Now safe to delete the user
         db.session.delete(user)
@@ -1153,19 +1146,12 @@ def confirm_company_deletion(user_id):
             # Delete all company-related data in the correct order
             # First, clear foreign key references that could cause constraint violations
             
-            # 1. Clear task references in kanban cards (they reference tasks)
-            KanbanCard.query.filter(KanbanCard.column_id.in_(
-                db.session.query(KanbanColumn.id).filter(KanbanColumn.board_id.in_(
-                    db.session.query(KanbanBoard.id).filter(KanbanBoard.company_id == company.id)
-                ))
-            )).update({'task_id': None}, synchronize_session=False)
-            
-            # 2. Delete time entries (they reference tasks and users)
+            # 1. Delete time entries (they reference tasks and users)
             TimeEntry.query.filter(TimeEntry.user_id.in_(
                 db.session.query(User.id).filter(User.company_id == company.id)
             )).delete(synchronize_session=False)
             
-            # 3. Delete user preferences and dashboards
+            # 2. Delete user preferences and dashboards
             UserPreferences.query.filter(UserPreferences.user_id.in_(
                 db.session.query(User.id).filter(User.company_id == company.id)
             )).delete(synchronize_session=False)
@@ -1174,57 +1160,42 @@ def confirm_company_deletion(user_id):
                 db.session.query(User.id).filter(User.company_id == company.id)
             )).delete(synchronize_session=False)
             
-            # 4. Delete work configs
+            # 3. Delete work configs
             WorkConfig.query.filter(WorkConfig.user_id.in_(
                 db.session.query(User.id).filter(User.company_id == company.id)
             )).delete(synchronize_session=False)
             
-            # 5. Delete kanban cards (now safe since task references are cleared)
-            KanbanCard.query.filter(KanbanCard.column_id.in_(
-                db.session.query(KanbanColumn.id).filter(KanbanColumn.board_id.in_(
-                    db.session.query(KanbanBoard.id).filter(KanbanBoard.company_id == company.id)
-                ))
-            )).delete(synchronize_session=False)
-            
-            # 6. Delete kanban columns (they depend on boards)
-            KanbanColumn.query.filter(KanbanColumn.board_id.in_(
-                db.session.query(KanbanBoard.id).filter(KanbanBoard.company_id == company.id)
-            )).delete(synchronize_session=False)
-            
-            # 7. Delete kanban boards
-            KanbanBoard.query.filter_by(company_id=company.id).delete()
-            
-            # 8. Delete subtasks (they depend on tasks)
+            # 4. Delete subtasks (they depend on tasks)
             SubTask.query.filter(SubTask.task_id.in_(
                 db.session.query(Task.id).filter(Task.project_id.in_(
                     db.session.query(Project.id).filter(Project.company_id == company.id)
                 ))
             )).delete(synchronize_session=False)
             
-            # 9. Delete tasks (now safe since kanban cards and subtasks are deleted)
+            # 5. Delete tasks (now safe since subtasks are deleted)
             Task.query.filter(Task.project_id.in_(
                 db.session.query(Project.id).filter(Project.company_id == company.id)
             )).delete(synchronize_session=False)
             
-            # 10. Delete projects
+            # 6. Delete projects
             Project.query.filter_by(company_id=company.id).delete()
             
-            # 11. Delete project categories
+            # 7. Delete project categories
             ProjectCategory.query.filter_by(company_id=company.id).delete()
             
-            # 12. Delete company work config
+            # 8. Delete company work config
             CompanyWorkConfig.query.filter_by(company_id=company.id).delete()
             
-            # 13. Delete teams
+            # 9. Delete teams
             Team.query.filter_by(company_id=company.id).delete()
             
-            # 14. Delete users
+            # 10. Delete users
             User.query.filter_by(company_id=company.id).delete()
             
-            # 15. Delete system events for this company
+            # 11. Delete system events for this company
             SystemEvent.query.filter_by(company_id=company.id).delete()
             
-            # 16. Finally, delete the company itself
+            # 12. Finally, delete the company itself
             db.session.delete(company)
             
             db.session.commit()
@@ -1254,7 +1225,6 @@ def confirm_company_deletion(user_id):
     teams = Team.query.filter_by(company_id=company.id).all()
     projects = Project.query.filter_by(company_id=company.id).all()
     categories = ProjectCategory.query.filter_by(company_id=company.id).all()
-    kanban_boards = KanbanBoard.query.filter_by(company_id=company.id).all()
     
     # Get tasks for all projects in the company
     project_ids = [p.id for p in projects]
@@ -1277,7 +1247,6 @@ def confirm_company_deletion(user_id):
                          teams=teams,
                          projects=projects,
                          categories=categories,
-                         kanban_boards=kanban_boards,
                          tasks=tasks,
                          time_entries_count=time_entries_count,
                          total_hours_tracked=total_hours_tracked)
@@ -2128,12 +2097,6 @@ def system_admin_delete_user(user_id):
             
             # Transfer ownership of project categories to alternative admin
             ProjectCategory.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-            
-            # Transfer ownership of kanban boards to alternative admin
-            KanbanBoard.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-            
-            # Transfer ownership of kanban cards to alternative admin
-            KanbanCard.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
         else:
             # No alternative admin found - redirect to company deletion confirmation
             flash('No other administrator or supervisor found in the same company. Company deletion required.', 'warning')
@@ -2150,7 +2113,6 @@ def system_admin_delete_user(user_id):
         # Clear task and subtask assignments
         Task.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
         SubTask.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
-        KanbanCard.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
         
         # Now safe to delete the user
         db.session.delete(user)
@@ -3674,157 +3636,14 @@ def manage_project_tasks(project_id):
                          tasks=tasks,
                          team_members=team_members)
 
-@app.route('/admin/projects/<int:project_id>/kanban')
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def project_kanban(project_id):
-    project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first_or_404()
 
-    # Check if user has access to this project
-    if not project.is_user_allowed(g.user):
-        flash('You do not have access to this project.', 'error')
-        return redirect(url_for('admin_projects'))
-
-    # Get all Kanban boards for this company (unified boards)
-    boards = KanbanBoard.query.filter_by(company_id=g.user.company_id, is_active=True).order_by(KanbanBoard.created_at.desc()).all()
-
-    # Get team members for assignment dropdown
-    if project.team_id:
-        team_members = User.query.filter_by(team_id=project.team_id, company_id=g.user.company_id).all()
-    else:
-        team_members = User.query.filter_by(company_id=g.user.company_id).all()
-
-    # Get tasks for task assignment dropdown
-    tasks = Task.query.filter_by(project_id=project_id).order_by(Task.name).all()
-
-    # Get available projects for card assignment dropdown
-    available_projects = []
-    if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
-        # Admins and Supervisors can see all company projects
-        all_projects = Project.query.filter_by(company_id=g.user.company_id, is_active=True).order_by(Project.name).all()
-        available_projects = [p for p in all_projects if p.is_user_allowed(g.user)]
-    elif g.user.team_id:
-        # Team members see team projects + unassigned projects
-        all_projects = Project.query.filter(
-            Project.company_id == g.user.company_id,
-            Project.is_active == True,
-            db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
-        ).order_by(Project.name).all()
-        available_projects = [p for p in all_projects if p.is_user_allowed(g.user)]
-    else:
-        # Unassigned users see only unassigned projects
-        all_projects = Project.query.filter_by(
-            company_id=g.user.company_id,
-            team_id=None,
-            is_active=True
-        ).order_by(Project.name).all()
-        available_projects = [p for p in all_projects if p.is_user_allowed(g.user)]
-
-    return render_template('project_kanban.html',
-                         title=f'Kanban - {project.name}',
-                         project=project,
-                         boards=boards,
-                         team_members=team_members,
-                         tasks=tasks,
-                         available_projects=available_projects)
-
-@app.route('/kanban')
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def kanban_overview():
-    # Check if create=true parameter is present
-    create_board = request.args.get('create') == 'true'
-    
-    # Check if board parameter is present (for viewing a specific board)
-    board_id = request.args.get('board')
-    if board_id:
-        try:
-            board_id = int(board_id)
-            # Verify board exists and user has access
-            board = KanbanBoard.query.filter_by(id=board_id, company_id=g.user.company_id, is_active=True).first()
-            if board:
-                # Get team members for assignment dropdown
-                team_members = User.query.filter_by(company_id=g.user.company_id).all()
-                
-                # Get all boards for the dropdown (so users can switch between boards)
-                all_boards = KanbanBoard.query.filter_by(company_id=g.user.company_id, is_active=True).order_by(KanbanBoard.created_at.desc()).all()
-                
-                # Get available projects for card assignment dropdown
-                available_projects = []
-                if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
-                    # Admins and Supervisors can see all company projects
-                    all_projects = Project.query.filter_by(company_id=g.user.company_id, is_active=True).order_by(Project.name).all()
-                    available_projects = [p for p in all_projects if p.is_user_allowed(g.user)]
-                elif g.user.team_id:
-                    # Team members see team projects + unassigned projects
-                    all_projects = Project.query.filter(
-                        Project.company_id == g.user.company_id,
-                        Project.is_active == True,
-                        db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
-                    ).order_by(Project.name).all()
-                    available_projects = [p for p in all_projects if p.is_user_allowed(g.user)]
-                else:
-                    # Unassigned users see only unassigned projects
-                    all_projects = Project.query.filter_by(
-                        company_id=g.user.company_id,
-                        team_id=None,
-                        is_active=True
-                    ).order_by(Project.name).all()
-                    available_projects = [p for p in all_projects if p.is_user_allowed(g.user)]
-                
-                # Render the board view template
-                return render_template('project_kanban.html',
-                                     title=f'Kanban - {board.name}',
-                                     project=None,  # No specific project context
-                                     boards=all_boards,  # Pass all boards for dropdown
-                                     team_members=team_members,
-                                     tasks=[],  # No project-specific tasks
-                                     available_projects=available_projects,
-                                     selected_board_id=board_id)
-            else:
-                flash('Board not found or access denied.', 'error')
-                return redirect(url_for('kanban_overview'))
-        except ValueError:
-            flash('Invalid board ID.', 'error')
-            return redirect(url_for('kanban_overview'))
-    
-    # Get all projects the user has access to (for context)
-    if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
-        # Admins and Supervisors can see all company projects
-        projects = Project.query.filter_by(company_id=g.user.company_id, is_active=True).order_by(Project.name).all()
-    elif g.user.team_id:
-        # Team members see team projects + unassigned projects
-        projects = Project.query.filter(
-            Project.company_id == g.user.company_id,
-            Project.is_active == True,
-            db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
-        ).order_by(Project.name).all()
-    else:
-        # Unassigned users see only unassigned projects
-        projects = Project.query.filter_by(
-            company_id=g.user.company_id,
-            team_id=None,
-            is_active=True
-        ).order_by(Project.name).all()
-
-    # Get all company Kanban boards (unified boards)
-    boards = KanbanBoard.query.filter_by(
-        company_id=g.user.company_id,
-        is_active=True
-    ).order_by(KanbanBoard.created_at.desc()).all()
-
-    return render_template('kanban_overview.html',
-                         title='Kanban Overview',
-                         boards=boards,
-                         projects=projects,
-                         create_board=create_board)
 
 # Unified Task Management Route
 @app.route('/tasks')
 @role_required(Role.TEAM_MEMBER)
 @company_required
 def unified_task_management():
-    """Unified task management interface combining tasks and kanban"""
+    """Unified task management interface"""
     
     # Get all projects the user has access to (for filtering and task creation)
     if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
@@ -4069,7 +3888,7 @@ def delete_task(task_id):
 @role_required(Role.TEAM_MEMBER)
 @company_required
 def get_unified_tasks():
-    """Get all tasks for unified kanban view"""
+    """Get all tasks for unified task view"""
     try:
         # Base query for tasks in user's company
         query = Task.query.join(Project).filter(Project.company_id == g.user.company_id)
@@ -4136,7 +3955,7 @@ def get_unified_tasks():
 @role_required(Role.TEAM_MEMBER)
 @company_required
 def update_task_status(task_id):
-    """Update task status (for kanban card movement)"""
+    """Update task status"""
     try:
         task = Task.query.join(Project).filter(
             Task.id == task_id,
@@ -4183,92 +4002,6 @@ def update_task_status(task_id):
         logger.error(f"Error updating task status: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
-@app.route('/api/admin/migrate-kanban-cards', methods=['POST'])
-@role_required(Role.ADMIN)
-@company_required
-def migrate_kanban_cards():
-    """Admin endpoint to migrate orphaned KanbanCards to Tasks"""
-    try:
-        from models import KanbanCard, Task, TaskStatus, TaskPriority, KanbanColumn
-        
-        def map_column_to_task_status(column_name):
-            """Map Kanban column name to Task status"""
-            column_name = column_name.upper().strip()
-            
-            if any(keyword in column_name for keyword in ['TODO', 'TO DO', 'BACKLOG', 'PLANNED', 'NOT STARTED']):
-                return TaskStatus.NOT_STARTED
-            elif any(keyword in column_name for keyword in ['DOING', 'IN PROGRESS', 'ACTIVE', 'WORKING']):
-                return TaskStatus.IN_PROGRESS
-            elif any(keyword in column_name for keyword in ['HOLD', 'BLOCKED', 'WAITING', 'PAUSED']):
-                return TaskStatus.ON_HOLD
-            elif any(keyword in column_name for keyword in ['DONE', 'COMPLETE', 'FINISHED', 'CLOSED']):
-                return TaskStatus.COMPLETED
-            else:
-                return TaskStatus.NOT_STARTED
-
-        def get_task_priority_from_card(card):
-            """Determine task priority from card properties"""
-            text_to_check = f"{card.title} {card.description or ''}".upper()
-            
-            if any(keyword in text_to_check for keyword in ['URGENT', 'CRITICAL', 'ASAP', '!!!', 'HIGH PRIORITY']):
-                return TaskPriority.URGENT
-            elif any(keyword in text_to_check for keyword in ['HIGH', 'IMPORTANT', '!!']):
-                return TaskPriority.HIGH
-            elif any(keyword in text_to_check for keyword in ['LOW', 'MINOR', 'NICE TO HAVE']):
-                return TaskPriority.LOW
-            else:
-                return TaskPriority.MEDIUM
-
-        # Find orphaned KanbanCards in user's company
-        orphaned_cards = db.session.query(KanbanCard).join(KanbanColumn).join(KanbanBoard).filter(
-            KanbanBoard.company_id == g.user.company_id,
-            KanbanCard.task_id.is_(None)
-        ).all()
-        
-        if not orphaned_cards:
-            return jsonify({'success': True, 'message': 'No orphaned KanbanCards found', 'converted_count': 0})
-        
-        converted_count = 0
-        
-        for card in orphaned_cards:
-            column = KanbanColumn.query.get(card.column_id)
-            if not column:
-                continue
-                
-            task_status = map_column_to_task_status(column.name)
-            task_priority = get_task_priority_from_card(card)
-            
-            task = Task(
-                name=card.title,
-                description=card.description or '',
-                status=task_status,
-                priority=task_priority,
-                project_id=card.project_id,
-                assigned_to_id=card.assigned_to_id,
-                due_date=card.due_date,
-                completed_date=card.completed_date if task_status == TaskStatus.COMPLETED else None,
-                created_by_id=card.created_by_id,
-                created_at=card.created_at,
-            )
-            
-            db.session.add(task)
-            db.session.flush()
-            
-            card.task_id = task.id
-            converted_count += 1
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True, 
-            'message': f'Successfully converted {converted_count} KanbanCards to Tasks',
-            'converted_count': converted_count
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error in migrate_kanban_cards: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
 
 # Sprint Management APIs
 @app.route('/api/sprints')
@@ -4739,632 +4472,6 @@ def delete_category(category_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)})
 
-# Kanban API Routes
-@app.route('/api/kanban/stats')
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def get_kanban_stats():
-    try:
-        # Get all projects the user has access to
-        if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
-            projects = Project.query.filter_by(company_id=g.user.company_id, is_active=True).all()
-        elif g.user.team_id:
-            projects = Project.query.filter(
-                Project.company_id == g.user.company_id,
-                Project.is_active == True,
-                db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
-            ).all()
-        else:
-            projects = Project.query.filter_by(
-                company_id=g.user.company_id,
-                team_id=None,
-                is_active=True
-            ).all()
-
-        # Count company boards and cards
-        boards = KanbanBoard.query.filter_by(company_id=g.user.company_id, is_active=True).all()
-        total_boards = len(boards)
-        total_cards = 0
-        
-        for board in boards:
-            for column in board.columns:
-                total_cards += len([card for card in column.cards if card.is_active])
-
-        return jsonify({
-            'success': True,
-            'stats': {
-                'total_boards': total_boards,
-                'total_cards': total_cards,
-                'total_projects': len(projects)
-            }
-        })
-
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/kanban/boards', methods=['GET'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def get_kanban_boards():
-    try:
-        # Optional project_id filter for backward compatibility
-        project_id = request.args.get('project_id')
-        
-        # Base query for company boards
-        boards_query = KanbanBoard.query.filter_by(company_id=g.user.company_id, is_active=True)
-        
-        # If project_id is provided, verify access and filter
-        if project_id:
-            project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
-            if not project or not project.is_user_allowed(g.user):
-                return jsonify({'success': False, 'message': 'Project not found or access denied'})
-            # For backward compatibility, we can still filter by project context
-            # but boards are now company-wide
-        
-        boards = boards_query.all()
-
-        boards_data = []
-        for board in boards:
-            boards_data.append({
-                'id': board.id,
-                'name': board.name,
-                'description': board.description,
-                'is_default': board.is_default,
-                'created_at': board.created_at.isoformat(),
-                'column_count': len(board.columns)
-            })
-
-        return jsonify({'success': True, 'boards': boards_data})
-
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/kanban/boards', methods=['POST'])
-@role_required(Role.TEAM_LEADER)
-@company_required
-def create_kanban_board():
-    try:
-        data = request.get_json()
-        
-        # Optional project_id for backward compatibility
-        project_id = data.get('project_id')
-        if project_id:
-            project_id = int(project_id)
-            # Verify project access if provided
-            project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
-            if not project or not project.is_user_allowed(g.user):
-                return jsonify({'success': False, 'message': 'Project not found or access denied'})
-
-        name = data.get('name')
-        if not name:
-            return jsonify({'success': False, 'message': 'Board name is required'})
-
-        # Check if board name already exists in company
-        existing = KanbanBoard.query.filter_by(company_id=g.user.company_id, name=name).first()
-        if existing:
-            return jsonify({'success': False, 'message': 'Board name already exists in this company'})
-
-        # Create board
-        board = KanbanBoard(
-            name=name,
-            description=data.get('description', ''),
-            company_id=g.user.company_id,
-            is_default=data.get('is_default') in ['true', 'on', True],
-            created_by_id=g.user.id
-        )
-
-        db.session.add(board)
-        db.session.flush()  # Get board ID for columns
-
-        # Create default columns
-        default_columns = [
-            {'name': 'To Do', 'position': 1, 'color': '#6c757d'},
-            {'name': 'In Progress', 'position': 2, 'color': '#007bff'},
-            {'name': 'Done', 'position': 3, 'color': '#28a745'}
-        ]
-
-        for col_data in default_columns:
-            column = KanbanColumn(
-                name=col_data['name'],
-                position=col_data['position'],
-                color=col_data['color'],
-                board_id=board.id
-            )
-            db.session.add(column)
-
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Board created successfully', 'board_id': board.id})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/kanban/boards/<int:board_id>', methods=['GET'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def get_kanban_board(board_id):
-    try:
-        board = KanbanBoard.query.filter(
-            KanbanBoard.id == board_id,
-            KanbanBoard.company_id == g.user.company_id
-        ).first()
-
-        if not board:
-            return jsonify({'success': False, 'message': 'Board not found or access denied'})
-
-        columns_data = []
-        for column in board.columns:
-            if not column.is_active:
-                continue
-
-            cards_data = []
-            for card in column.cards:
-                if not card.is_active:
-                    continue
-
-                cards_data.append({
-                    'id': card.id,
-                    'title': card.title,
-                    'description': card.description,
-                    'position': card.position,
-                    'color': card.color,
-                    'assigned_to': {
-                        'id': card.assigned_to.id,
-                        'username': card.assigned_to.username
-                    } if card.assigned_to else None,
-                    'project': {
-                        'id': card.project.id,
-                        'name': card.project.name,
-                        'code': card.project.code
-                    } if card.project else None,
-                    'task_id': card.task_id,
-                    'task_name': card.task.name if card.task else None,
-                    'due_date': card.due_date.isoformat() if card.due_date else None,
-                    'created_at': card.created_at.isoformat()
-                })
-
-            columns_data.append({
-                'id': column.id,
-                'name': column.name,
-                'description': column.description,
-                'position': column.position,
-                'color': column.color,
-                'wip_limit': column.wip_limit,
-                'card_count': column.card_count,
-                'is_over_wip_limit': column.is_over_wip_limit,
-                'cards': cards_data
-            })
-
-        board_data = {
-            'id': board.id,
-            'name': board.name,
-            'description': board.description,
-            'company': {
-                'id': board.company.id,
-                'name': board.company.name
-            },
-            'columns': columns_data
-        }
-
-        return jsonify({'success': True, 'board': board_data})
-
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/kanban/cards', methods=['POST'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def create_kanban_card():
-    try:
-        data = request.get_json()
-        column_id = data.get('column_id')
-
-        # Verify column access
-        column = KanbanColumn.query.join(KanbanBoard).filter(
-            KanbanColumn.id == column_id,
-            KanbanBoard.company_id == g.user.company_id
-        ).first()
-
-        if not column:
-            return jsonify({'success': False, 'message': 'Column not found or access denied'})
-
-        title = data.get('title')
-        if not title:
-            return jsonify({'success': False, 'message': 'Card title is required'})
-
-        # Calculate position (add to end of column)
-        max_position = db.session.query(func.max(KanbanCard.position)).filter_by(
-            column_id=column_id, is_active=True
-        ).scalar() or 0
-
-        # Parse due date
-        due_date = None
-        if data.get('due_date'):
-            due_date = datetime.strptime(data.get('due_date'), '%Y-%m-%d').date()
-
-        # Verify project access if project_id is provided
-        project_id = None
-        if data.get('project_id'):
-            project_id = int(data.get('project_id'))
-            project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
-            if not project or not project.is_user_allowed(g.user):
-                return jsonify({'success': False, 'message': 'Project not found or access denied'})
-
-        # Create card
-        card = KanbanCard(
-            title=title,
-            description=data.get('description', ''),
-            position=max_position + 1,
-            color=data.get('color'),
-            column_id=column_id,
-            project_id=project_id,
-            task_id=int(data.get('task_id')) if data.get('task_id') else None,
-            assigned_to_id=int(data.get('assigned_to_id')) if data.get('assigned_to_id') else None,
-            due_date=due_date,
-            created_by_id=g.user.id
-        )
-
-        db.session.add(card)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Card created successfully', 'card_id': card.id})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/kanban/cards/<int:card_id>/move', methods=['PUT'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def move_kanban_card(card_id):
-    try:
-        data = request.get_json()
-        new_column_id = data.get('column_id')
-        new_position = data.get('position')
-
-        # Verify card access
-        card = KanbanCard.query.join(KanbanColumn).join(KanbanBoard).filter(
-            KanbanCard.id == card_id,
-            KanbanBoard.company_id == g.user.company_id
-        ).first()
-
-        if not card:
-            return jsonify({'success': False, 'message': 'Card not found or access denied'})
-
-        # Verify new column access
-        new_column = KanbanColumn.query.join(KanbanBoard).filter(
-            KanbanColumn.id == new_column_id,
-            KanbanBoard.company_id == g.user.company_id
-        ).first()
-
-        if not new_column:
-            return jsonify({'success': False, 'message': 'Target column not found or access denied'})
-
-        old_column_id = card.column_id
-        old_position = card.position
-
-        # Update positions in old column (if moving to different column)
-        if old_column_id != new_column_id:
-            # Shift cards down in old column
-            cards_to_shift = KanbanCard.query.filter(
-                KanbanCard.column_id == old_column_id,
-                KanbanCard.position > old_position,
-                KanbanCard.is_active == True
-            ).all()
-
-            for c in cards_to_shift:
-                c.position -= 1
-
-        # Update positions in new column
-        cards_to_shift = KanbanCard.query.filter(
-            KanbanCard.column_id == new_column_id,
-            KanbanCard.position >= new_position,
-            KanbanCard.is_active == True,
-            KanbanCard.id != card_id
-        ).all()
-
-        for c in cards_to_shift:
-            c.position += 1
-
-        # Update card
-        card.column_id = new_column_id
-        card.position = new_position
-        card.updated_at = datetime.now()
-
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Card moved successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/kanban/cards/<int:card_id>', methods=['PUT'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def update_kanban_card(card_id):
-    try:
-        card = KanbanCard.query.join(KanbanColumn).join(KanbanBoard).filter(
-            KanbanCard.id == card_id,
-            KanbanBoard.company_id == g.user.company_id
-        ).first()
-
-        if not card:
-            return jsonify({'success': False, 'message': 'Card not found or access denied'})
-
-        data = request.get_json()
-
-        # Update card fields
-        if 'title' in data:
-            card.title = data['title']
-        if 'description' in data:
-            card.description = data['description']
-        if 'color' in data:
-            card.color = data['color']
-        if 'assigned_to_id' in data:
-            card.assigned_to_id = int(data['assigned_to_id']) if data['assigned_to_id'] else None
-        if 'task_id' in data:
-            card.task_id = int(data['task_id']) if data['task_id'] else None
-        if 'due_date' in data:
-            card.due_date = datetime.strptime(data['due_date'], '%Y-%m-%d').date() if data['due_date'] else None
-        if 'project_id' in data:
-            # Verify project access if project_id is provided
-            if data['project_id']:
-                project_id = int(data['project_id'])
-                project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
-                if not project or not project.is_user_allowed(g.user):
-                    return jsonify({'success': False, 'message': 'Project not found or access denied'})
-                card.project_id = project_id
-            else:
-                card.project_id = None
-
-        card.updated_at = datetime.now()
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Card updated successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/kanban/cards/<int:card_id>', methods=['DELETE'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def delete_kanban_card(card_id):
-    try:
-        card = KanbanCard.query.join(KanbanColumn).join(KanbanBoard).filter(
-            KanbanCard.id == card_id,
-            KanbanBoard.company_id == g.user.company_id
-        ).first()
-
-        if not card:
-            return jsonify({'success': False, 'message': 'Card not found or access denied'})
-
-        column_id = card.column_id
-        position = card.position
-
-        # Soft delete
-        card.is_active = False
-        card.updated_at = datetime.now()
-
-        # Shift remaining cards up
-        cards_to_shift = KanbanCard.query.filter(
-            KanbanCard.column_id == column_id,
-            KanbanCard.position > position,
-            KanbanCard.is_active == True
-        ).all()
-
-        for c in cards_to_shift:
-            c.position -= 1
-
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Card deleted successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-# Kanban Column Management API
-@app.route('/api/kanban/columns', methods=['POST'])
-@role_required(Role.TEAM_LEADER)
-@company_required
-def create_kanban_column():
-    try:
-        data = request.get_json()
-        board_id = int(data.get('board_id'))
-
-        # Verify board access
-        board = KanbanBoard.query.filter(
-            KanbanBoard.id == board_id,
-            KanbanBoard.company_id == g.user.company_id
-        ).first()
-
-        if not board:
-            return jsonify({'success': False, 'message': 'Board not found or access denied'})
-
-        name = data.get('name')
-        if not name:
-            return jsonify({'success': False, 'message': 'Column name is required'})
-
-        # Check if column name already exists in board
-        existing = KanbanColumn.query.filter_by(board_id=board_id, name=name).first()
-        if existing:
-            return jsonify({'success': False, 'message': 'Column name already exists in this board'})
-
-        # Calculate position (add to end)
-        max_position = db.session.query(func.max(KanbanColumn.position)).filter_by(
-            board_id=board_id, is_active=True
-        ).scalar() or 0
-
-        # Create column
-        column = KanbanColumn(
-            name=name,
-            description=data.get('description', ''),
-            position=max_position + 1,
-            color=data.get('color', '#6c757d'),
-            wip_limit=int(data.get('wip_limit')) if data.get('wip_limit') else None,
-            board_id=board_id
-        )
-
-        db.session.add(column)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Column created successfully', 'column_id': column.id})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/kanban/columns/<int:column_id>', methods=['PUT'])
-@role_required(Role.TEAM_LEADER)
-@company_required
-def update_kanban_column(column_id):
-    try:
-        column = KanbanColumn.query.join(KanbanBoard).filter(
-            KanbanColumn.id == column_id,
-            KanbanBoard.company_id == g.user.company_id
-        ).first()
-
-        if not column:
-            return jsonify({'success': False, 'message': 'Column not found or access denied'})
-
-        data = request.get_json()
-
-        # Check for name conflicts (excluding current column)
-        if 'name' in data:
-            existing = KanbanColumn.query.filter(
-                KanbanColumn.board_id == column.board_id,
-                KanbanColumn.name == data['name'],
-                KanbanColumn.id != column_id
-            ).first()
-            if existing:
-                return jsonify({'success': False, 'message': 'Column name already exists in this board'})
-
-        # Update column fields
-        if 'name' in data:
-            column.name = data['name']
-        if 'description' in data:
-            column.description = data['description']
-        if 'color' in data:
-            column.color = data['color']
-        if 'wip_limit' in data:
-            column.wip_limit = int(data['wip_limit']) if data['wip_limit'] else None
-
-        column.updated_at = datetime.now()
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Column updated successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/kanban/columns/<int:column_id>/move', methods=['PUT'])
-@role_required(Role.TEAM_LEADER)
-@company_required
-def move_kanban_column(column_id):
-    try:
-        data = request.get_json()
-        new_position = int(data.get('position'))
-
-        # Verify column access
-        column = KanbanColumn.query.join(KanbanBoard).filter(
-            KanbanColumn.id == column_id,
-            KanbanBoard.company_id == g.user.company_id
-        ).first()
-
-        if not column:
-            return jsonify({'success': False, 'message': 'Column not found or access denied'})
-
-        old_position = column.position
-        board_id = column.board_id
-
-        if old_position == new_position:
-            return jsonify({'success': True, 'message': 'Column position unchanged'})
-
-        # Update positions of other columns
-        if old_position < new_position:
-            # Moving right: shift columns left
-            columns_to_shift = KanbanColumn.query.filter(
-                KanbanColumn.board_id == board_id,
-                KanbanColumn.position > old_position,
-                KanbanColumn.position <= new_position,
-                KanbanColumn.is_active == True,
-                KanbanColumn.id != column_id
-            ).all()
-
-            for c in columns_to_shift:
-                c.position -= 1
-        else:
-            # Moving left: shift columns right
-            columns_to_shift = KanbanColumn.query.filter(
-                KanbanColumn.board_id == board_id,
-                KanbanColumn.position >= new_position,
-                KanbanColumn.position < old_position,
-                KanbanColumn.is_active == True,
-                KanbanColumn.id != column_id
-            ).all()
-
-            for c in columns_to_shift:
-                c.position += 1
-
-        # Update the moved column
-        column.position = new_position
-        column.updated_at = datetime.now()
-
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Column moved successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/kanban/columns/<int:column_id>', methods=['DELETE'])
-@role_required(Role.TEAM_LEADER)
-@company_required
-def delete_kanban_column(column_id):
-    try:
-        column = KanbanColumn.query.join(KanbanBoard).filter(
-            KanbanColumn.id == column_id,
-            KanbanBoard.company_id == g.user.company_id
-        ).first()
-
-        if not column:
-            return jsonify({'success': False, 'message': 'Column not found or access denied'})
-
-        # Check if column has active cards
-        active_cards = KanbanCard.query.filter_by(column_id=column_id, is_active=True).count()
-        if active_cards > 0:
-            return jsonify({'success': False, 'message': f'Cannot delete column with {active_cards} active cards. Move or delete cards first.'})
-
-        board_id = column.board_id
-        position = column.position
-
-        # Soft delete the column
-        column.is_active = False
-        column.updated_at = datetime.now()
-
-        # Shift remaining columns left
-        columns_to_shift = KanbanColumn.query.filter(
-            KanbanColumn.board_id == board_id,
-            KanbanColumn.position > position,
-            KanbanColumn.is_active == True
-        ).all()
-
-        for c in columns_to_shift:
-            c.position -= 1
-
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Column deleted successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
 # Dashboard API Endpoints
 @app.route('/api/dashboard')
 @role_required(Role.TEAM_MEMBER)
@@ -5819,28 +4926,6 @@ def get_widget_data(widget_id):
                 'status': t.status.value if t.status else 'Pending',
                 'project_name': t.project.name if t.project else 'No Project'
             } for t in tasks]
-
-        elif widget.widget_type == WidgetType.KANBAN_SUMMARY:
-            # Get kanban data summary - company-wide boards
-            boards = KanbanBoard.query.filter_by(
-                company_id=g.user.company_id,
-                is_active=True
-            ).limit(3).all()
-
-            board_summaries = []
-            for board in boards:
-                columns = KanbanColumn.query.filter_by(board_id=board.id).order_by(KanbanColumn.position).all()
-                total_cards = sum(len([c for c in col.cards if c.is_active]) for col in columns)
-
-                board_summaries.append({
-                    'id': board.id,
-                    'name': board.name,
-                    'company_name': board.company.name,
-                    'total_cards': total_cards,
-                    'columns': len(columns)
-                })
-
-            widget_data['kanban_boards'] = board_summaries
 
         elif widget.widget_type == WidgetType.PROJECT_PROGRESS:
             # Get project progress data

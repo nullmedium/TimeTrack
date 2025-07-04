@@ -15,9 +15,8 @@ try:
     from app import app, db
     from models import (User, TimeEntry, WorkConfig, SystemSettings, Team, Role, Project,
                        Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType,
-                       ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent, KanbanBoard,
-                       KanbanColumn, KanbanCard, WidgetType, UserDashboard, DashboardWidget,
-                       WidgetTemplate)
+                       ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent,
+                       WidgetType, UserDashboard, DashboardWidget, WidgetTemplate)
     from werkzeug.security import generate_password_hash
     FLASK_AVAILABLE = True
 except ImportError:
@@ -74,7 +73,6 @@ def run_all_migrations(db_path=None):
     migrate_work_config_data(db_path)
     migrate_task_system(db_path)
     migrate_system_events(db_path)
-    migrate_kanban_system(db_path)
     migrate_dashboard_system(db_path)
 
     if FLASK_AVAILABLE:
@@ -886,107 +884,6 @@ def create_all_tables(cursor):
     print("All tables created")
 
 
-def migrate_kanban_system(db_file=None):
-    """Migrate to add Kanban board system."""
-    db_path = get_db_path(db_file)
-
-    print(f"Migrating Kanban system in {db_path}...")
-
-    if not os.path.exists(db_path):
-        print(f"Database file {db_path} does not exist. Run basic migration first.")
-        return False
-
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    try:
-        # Check if kanban_board table already exists
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='kanban_board'")
-        if cursor.fetchone():
-            print("Kanban tables already exist. Skipping migration.")
-            return True
-
-        print("Creating Kanban board tables...")
-
-        # Create kanban_board table
-        cursor.execute("""
-        CREATE TABLE kanban_board (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name VARCHAR(100) NOT NULL,
-            description TEXT,
-            project_id INTEGER NOT NULL,
-            is_active BOOLEAN DEFAULT 1,
-            is_default BOOLEAN DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            created_by_id INTEGER NOT NULL,
-            FOREIGN KEY (project_id) REFERENCES project (id),
-            FOREIGN KEY (created_by_id) REFERENCES user (id),
-            UNIQUE(project_id, name)
-        )
-        """)
-
-        # Create kanban_column table
-        cursor.execute("""
-        CREATE TABLE kanban_column (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name VARCHAR(100) NOT NULL,
-            description TEXT,
-            position INTEGER NOT NULL,
-            color VARCHAR(7) DEFAULT '#6c757d',
-            wip_limit INTEGER,
-            is_active BOOLEAN DEFAULT 1,
-            board_id INTEGER NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (board_id) REFERENCES kanban_board (id),
-            UNIQUE(board_id, name)
-        )
-        """)
-
-        # Create kanban_card table
-        cursor.execute("""
-        CREATE TABLE kanban_card (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title VARCHAR(200) NOT NULL,
-            description TEXT,
-            position INTEGER NOT NULL,
-            color VARCHAR(7),
-            is_active BOOLEAN DEFAULT 1,
-            column_id INTEGER NOT NULL,
-            task_id INTEGER,
-            assigned_to_id INTEGER,
-            due_date DATE,
-            completed_date DATE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            created_by_id INTEGER NOT NULL,
-            FOREIGN KEY (column_id) REFERENCES kanban_column (id),
-            FOREIGN KEY (task_id) REFERENCES task (id),
-            FOREIGN KEY (assigned_to_id) REFERENCES user (id),
-            FOREIGN KEY (created_by_id) REFERENCES user (id)
-        )
-        """)
-
-        # Create indexes for better performance
-        cursor.execute("CREATE INDEX idx_kanban_board_project ON kanban_board(project_id)")
-        cursor.execute("CREATE INDEX idx_kanban_column_board ON kanban_column(board_id)")
-        cursor.execute("CREATE INDEX idx_kanban_card_column ON kanban_card(column_id)")
-        cursor.execute("CREATE INDEX idx_kanban_card_task ON kanban_card(task_id)")
-        cursor.execute("CREATE INDEX idx_kanban_card_assigned ON kanban_card(assigned_to_id)")
-
-        conn.commit()
-        print("Kanban system migration completed successfully!")
-        return True
-
-    except Exception as e:
-        print(f"Error during Kanban system migration: {e}")
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
-
 def migrate_dashboard_system(db_file=None):
     """Migrate to add Dashboard widget system."""
     db_path = get_db_path(db_file)
@@ -1091,7 +988,6 @@ def migrate_dashboard_system(db_file=None):
             # Task Management Widgets
             ('assigned_tasks', 'My Tasks', 'Tasks assigned to me', '✅', 2, 2, '{}', 'Team Member', 'Tasks'),
             ('task_priority', 'Priority Matrix', 'Tasks organized by priority', '🔥', 2, 2, '{}', 'Team Member', 'Tasks'),
-            ('kanban_summary', 'Kanban Overview', 'Summary of Kanban boards', '📋', 3, 1, '{}', 'Team Member', 'Tasks'),
             ('task_trends', 'Task Trends', 'Task completion trends', '📉', 2, 1, '{}', 'Team Member', 'Tasks'),
 
             # Analytics Widgets
@@ -1147,8 +1043,6 @@ def main():
                        help='Run only basic table migrations')
     parser.add_argument('--system-events', '-s', action='store_true',
                        help='Run only system events migration')
-    parser.add_argument('--kanban', '-k', action='store_true',
-                       help='Run only Kanban system migration')
     parser.add_argument('--dashboard', '--dash', action='store_true',
                        help='Run only dashboard system migration')
 
@@ -1183,8 +1077,6 @@ def main():
         elif args.system_events:
             migrate_system_events(db_path)
 
-        elif args.kanban:
-            migrate_kanban_system(db_path)
 
         elif args.dashboard:
             migrate_dashboard_system(db_path)

@@ -44,10 +44,18 @@
                 <!-- Date Range Filters -->
                 <div class="date-range-filters">
                     <label for="start-date-filter">From:</label>
-                    <input type="date" id="start-date-filter" class="filter-input">
+                    <div class="hybrid-date-input compact">
+                        <input type="date" id="start-date-filter-native" class="date-input-native">
+                        <input type="text" id="start-date-filter" class="date-input-formatted filter-input" placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
+                        <button type="button" class="calendar-picker-btn compact" onclick="openCalendarPicker('start-date-filter')" title="Open calendar">📅</button>
+                    </div>
                     
                     <label for="end-date-filter">To:</label>
-                    <input type="date" id="end-date-filter" class="filter-input">
+                    <div class="hybrid-date-input compact">
+                        <input type="date" id="end-date-filter-native" class="date-input-native">
+                        <input type="text" id="end-date-filter" class="date-input-formatted filter-input" placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
+                        <button type="button" class="calendar-picker-btn compact" onclick="openCalendarPicker('end-date-filter')" title="Open calendar">📅</button>
+                    </div>
                     
                     <select id="date-field-filter" class="filter-select">
                         <option value="created">Created Date</option>
@@ -93,9 +101,9 @@
         </div>
     </div>
 
-    <!-- Kanban Board -->
-    <div class="kanban-board" id="task-board">
-        <div class="kanban-column" data-status="NOT_STARTED">
+    <!-- Task Board -->
+    <div class="task-board" id="task-board">
+        <div class="task-column" data-status="NOT_STARTED">
             <div class="column-header">
                 <h3>📝 Not Started</h3>
                 <span class="task-count">0</span>
@@ -105,7 +113,7 @@
             </div>
         </div>
         
-        <div class="kanban-column" data-status="IN_PROGRESS">
+        <div class="task-column" data-status="IN_PROGRESS">
             <div class="column-header">
                 <h3>⚡ In Progress</h3>
                 <span class="task-count">0</span>
@@ -115,7 +123,7 @@
             </div>
         </div>
         
-        <div class="kanban-column" data-status="ON_HOLD">
+        <div class="task-column" data-status="ON_HOLD">
             <div class="column-header">
                 <h3>⏸️ On Hold</h3>
                 <span class="task-count">0</span>
@@ -125,7 +133,7 @@
             </div>
         </div>
         
-        <div class="kanban-column" data-status="COMPLETED">
+        <div class="task-column" data-status="COMPLETED">
             <div class="column-header">
                 <h3>✅ Completed</h3>
                 <span class="task-count">0</span>
@@ -217,11 +225,12 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="task-due-date">Due Date</label>
-                        <input type="date" id="task-due-date">
-                    </div>
-                    <div class="form-group">
-                        <label for="task-estimated-hours">Estimated Hours</label>
-                        <input type="number" id="task-estimated-hours" min="0" step="0.5">
+                        <div class="hybrid-date-input">
+                            <input type="date" id="task-due-date-native" class="date-input-native">
+                            <input type="text" id="task-due-date" class="date-input-formatted" placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
+                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('task-due-date')" title="Open calendar">📅</button>
+                        </div>
+                        <div class="date-error" id="task-due-date-error" style="display: none; color: #dc3545; font-size: 0.8rem; margin-top: 0.25rem;"></div>
                     </div>
                 </div>
                 
@@ -293,14 +302,77 @@
     white-space: nowrap;
 }
 
-.kanban-board {
+/* Hybrid Date Input Styles */
+.hybrid-date-input {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.hybrid-date-input.compact {
+    display: inline-flex;
+}
+
+.date-input-native {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: calc(100% - 35px); /* Leave space for calendar button */
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+    pointer-events: auto;
+}
+
+.date-input-formatted {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+    position: relative;
+    z-index: 2;
+}
+
+.calendar-picker-btn {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.5rem;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+    z-index: 3;
+    position: relative;
+}
+
+.calendar-picker-btn:hover {
+    background: #e9ecef;
+}
+
+.calendar-picker-btn.compact {
+    padding: 0.375rem 0.5rem;
+    font-size: 12px;
+}
+
+.hybrid-date-input.compact .date-input-formatted {
+    padding: 0.375rem;
+    font-size: 12px;
+    width: 100px;
+    flex: none;
+}
+
+.task-board {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 1rem;
     margin-bottom: 2rem;
 }
 
-.kanban-column {
+.task-column {
     background: #f8f9fa;
     border-radius: 8px;
     padding: 1rem;
@@ -431,7 +503,7 @@
 }
 
 @media (max-width: 768px) {
-    .kanban-board {
+    .task-board {
         grid-template-columns: 1fr;
     }
 }
@@ -441,6 +513,179 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
 <script>
+// User preferences for date formatting
+const USER_DATE_FORMAT = '{{ g.user.preferences.date_format if g.user.preferences else "ISO" }}';
+
+// Date formatting utility function
+function formatUserDate(dateString) {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    
+    switch (USER_DATE_FORMAT) {
+        case 'US':
+            return date.toLocaleDateString('en-US'); // MM/DD/YYYY
+        case 'EU':
+        case 'UK':
+            return date.toLocaleDateString('en-GB'); // DD/MM/YYYY
+        case 'Readable':
+            return date.toLocaleDateString('en-US', { 
+                weekday: 'short', 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            }); // Mon, Dec 25, 2024
+        case 'ISO':
+        default:
+            return date.toISOString().split('T')[0]; // YYYY-MM-DD
+    }
+}
+
+// Date input formatting function - formats ISO date for user input
+function formatDateForInput(isoDateString) {
+    if (!isoDateString) return '';
+    
+    const date = new Date(isoDateString);
+    if (isNaN(date.getTime())) return '';
+    
+    return formatUserDate(isoDateString);
+}
+
+// Date parsing function - converts user-formatted date to ISO format
+function parseUserDate(dateString) {
+    if (!dateString || dateString.trim() === '') return null;
+    
+    const trimmed = dateString.trim();
+    let date;
+    
+    switch (USER_DATE_FORMAT) {
+        case 'US': // MM/DD/YYYY
+            const usParts = trimmed.split('/');
+            if (usParts.length === 3) {
+                const month = parseInt(usParts[0], 10);
+                const day = parseInt(usParts[1], 10);
+                const year = parseInt(usParts[2], 10);
+                if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year > 1900) {
+                    date = new Date(year, month - 1, day);
+                }
+            }
+            break;
+            
+        case 'EU':
+        case 'UK': // DD/MM/YYYY
+            const euParts = trimmed.split('/');
+            if (euParts.length === 3) {
+                const day = parseInt(euParts[0], 10);
+                const month = parseInt(euParts[1], 10);
+                const year = parseInt(euParts[2], 10);
+                if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year > 1900) {
+                    date = new Date(year, month - 1, day);
+                }
+            }
+            break;
+            
+        case 'Readable': // Mon, Dec 25, 2024
+            date = new Date(trimmed);
+            break;
+            
+        case 'ISO': // YYYY-MM-DD
+        default:
+            if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+                date = new Date(trimmed);
+            }
+            break;
+    }
+    
+    if (!date || isNaN(date.getTime())) {
+        return null;
+    }
+    
+    return date.toISOString().split('T')[0];
+}
+
+// Date validation function
+function validateDateInput(inputElement, errorElement) {
+    const value = inputElement.value.trim();
+    if (!value) {
+        errorElement.style.display = 'none';
+        return true;
+    }
+    
+    const parsedDate = parseUserDate(value);
+    if (!parsedDate) {
+        let expectedFormat;
+        switch (USER_DATE_FORMAT) {
+            case 'US': expectedFormat = 'MM/DD/YYYY'; break;
+            case 'EU':
+            case 'UK': expectedFormat = 'DD/MM/YYYY'; break;
+            case 'Readable': expectedFormat = 'Mon, Dec 25, 2024'; break;
+            case 'ISO':
+            default: expectedFormat = 'YYYY-MM-DD'; break;
+        }
+        errorElement.textContent = `Invalid date format. Expected: ${expectedFormat}`;
+        errorElement.style.display = 'block';
+        return false;
+    }
+    
+    errorElement.style.display = 'none';
+    return true;
+}
+
+// Hybrid Date Input Functions
+function setupHybridDateInput(inputId) {
+    const formattedInput = document.getElementById(inputId);
+    const nativeInput = document.getElementById(inputId + '-native');
+    
+    if (!formattedInput || !nativeInput) return;
+    
+    // Sync from native input to formatted input
+    nativeInput.addEventListener('change', function() {
+        if (this.value) {
+            formattedInput.value = formatDateForInput(this.value);
+            // Trigger change event on formatted input
+            formattedInput.dispatchEvent(new Event('change'));
+        }
+    });
+    
+    // Sync from formatted input to native input
+    formattedInput.addEventListener('change', function() {
+        const isoDate = parseUserDate(this.value);
+        if (isoDate) {
+            nativeInput.value = isoDate;
+        } else {
+            nativeInput.value = '';
+        }
+    });
+    
+    // Clear both inputs when formatted input is cleared
+    formattedInput.addEventListener('input', function() {
+        if (this.value === '') {
+            nativeInput.value = '';
+        }
+    });
+}
+
+function openCalendarPicker(inputId) {
+    const nativeInput = document.getElementById(inputId + '-native');
+    if (nativeInput) {
+        nativeInput.focus();
+        
+        // Try showPicker() first for modern browsers
+        if (nativeInput.showPicker) {
+            try {
+                nativeInput.showPicker();
+            } catch (e) {
+                // Fallback to click if showPicker fails
+                nativeInput.click();
+            }
+        } else {
+            // Fallback for older browsers
+            nativeInput.click();
+        }
+    }
+}
+
 // Task Management Controller
 class UnifiedTaskManager {
     constructor() {
@@ -457,6 +702,7 @@ class UnifiedTaskManager {
         };
         this.currentTask = null;
         this.sortableInstances = [];
+        this.currentUserId = {{ g.user.id|tojson }};
     }
 
     async init() {
@@ -492,12 +738,12 @@ class UnifiedTaskManager {
 
         // Date range filters
         document.getElementById('start-date-filter').addEventListener('change', () => {
-            this.filters.startDate = document.getElementById('start-date-filter').value;
+            this.filters.startDate = parseUserDate(document.getElementById('start-date-filter').value) || '';
             this.applyFilters();
         });
 
         document.getElementById('end-date-filter').addEventListener('change', () => {
-            this.filters.endDate = document.getElementById('end-date-filter').value;
+            this.filters.endDate = parseUserDate(document.getElementById('end-date-filter').value) || '';
             this.applyFilters();
         });
 
@@ -520,6 +766,18 @@ class UnifiedTaskManager {
         document.getElementById('refresh-tasks').addEventListener('click', () => {
             this.loadTasks();
         });
+        
+        // Date validation
+        document.getElementById('task-due-date').addEventListener('blur', () => {
+            const input = document.getElementById('task-due-date');
+            const error = document.getElementById('task-due-date-error');
+            validateDateInput(input, error);
+        });
+        
+        // Setup hybrid date inputs
+        setupHybridDateInput('task-due-date');
+        setupHybridDateInput('start-date-filter');
+        setupHybridDateInput('end-date-filter');
     }
 
     setupSortable() {
@@ -638,7 +896,7 @@ class UnifiedTaskManager {
     getFilteredTasks() {
         return this.tasks.filter(task => {
             // View filter
-            if (this.currentView === 'personal' && task.assigned_to_id !== {{ g.user.id }}) {
+            if (this.currentView === 'personal' && task.assigned_to_id !== this.currentUserId) {
                 return false;
             }
             if (this.currentView === 'team' && !task.is_team_task) {
@@ -732,7 +990,7 @@ class UnifiedTaskManager {
             ${task.project_name ? `<div class="task-project">${task.project_code} - ${task.project_name}</div>` : ''}
             <div class="task-meta">
                 <span class="task-assignee">${task.assigned_to_name || 'Unassigned'}</span>
-                ${dueDate ? `<span class="task-due-date ${isOverdue ? 'overdue' : ''}">${dueDate.toLocaleDateString()}</span>` : ''}
+                ${dueDate ? `<span class="task-due-date ${isOverdue ? 'overdue' : ''}">${formatUserDate(task.due_date)}</span>` : ''}
             </div>
         `;
 
@@ -801,7 +1059,7 @@ class UnifiedTaskManager {
             document.getElementById('task-priority').value = task.priority;
             document.getElementById('task-project').value = task.project_id || '';
             document.getElementById('task-assignee').value = task.assigned_to_id || '';
-            document.getElementById('task-due-date').value = task.due_date || '';
+            document.getElementById('task-due-date').value = formatDateForInput(task.due_date) || '';
             document.getElementById('task-estimated-hours').value = task.estimated_hours || '';
             document.getElementById('task-status').value = task.status;
             document.getElementById('delete-task-btn').style.display = 'inline-block';
@@ -816,13 +1074,22 @@ class UnifiedTaskManager {
     }
 
     async saveTask() {
+        // Validate date input before saving
+        const dueDateInput = document.getElementById('task-due-date');
+        const dueDateError = document.getElementById('task-due-date-error');
+        
+        if (!validateDateInput(dueDateInput, dueDateError)) {
+            dueDateInput.focus();
+            return;
+        }
+        
         const taskData = {
             name: document.getElementById('task-name').value,
             description: document.getElementById('task-description').value,
             priority: document.getElementById('task-priority').value,
             project_id: document.getElementById('task-project').value || null,
             assigned_to_id: document.getElementById('task-assignee').value || null,
-            due_date: document.getElementById('task-due-date').value || null,
+            due_date: parseUserDate(document.getElementById('task-due-date').value) || null,
             estimated_hours: document.getElementById('task-estimated-hours').value || null,
             status: document.getElementById('task-status').value
         };

@@ -2041,61 +2041,6 @@ input[type="time"]::-webkit-datetime-edit {
     gap: 0.5rem;
 }
 
-/* Kanban Common Styles */
-.kanban-container {
-    padding: 1rem;
-}
-
-.kanban-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid #dee2e6;
-}
-
-.kanban-board {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-
-.kanban-column {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 1rem;
-    min-height: 500px;
-}
-
-.column-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid #ddd;
-}
-
-.column-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    color: #333;
-}
-
-.column-content {
-    min-height: 400px;
-    padding: 0.5rem 0;
-}
-
-.task-count {
-    background: #007bff;
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.8rem;
-}
 
 /* Card Components - Enhanced */
 .card {
@@ -2315,9 +2260,6 @@ input[type="time"]::-webkit-datetime-edit {
         grid-template-columns: repeat(2, 1fr);
     }
     
-    .kanban-board {
-        grid-template-columns: repeat(2, 1fr);
-    }
 }
 
 @media (max-width: 768px) {
@@ -2339,9 +2281,6 @@ input[type="time"]::-webkit-datetime-edit {
         grid-template-columns: 1fr;
     }
     
-    .kanban-board {
-        grid-template-columns: 1fr;
-    }
     
     .filter-row {
         flex-direction: column;
