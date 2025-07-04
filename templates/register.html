@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="auth-container">
-    <h1>Register for TimeTrack</h1>
+    <h1>Register for {{ g.branding.app_name }}</h1>
     <p class="text-muted">Join your company team</p>
     
     {% with messages = get_flashed_messages(with_categories=true) %}

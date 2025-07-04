@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent, BrandingSettings
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data
@@ -40,7 +40,7 @@ app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT') or 587)
 app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'your-email@example.com')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'your-password')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'TimeTrack <noreply@timetrack.com>')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'TimeTrack <noreply@timetrack.com>')  # Will be overridden by branding in mail sending functions
 
 # Log mail configuration (without password)
 logger.info(f"Mail server: {app.config['MAIL_SERVER']}")
@@ -396,6 +396,9 @@ def load_logged_in_user():
                     return redirect(url_for('login'))
         else:
             g.company = None
+    
+    # Load branding settings for all requests
+    g.branding = BrandingSettings.get_current()
 
 @app.route('/')
 def home():
@@ -621,19 +624,19 @@ def register():
                 else:
                     # Send verification email for regular users when verification is required
                     verification_url = url_for('verify_email', token=token, _external=True)
-                    msg = Message('Verify your TimeTrack account', recipients=[email])
+                    msg = Message(f'Verify your {g.branding.app_name} account', recipients=[email])
                     msg.body = f'''Hello {username},
 
-Thank you for registering with TimeTrack. To complete your registration, please click on the link below:
+Thank you for registering with {g.branding.app_name}. To complete your registration, please click on the link below:
 
 {verification_url}
 
 This link will expire in 24 hours.
 
-If you did not register for TimeTrack, please ignore this email.
+If you did not register for {g.branding.app_name}, please ignore this email.
 
 Best regards,
-The TimeTrack Team
+The {g.branding.app_name} Team
 '''
                     mail.send(msg)
                     logger.info(f"Verification email sent to {email}")
@@ -994,17 +997,17 @@ def create_user():
                 # Generate verification token and send email
                 token = new_user.generate_verification_token()
                 verification_url = url_for('verify_email', token=token, _external=True)
-                msg = Message('Verify your TimeTrack account', recipients=[email])
+                msg = Message(f'Verify your {g.branding.app_name} account', recipients=[email])
                 msg.body = f'''Hello {username},
 
-An administrator has created an account for you on TimeTrack. To activate your account, please click on the link below:
+An administrator has created an account for you on {g.branding.app_name}. To activate your account, please click on the link below:
 
 {verification_url}
 
 This link will expire in 24 hours.
 
 Best regards,
-The TimeTrack Team
+The {g.branding.app_name} Team
 '''
                 mail.send(msg)
 
@@ -1177,7 +1180,7 @@ def setup_2fa():
     import io
     import base64
 
-    qr_uri = g.user.get_2fa_uri()
+    qr_uri = g.user.get_2fa_uri(issuer_name=g.branding.app_name)
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
     qr.add_data(qr_uri)
     qr.make(fit=True)
@@ -2107,6 +2110,60 @@ def system_admin_settings():
                          total_companies=total_companies,
                          total_users=total_users,
                          total_system_admins=total_system_admins)
+
+@app.route('/system-admin/branding', methods=['GET', 'POST'])
+@system_admin_required
+def system_admin_branding():
+    """System Admin: Branding settings"""
+    if request.method == 'POST':
+        branding = BrandingSettings.get_current()
+        
+        # Handle form data
+        branding.app_name = request.form.get('app_name', g.branding.app_name).strip()
+        branding.logo_alt_text = request.form.get('logo_alt_text', '').strip()
+        branding.primary_color = request.form.get('primary_color', '#007bff').strip()
+        branding.updated_by_id = g.user.id
+        
+        # Handle logo upload
+        if 'logo_file' in request.files:
+            logo_file = request.files['logo_file']
+            if logo_file and logo_file.filename:
+                # Create uploads directory if it doesn't exist
+                upload_dir = os.path.join(app.static_folder, 'uploads', 'branding')
+                os.makedirs(upload_dir, exist_ok=True)
+                
+                # Save the file with a timestamp to avoid conflicts
+                import time
+                filename = f"logo_{int(time.time())}_{logo_file.filename}"
+                logo_path = os.path.join(upload_dir, filename)
+                logo_file.save(logo_path)
+                branding.logo_filename = filename
+        
+        # Handle favicon upload
+        if 'favicon_file' in request.files:
+            favicon_file = request.files['favicon_file']
+            if favicon_file and favicon_file.filename:
+                # Create uploads directory if it doesn't exist
+                upload_dir = os.path.join(app.static_folder, 'uploads', 'branding')
+                os.makedirs(upload_dir, exist_ok=True)
+                
+                # Save the file with a timestamp to avoid conflicts
+                import time
+                filename = f"favicon_{int(time.time())}_{favicon_file.filename}"
+                favicon_path = os.path.join(upload_dir, filename)
+                favicon_file.save(favicon_path)
+                branding.favicon_filename = filename
+        
+        db.session.commit()
+        flash('Branding settings updated successfully.', 'success')
+        return redirect(url_for('system_admin_branding'))
+    
+    # Get current branding settings
+    branding = BrandingSettings.get_current()
+    
+    return render_template('system_admin_branding.html',
+                         title='System Administrator - Branding Settings',
+                         branding=branding)
 
 @app.route('/system-admin/health')
 @system_admin_required  

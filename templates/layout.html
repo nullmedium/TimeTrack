@@ -3,14 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - TimeTrack{% if g.company %} - {{ g.company.name }}{% endif %}</title>
+    <title>{{ title }} - {{ g.branding.app_name }}{% if g.company %} - {{ g.company.name }}{% endif %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% if g.branding.favicon_filename %}
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/branding/' + g.branding.favicon_filename) }}">
+    {% endif %}
+    <style>
+        :root {
+            --primary-color: {{ g.branding.primary_color }};
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .btn-primary:hover {
+            background-color: {{ g.branding.primary_color }}dd;
+            border-color: {{ g.branding.primary_color }}dd;
+        }
+        .nav-icon {
+            color: var(--primary-color);
+        }
+        a:hover {
+            color: var(--primary-color);
+        }
+        .mobile-logo {
+            max-height: 30px;
+            max-width: 150px;
+            object-fit: contain;
+        }
+        .sidebar-logo {
+            max-height: 32px;
+            max-width: 160px;
+            object-fit: contain;
+        }
+        .mobile-nav-brand a {
+            display: flex;
+            align-items: center;
+        }
+        .sidebar-header h2 a {
+            display: flex;
+            align-items: center;
+            color: inherit;
+            text-decoration: none;
+        }
+    </style>
 </head>
 <body>
     <!-- Mobile header -->
     <header class="mobile-header">
         <div class="mobile-nav-brand">
-            <a href="{{ url_for('home') }}">TimeTrack</a>
+            <a href="{{ url_for('home') }}">
+                {% if g.branding.logo_filename %}
+                    <img src="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename) }}" 
+                         alt="{{ g.branding.logo_alt_text }}" 
+                         class="mobile-logo">
+                {% else %}
+                    {{ g.branding.app_name }}
+                {% endif %}
+            </a>
             {% if g.company %}
                 <small class="company-name">{{ g.company.name }}</small>
             {% endif %}
@@ -25,7 +75,17 @@
     <!-- Sidebar navigation -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h2><a href="{{ url_for('home') }}">TimeTrack</a></h2>
+            <h2>
+                <a href="{{ url_for('home') }}">
+                    {% if g.branding.logo_filename %}
+                        <img src="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename) }}" 
+                             alt="{{ g.branding.logo_alt_text }}" 
+                             class="sidebar-logo">
+                    {% else %}
+                        {{ g.branding.app_name }}
+                    {% endif %}
+                </a>
+            </h2>
             {% if g.company %}
                 <div class="company-info">
                     <small class="text-muted">{{ g.company.name }}</small>
@@ -127,7 +187,7 @@
     </main>
 
     <footer>
-        <p>&copy; {{ current_year }} TimeTrack. All rights reserved.</p>
+        <p>&copy; {{ current_year }} {{ g.branding.app_name }}. All rights reserved.</p>
     </footer>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>

@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="auth-container">
-    <h1>Login to TimeTrack</h1>
+    <h1>Login to {{ g.branding.app_name }}</h1>
     
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
