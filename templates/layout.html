@@ -58,6 +58,7 @@
                     {% if g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">System Admin</li>
                     <li><a href="{{ url_for('system_admin_dashboard') }}" data-tooltip="System Dashboard"><i class="nav-icon">🌐</i><span class="nav-text">System Dashboard</span></a></li>
+                    <li><a href="{{ url_for('system_admin_announcements') }}" data-tooltip="Announcements"><i class="nav-icon">📢</i><span class="nav-text">Announcements</span></a></li>
                     {% endif %}
                     {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
                     <li class="nav-divider">{{ g.user.username }}</li>
@@ -88,6 +89,30 @@
     <div class="mobile-overlay" id="mobile-overlay"></div>
 
     <main class="main-content">
+        <!-- System Announcements -->
+        {% if active_announcements %}
+            <div class="announcements">
+                {% for announcement in active_announcements %}
+                    <div class="alert alert-{{ announcement.announcement_type }}{% if announcement.is_urgent %} alert-urgent{% endif %}">
+                        <div class="announcement-header">
+                            <strong>{{ announcement.title }}</strong>
+                            {% if announcement.is_urgent %}
+                                <span class="urgent-badge">URGENT</span>
+                            {% endif %}
+                        </div>
+                        <div class="announcement-content">
+                            {{ announcement.content|safe }}
+                        </div>
+                        {% if announcement.created_at %}
+                            <small class="announcement-date">
+                                Posted: {{ announcement.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            </small>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="flash-messages">
@@ -107,5 +132,10 @@
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+    
+    <!-- Custom Tracking Script -->
+    {% if tracking_script_enabled and tracking_script_code %}
+        {{ tracking_script_code|safe }}
+    {% endif %}
 </body>
 </html>

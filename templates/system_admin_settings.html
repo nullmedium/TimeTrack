@@ -69,6 +69,43 @@
                 </div>
             </div>
 
+            <div class="setting-group">
+                <div class="setting-header">
+                    <h4>Tracking Script</h4>
+                    <p>Enable custom tracking script (e.g., Google Analytics)</p>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="tracking_script_enabled" 
+                               {% if settings.get('tracking_script_enabled', False) %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-text">Enable tracking script</span>
+                    </label>
+                    <small class="setting-description">
+                        When enabled, the custom tracking script will be included on all pages. 
+                        Use this for analytics tracking, monitoring, or other custom JavaScript.
+                    </small>
+                </div>
+            </div>
+
+            <div class="setting-group full-width">
+                <div class="setting-header">
+                    <h4>Tracking Script Code</h4>
+                    <p>Enter your tracking script code (HTML/JavaScript)</p>
+                </div>
+                <div class="setting-control">
+                    <textarea name="tracking_script_code" 
+                              class="form-control code-textarea"
+                              rows="8"
+                              placeholder="<!-- Paste your tracking script here (e.g., Google Analytics, custom JavaScript) -->"
+                    >{{ settings.get('tracking_script_code', '') }}</textarea>
+                    <small class="setting-description">
+                        This code will be inserted at the bottom of every page before the closing &lt;/body&gt; tag.
+                        Common use cases: Google Analytics, Facebook Pixel, custom JavaScript, monitoring scripts.
+                    </small>
+                </div>
+            </div>
+
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Save Settings</button>
                 <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
@@ -233,6 +270,27 @@
     padding: 1.5rem;
     border: 1px solid #e9ecef;
     border-radius: 8px;
+}
+
+.setting-group.full-width {
+    grid-template-columns: 1fr;
+}
+
+.code-textarea {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    background: #f8f9fa;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 0.75rem;
+    resize: vertical;
+    min-height: 120px;
+}
+
+.form-control {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .setting-header h4 {

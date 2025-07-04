@@ -1,0 +1,165 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="content-header">
+    <div class="header-row">
+        <h1>System Announcements</h1>
+        <a href="{{ url_for('system_admin_announcement_new') }}" class="btn btn-primary">
+            <i class="icon">➕</i> New Announcement
+        </a>
+    </div>
+</div>
+
+<div class="content-body">
+    {% if announcements.items %}
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Target</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for announcement in announcements.items %}
+                    <tr class="{% if not announcement.is_active %}inactive{% endif %}">
+                        <td>
+                            <strong>{{ announcement.title }}</strong>
+                            {% if announcement.is_urgent %}
+                                <span class="badge badge-danger">URGENT</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge badge-{{ announcement.announcement_type }}">
+                                {{ announcement.announcement_type.title() }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if announcement.is_active %}
+                                {% if announcement.is_visible_now() %}
+                                    <span class="badge badge-success">Active</span>
+                                {% else %}
+                                    <span class="badge badge-warning">Scheduled</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge badge-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if announcement.start_date %}
+                                {{ announcement.start_date.strftime('%Y-%m-%d %H:%M') }}
+                            {% else %}
+                                <em>Immediate</em>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if announcement.end_date %}
+                                {{ announcement.end_date.strftime('%Y-%m-%d %H:%M') }}
+                            {% else %}
+                                <em>No expiry</em>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if announcement.target_all_users %}
+                                All Users
+                            {% else %}
+                                <span class="text-muted">Targeted</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ announcement.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{{ url_for('system_admin_announcement_edit', id=announcement.id) }}" 
+                                   class="btn btn-sm btn-outline-primary" title="Edit">
+                                    ✏️
+                                </a>
+                                <form method="POST" action="{{ url_for('system_admin_announcement_delete', id=announcement.id) }}" 
+                                      style="display: inline-block;" 
+                                      onsubmit="return confirm('Are you sure you want to delete this announcement?')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        🗑️
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if announcements.pages > 1 %}
+        <div class="pagination-container">
+            <div class="pagination">
+                {% if announcements.has_prev %}
+                    <a href="{{ url_for('system_admin_announcements', page=announcements.prev_num) }}" class="page-link">« Previous</a>
+                {% endif %}
+                
+                {% for page_num in announcements.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != announcements.page %}
+                            <a href="{{ url_for('system_admin_announcements', page=page_num) }}" class="page-link">{{ page_num }}</a>
+                        {% else %}
+                            <span class="page-link current">{{ page_num }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="page-link">…</span>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if announcements.has_next %}
+                    <a href="{{ url_for('system_admin_announcements', page=announcements.next_num) }}" class="page-link">Next »</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+    {% else %}
+        <div class="empty-state">
+            <h3>No announcements found</h3>
+            <p>Create your first announcement to communicate with users.</p>
+            <a href="{{ url_for('system_admin_announcement_new') }}" class="btn btn-primary">
+                Create Announcement
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.inactive {
+    opacity: 0.6;
+}
+
+.badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.badge-info { background: #17a2b8; color: white; }
+.badge-warning { background: #ffc107; color: #212529; }
+.badge-success { background: #28a745; color: white; }
+.badge-danger { background: #dc3545; color: white; }
+.badge-secondary { background: #6c757d; color: white; }
+
+.action-buttons {
+    display: flex;
+    gap: 5px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,369 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="header-section">
+        <h1>{{ "Edit" if announcement else "Create" }} Announcement</h1>
+        <p class="subtitle">{{ "Update" if announcement else "Create new" }} system announcement for users</p>
+        <a href="{{ url_for('system_admin_announcements') }}" class="btn btn-secondary">
+            ← Back to Announcements
+        </a>
+    </div>
+
+    <div class="form-section">
+        <form method="POST" class="announcement-form">
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" 
+                       id="title" 
+                       name="title" 
+                       value="{{ announcement.title if announcement else '' }}" 
+                       required 
+                       maxlength="200"
+                       class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="content">Content</label>
+                <textarea id="content" 
+                          name="content" 
+                          required 
+                          rows="6"
+                          class="form-control">{{ announcement.content if announcement else '' }}</textarea>
+                <small class="form-text">You can use HTML formatting in the content.</small>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="announcement_type">Type</label>
+                    <select id="announcement_type" name="announcement_type" class="form-control">
+                        <option value="info" {{ 'selected' if announcement and announcement.announcement_type == 'info' else '' }}>Info</option>
+                        <option value="warning" {{ 'selected' if announcement and announcement.announcement_type == 'warning' else '' }}>Warning</option>
+                        <option value="success" {{ 'selected' if announcement and announcement.announcement_type == 'success' else '' }}>Success</option>
+                        <option value="danger" {{ 'selected' if announcement and announcement.announcement_type == 'danger' else '' }}>Danger</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" 
+                               name="is_urgent" 
+                               {{ 'checked' if announcement and announcement.is_urgent else '' }}>
+                        <span class="checkmark"></span>
+                        Mark as Urgent
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" 
+                               name="is_active" 
+                               {{ 'checked' if not announcement or announcement.is_active else '' }}>
+                        <span class="checkmark"></span>
+                        Active
+                    </label>
+                </div>
+            </div>
+
+        <div class="form-section">
+            <h3>Scheduling</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="start_date">Start Date/Time (Optional)</label>
+                    <input type="datetime-local" 
+                           id="start_date" 
+                           name="start_date" 
+                           value="{{ announcement.start_date.strftime('%Y-%m-%dT%H:%M') if announcement and announcement.start_date else '' }}"
+                           class="form-control">
+                    <small class="form-text">Leave empty to show immediately</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="end_date">End Date/Time (Optional)</label>
+                    <input type="datetime-local" 
+                           id="end_date" 
+                           name="end_date" 
+                           value="{{ announcement.end_date.strftime('%Y-%m-%dT%H:%M') if announcement and announcement.end_date else '' }}"
+                           class="form-control">
+                    <small class="form-text">Leave empty for no expiry</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Targeting</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" 
+                               name="target_all_users" 
+                               id="target_all_users"
+                               {{ 'checked' if not announcement or announcement.target_all_users else '' }}
+                               onchange="toggleTargeting()">
+                        <span class="checkmark"></span>
+                        Target All Users
+                    </label>
+                </div>
+            </div>
+
+            <div id="targeting_options" style="display: {{ 'none' if not announcement or announcement.target_all_users else 'block' }};">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Target Roles</label>
+                        <div class="checkbox-list">
+                            {% set selected_roles = [] %}
+                            {% if announcement and announcement.target_roles %}
+                                {% set selected_roles = announcement.target_roles|from_json %}
+                            {% endif %}
+                            {% for role in roles %}
+                            <label class="checkbox-container">
+                                <input type="checkbox" 
+                                       name="target_roles" 
+                                       value="{{ role }}"
+                                       {{ 'checked' if role in selected_roles else '' }}>
+                                <span class="checkmark"></span>
+                                {{ role }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Target Companies</label>
+                        <div class="checkbox-list">
+                            {% set selected_companies = [] %}
+                            {% if announcement and announcement.target_companies %}
+                                {% set selected_companies = announcement.target_companies|from_json %}
+                            {% endif %}
+                            {% for company in companies %}
+                            <label class="checkbox-container">
+                                <input type="checkbox" 
+                                       name="target_companies" 
+                                       value="{{ company.id }}"
+                                       {{ 'checked' if company.id in selected_companies else '' }}>
+                                <span class="checkmark"></span>
+                                {{ company.name }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    {{ "Update" if announcement else "Create" }} Announcement
+                </button>
+                <a href="{{ url_for('system_admin_announcements') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function toggleTargeting() {
+    const targetAllUsers = document.getElementById('target_all_users');
+    const targetingOptions = document.getElementById('targeting_options');
+    
+    if (targetAllUsers.checked) {
+        targetingOptions.style.display = 'none';
+    } else {
+        targetingOptions.style.display = 'block';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleTargeting();
+});
+</script>
+
+<style>
+.header-section {
+    margin-bottom: 2rem;
+}
+
+.subtitle {
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.form-section {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.announcement-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-section h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #495057;
+    font-size: 1.2rem;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 0.5rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #495057;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.form-text {
+    display: block;
+    margin-top: 0.25rem;
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.checkbox-container {
+    display: block;
+    position: relative;
+    padding-left: 35px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    font-size: 16px;
+    user-select: none;
+}
+
+.checkbox-container input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.checkmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 25px;
+    width: 25px;
+    background-color: #eee;
+    border-radius: 4px;
+}
+
+.checkbox-container:hover input ~ .checkmark {
+    background-color: #ccc;
+}
+
+.checkbox-container input:checked ~ .checkmark {
+    background-color: #2196F3;
+}
+
+.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+    display: block;
+}
+
+.checkbox-container .checkmark:after {
+    left: 9px;
+    top: 5px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 3px 3px 0;
+    transform: rotate(45deg);
+}
+
+.checkbox-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    text-align: center;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .checkbox-list {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

@@ -15,7 +15,7 @@ try:
     from app import app, db
     from models import (User, TimeEntry, WorkConfig, SystemSettings, Team, Role, Project, 
                        Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, 
-                       ProjectCategory, Task, SubTask, TaskStatus, TaskPriority)
+                       ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement)
     from werkzeug.security import generate_password_hash
     FLASK_AVAILABLE = True
 except ImportError:
@@ -269,6 +269,30 @@ def create_missing_tables(cursor):
             is_active BOOLEAN DEFAULT 1,
             max_users INTEGER DEFAULT 100,
             UNIQUE(name)
+        )
+        """)
+    
+    # Announcement table
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='announcement'")
+    if not cursor.fetchone():
+        print("Creating announcement table...")
+        cursor.execute("""
+        CREATE TABLE announcement (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title VARCHAR(200) NOT NULL,
+            content TEXT NOT NULL,
+            is_active BOOLEAN DEFAULT 1,
+            is_urgent BOOLEAN DEFAULT 0,
+            announcement_type VARCHAR(20) DEFAULT 'info',
+            start_date TIMESTAMP,
+            end_date TIMESTAMP,
+            target_all_users BOOLEAN DEFAULT 1,
+            target_roles TEXT,
+            target_companies TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_by_id INTEGER NOT NULL,
+            FOREIGN KEY (created_by_id) REFERENCES user (id)
         )
         """)
 
@@ -716,6 +740,32 @@ def init_system_settings():
         db.session.add(email_verification_setting)
         db.session.commit()
         print("Email verification setting initialized to enabled")
+    
+    # Check if tracking_script_enabled setting exists
+    tracking_script_setting = SystemSettings.query.filter_by(key='tracking_script_enabled').first()
+    if not tracking_script_setting:
+        print("Adding tracking_script_enabled system setting...")
+        tracking_script_setting = SystemSettings(
+            key='tracking_script_enabled',
+            value='false',
+            description='Controls whether custom tracking script is enabled'
+        )
+        db.session.add(tracking_script_setting)
+        db.session.commit()
+        print("Tracking script setting initialized to disabled")
+    
+    # Check if tracking_script_code setting exists
+    tracking_script_code_setting = SystemSettings.query.filter_by(key='tracking_script_code').first()
+    if not tracking_script_code_setting:
+        print("Adding tracking_script_code system setting...")
+        tracking_script_code_setting = SystemSettings(
+            key='tracking_script_code',
+            value='',
+            description='Custom tracking script code (HTML/JavaScript)'
+        )
+        db.session.add(tracking_script_code_setting)
+        db.session.commit()
+        print("Tracking script code setting initialized")
 
 
 def create_new_database(db_path):
