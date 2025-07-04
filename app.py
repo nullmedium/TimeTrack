@@ -1357,8 +1357,8 @@ def leave(entry_id):
 
     return jsonify({
         'id': entry.id,
-        'arrival_time': entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S'),
-        'departure_time': entry.departure_time.strftime('%Y-%m-%d %H:%M:%S'),
+        'arrival_time': entry.arrival_time.isoformat(),
+        'departure_time': entry.departure_time.isoformat(),
         'duration': entry.duration,
         'total_break_duration': entry.total_break_duration,
         'effective_break_duration': effective_break
@@ -1448,16 +1448,24 @@ def delete_entry(entry_id):
 def update_entry(entry_id):
     entry = TimeEntry.query.filter_by(id=entry_id, user_id=session['user_id']).first_or_404()
     data = request.json
+    
+    if not data:
+        return jsonify({'success': False, 'message': 'No JSON data provided'}), 400
 
     if 'arrival_time' in data:
         try:
-            entry.arrival_time = datetime.strptime(data['arrival_time'], '%Y-%m-%d %H:%M:%S')
-        except ValueError:
-            return jsonify({'success': False, 'message': 'Invalid arrival time format'}), 400
+            # Accept only ISO 8601 format
+            arrival_time_str = data['arrival_time']
+            entry.arrival_time = datetime.fromisoformat(arrival_time_str.replace('Z', '+00:00'))
+        except (ValueError, AttributeError) as e:
+            return jsonify({'success': False, 'message': f'Invalid arrival time format. Expected ISO 8601: {arrival_time_str}'}), 400
 
     if 'departure_time' in data and data['departure_time']:
         try:
-            entry.departure_time = datetime.strptime(data['departure_time'], '%Y-%m-%d %H:%M:%S')
+            # Accept only ISO 8601 format
+            departure_time_str = data['departure_time']
+            entry.departure_time = datetime.fromisoformat(departure_time_str.replace('Z', '+00:00'))
+            
             # Recalculate duration if both times are present
             if entry.arrival_time and entry.departure_time:
                 # Calculate work duration considering breaks
@@ -1467,8 +1475,8 @@ def update_entry(entry_id):
                     entry.total_break_duration,
                     g.user
                 )
-        except ValueError:
-            return jsonify({'success': False, 'message': 'Invalid departure time format'}), 400
+        except (ValueError, AttributeError) as e:
+            return jsonify({'success': False, 'message': f'Invalid departure time format. Expected ISO 8601: {departure_time_str}'}), 400
 
     db.session.commit()
     return jsonify({
@@ -1476,8 +1484,8 @@ def update_entry(entry_id):
         'message': 'Entry updated successfully',
         'entry': {
             'id': entry.id,
-            'arrival_time': entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S'),
-            'departure_time': entry.departure_time.strftime('%Y-%m-%d %H:%M:%S') if entry.departure_time else None,
+            'arrival_time': entry.arrival_time.isoformat(),
+            'departure_time': entry.departure_time.isoformat() if entry.departure_time else None,
             'duration': entry.duration,
             'is_paused': entry.is_paused,
             'total_break_duration': entry.total_break_duration
@@ -1562,7 +1570,7 @@ def resume_entry(entry_id):
         'success': True,
         'message': 'Work resumed on existing entry',
         'id': entry_to_resume.id,
-        'arrival_time': entry_to_resume.arrival_time.strftime('%Y-%m-%d %H:%M:%S'),
+        'arrival_time': entry_to_resume.arrival_time.isoformat(),
         'total_break_duration': entry_to_resume.total_break_duration
     })
 
@@ -2900,8 +2908,8 @@ def team_hours_data():
         for entry in entries:
             formatted_entries.append({
                 'id': entry.id,
-                'arrival_time': entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S'),
-                'departure_time': entry.departure_time.strftime('%Y-%m-%d %H:%M:%S') if entry.departure_time else None,
+                'arrival_time': entry.arrival_time.isoformat(),
+                'departure_time': entry.departure_time.isoformat() if entry.departure_time else None,
                 'duration': entry.duration,
                 'total_break_duration': entry.total_break_duration
             })
@@ -2934,8 +2942,8 @@ def team_hours_data():
         },
         'team_data': team_data,
         'date_range': date_range,
-        'start_date': start_date.strftime('%Y-%m-%d'),
-        'end_date': end_date.strftime('%Y-%m-%d')
+        'start_date': start_date.isoformat(),
+        'end_date': end_date.isoformat()
     })
 
 @app.route('/export')
@@ -3455,8 +3463,8 @@ def get_task(task_id):
             'priority': task.priority.value,
             'estimated_hours': task.estimated_hours,
             'assigned_to_id': task.assigned_to_id,
-            'start_date': task.start_date.strftime('%Y-%m-%d') if task.start_date else None,
-            'due_date': task.due_date.strftime('%Y-%m-%d') if task.due_date else None
+            'start_date': task.start_date.isoformat() if task.start_date else None,
+            'due_date': task.due_date.isoformat() if task.due_date else None
         }
 
         return jsonify({'success': True, 'task': task_data})
@@ -3606,8 +3614,8 @@ def get_subtask(subtask_id):
             'priority': subtask.priority.value,
             'estimated_hours': subtask.estimated_hours,
             'assigned_to_id': subtask.assigned_to_id,
-            'start_date': subtask.start_date.strftime('%Y-%m-%d') if subtask.start_date else None,
-            'due_date': subtask.due_date.strftime('%Y-%m-%d') if subtask.due_date else None
+            'start_date': subtask.start_date.isoformat() if subtask.start_date else None,
+            'due_date': subtask.due_date.isoformat() if subtask.due_date else None
         }
 
         return jsonify({'success': True, 'subtask': subtask_data})

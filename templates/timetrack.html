@@ -193,12 +193,12 @@
             const departureDate = document.getElementById('edit-departure-date').value;
             const departureTime = document.getElementById('edit-departure-time').value;
 
-            // Format datetime strings
-            const arrivalDateTime = `${arrivalDate} ${arrivalTime}:00`;
+            // Format datetime strings as ISO 8601
+            const arrivalDateTime = `${arrivalDate}T${arrivalTime}:00`;
             let departureDateTime = null;
 
             if (departureDate && departureTime) {
-                departureDateTime = `${departureDate} ${departureTime}:00`;
+                departureDateTime = `${departureDate}T${departureTime}:00`;
             }
 
             // Send update request
