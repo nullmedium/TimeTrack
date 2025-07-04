@@ -355,12 +355,8 @@ class TimeAnalyticsController {
 
         this.state.activeView = viewType;
         
-        // Load data for new view if needed
-        if (this.state.data) {
-            this.refreshCurrentView();
-        } else {
-            this.loadData();
-        }
+        // Always load new data since different views need different data structures
+        this.loadData();
     }
 
     updateTableView() {
