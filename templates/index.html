@@ -390,15 +390,15 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
                 (arrivalTime.split(':').length === 2 ? arrivalTime + ':00' : arrivalTime) :
                 arrivalTime + ':00:00';
 
-            // Format datetime strings for the API (YYYY-MM-DD HH:MM:SS)
-            const arrivalDateTime = `${arrivalDate} ${arrivalTimeWithSeconds}`;
+            // Format datetime strings for the API (ISO 8601: YYYY-MM-DDTHH:MM:SS)
+            const arrivalDateTime = `${arrivalDate}T${arrivalTimeWithSeconds}`;
             let departureDateTime = null;
 
             if (departureDate && departureTime) {
                 const departureTimeWithSeconds = departureTime.includes(':') ?
                     (departureTime.split(':').length === 2 ? departureTime + ':00' : departureTime) :
                     departureTime + ':00:00';
-                departureDateTime = `${departureDate} ${departureTimeWithSeconds}`;
+                departureDateTime = `${departureDate}T${departureTimeWithSeconds}`;
             }
 
             console.log('Sending update:', {
