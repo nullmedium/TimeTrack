@@ -106,6 +106,7 @@
                 <select id="chart-type">
                     <option value="timeSeries">Time Series</option>
                     <option value="projectDistribution">Project Distribution</option>
+                    <option value="burndown">Burndown Chart</option>
                 </select>
                 <div class="export-buttons">
                     <button class="btn btn-secondary" onclick="exportChart('png')">Export PNG</button>
@@ -268,7 +269,12 @@ class TimeAnalyticsController {
         const chartTypeSelect = document.getElementById('chart-type');
         if (chartTypeSelect) {
             chartTypeSelect.addEventListener('change', () => {
-                this.updateChart();
+                // For burndown chart, we need to reload data from the server
+                if (chartTypeSelect.value === 'burndown') {
+                    this.loadData();
+                } else {
+                    this.updateChart();
+                }
             });
         }
 
@@ -307,6 +313,12 @@ class TimeAnalyticsController {
 
             if (this.state.selectedProject) {
                 params.append('project_id', this.state.selectedProject);
+            }
+
+            // Add chart_type parameter for graph view
+            if (this.state.activeView === 'graph') {
+                const chartType = document.getElementById('chart-type')?.value || 'timeSeries';
+                params.append('chart_type', chartType);
             }
 
             const response = await fetch(`/api/analytics/data?${params}`);
@@ -396,11 +408,29 @@ class TimeAnalyticsController {
         const data = this.state.data;
         if (!data) return;
 
-        // Update stats
-        document.getElementById('total-hours').textContent = data.totalHours?.toFixed(1) || '0';
-        document.getElementById('total-days').textContent = data.totalDays || '0';
-        document.getElementById('avg-hours').textContent = 
-            data.totalDays > 0 ? (data.totalHours / data.totalDays).toFixed(1) : '0';
+        const chartType = document.getElementById('chart-type').value;
+        
+        // Update stats based on chart type
+        if (chartType === 'burndown' && data.burndown) {
+            document.getElementById('total-hours').textContent = data.burndown.total_tasks || '0';
+            document.getElementById('total-days').textContent = data.burndown.dates?.length || '0';
+            document.getElementById('avg-hours').textContent = data.burndown.tasks_completed || '0';
+            
+            // Update stat labels for burndown
+            document.querySelector('.stat-card:nth-child(1) h4').textContent = 'Total Tasks';
+            document.querySelector('.stat-card:nth-child(2) h4').textContent = 'Timeline Days';
+            document.querySelector('.stat-card:nth-child(3) h4').textContent = 'Completed Tasks';
+        } else {
+            document.getElementById('total-hours').textContent = data.totalHours?.toFixed(1) || '0';
+            document.getElementById('total-days').textContent = data.totalDays || '0';
+            document.getElementById('avg-hours').textContent = 
+                data.totalDays > 0 ? (data.totalHours / data.totalDays).toFixed(1) : '0';
+            
+            // Restore original stat labels
+            document.querySelector('.stat-card:nth-child(1) h4').textContent = 'Total Hours';
+            document.querySelector('.stat-card:nth-child(2) h4').textContent = 'Total Days';
+            document.querySelector('.stat-card:nth-child(3) h4').textContent = 'Average Hours/Day';
+        }
 
         this.updateChart();
     }
@@ -483,6 +513,68 @@ class TimeAnalyticsController {
                     }
                 }
             });
+        } else if (chartType === 'burndown') {
+            this.charts.main = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.burndown?.dates || [],
+                    datasets: [{
+                        label: 'Remaining Tasks',
+                        data: data.burndown?.remaining || [],
+                        borderColor: '#FF5722',
+                        backgroundColor: 'rgba(255, 87, 34, 0.1)',
+                        fill: true,
+                        tension: 0.1,
+                        pointBackgroundColor: '#FF5722',
+                        pointBorderColor: '#FF5722',
+                        pointRadius: 4
+                    }, {
+                        label: 'Ideal Burndown',
+                        data: data.burndown?.ideal || [],
+                        borderColor: '#4CAF50',
+                        backgroundColor: 'transparent',
+                        borderDash: [5, 5],
+                        fill: false,
+                        tension: 0,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Project Burndown Chart'
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Remaining Tasks'
+                            },
+                            ticks: {
+                                stepSize: 1
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
         }
     }
 
@@ -554,7 +646,9 @@ function exportChart(format) {
     } else if (format === 'pdf') {
         // Get chart title for PDF
         const chartType = document.getElementById('chart-type').value;
-        const title = chartType === 'timeSeries' ? 'Daily Hours Worked' : 'Time Distribution by Project';
+        const title = chartType === 'timeSeries' ? 'Daily Hours Worked' : 
+                     chartType === 'projectDistribution' ? 'Time Distribution by Project' : 
+                     'Project Burndown Chart';
         
         // Create PDF using jsPDF
         const { jsPDF } = window.jspdf;

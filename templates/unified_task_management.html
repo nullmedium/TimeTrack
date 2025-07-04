@@ -1,0 +1,1084 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="task-management-container">
+    <!-- Header Section -->
+    <div class="task-header">
+        <h1>📋 Task Management</h1>
+        <div class="task-controls">
+            <!-- View Switcher -->
+            <div class="view-switcher">
+                <button class="view-btn active" data-view="all">All Tasks</button>
+                <button class="view-btn" data-view="project">By Project</button>
+                <button class="view-btn" data-view="personal">My Tasks</button>
+                {% if g.user.team_id %}
+                <button class="view-btn" data-view="team">Team Tasks</button>
+                {% endif %}
+            </div>
+            
+            <!-- Filters -->
+            <div class="task-filters">
+                <select id="project-filter" class="filter-select">
+                    <option value="">All Projects</option>
+                    {% for project in available_projects %}
+                    <option value="{{ project.id }}">{{ project.code }} - {{ project.name }}</option>
+                    {% endfor %}
+                </select>
+                
+                <select id="assignee-filter" class="filter-select">
+                    <option value="">All Assignees</option>
+                    <option value="unassigned">Unassigned</option>
+                    {% for user in team_members %}
+                    <option value="{{ user.id }}">{{ user.username }}</option>
+                    {% endfor %}
+                </select>
+                
+                <select id="priority-filter" class="filter-select">
+                    <option value="">All Priorities</option>
+                    <option value="URGENT">Urgent</option>
+                    <option value="HIGH">High</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="LOW">Low</option>
+                </select>
+                
+                <!-- Date Range Filters -->
+                <div class="date-range-filters">
+                    <label for="start-date-filter">From:</label>
+                    <input type="date" id="start-date-filter" class="filter-input">
+                    
+                    <label for="end-date-filter">To:</label>
+                    <input type="date" id="end-date-filter" class="filter-input">
+                    
+                    <select id="date-field-filter" class="filter-select">
+                        <option value="created">Created Date</option>
+                        <option value="due">Due Date</option>
+                        <option value="completed">Completed Date</option>
+                    </select>
+                </div>
+                
+                <!-- Sprint Filter -->
+                <select id="sprint-filter" class="filter-select">
+                    <option value="">All Sprints</option>
+                    <option value="no-sprint">No Sprint</option>
+                    <option value="current">Current Sprint</option>
+                    <!-- Sprint options will be populated dynamically -->
+                </select>
+            </div>
+            
+            <!-- Actions -->
+            <div class="task-actions">
+                <button id="add-task-btn" class="btn btn-primary">+ Add Task</button>
+                <button id="refresh-tasks" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Statistics -->
+    <div class="task-stats">
+        <div class="stat-card">
+            <div class="stat-number" id="total-tasks">0</div>
+            <div class="stat-label">Total Tasks</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="completed-tasks">0</div>
+            <div class="stat-label">Completed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="in-progress-tasks">0</div>
+            <div class="stat-label">In Progress</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="overdue-tasks">0</div>
+            <div class="stat-label">Overdue</div>
+        </div>
+    </div>
+
+    <!-- Kanban Board -->
+    <div class="kanban-board" id="task-board">
+        <div class="kanban-column" data-status="NOT_STARTED">
+            <div class="column-header">
+                <h3>📝 Not Started</h3>
+                <span class="task-count">0</span>
+            </div>
+            <div class="column-content" id="column-NOT_STARTED">
+                <!-- Task cards will be populated here -->
+            </div>
+        </div>
+        
+        <div class="kanban-column" data-status="IN_PROGRESS">
+            <div class="column-header">
+                <h3>⚡ In Progress</h3>
+                <span class="task-count">0</span>
+            </div>
+            <div class="column-content" id="column-IN_PROGRESS">
+                <!-- Task cards will be populated here -->
+            </div>
+        </div>
+        
+        <div class="kanban-column" data-status="ON_HOLD">
+            <div class="column-header">
+                <h3>⏸️ On Hold</h3>
+                <span class="task-count">0</span>
+            </div>
+            <div class="column-content" id="column-ON_HOLD">
+                <!-- Task cards will be populated here -->
+            </div>
+        </div>
+        
+        <div class="kanban-column" data-status="COMPLETED">
+            <div class="column-header">
+                <h3>✅ Completed</h3>
+                <span class="task-count">0</span>
+            </div>
+            <div class="column-content" id="column-COMPLETED">
+                <!-- Task cards will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading and Error States -->
+    <div id="loading-indicator" class="loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading tasks...</p>
+    </div>
+    
+    <div id="error-message" class="error-alert" style="display: none;">
+        <p>Failed to load tasks. Please try again.</p>
+    </div>
+</div>
+
+<!-- Task Detail Modal -->
+<div id="task-modal" class="modal" style="display: none;">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h2 id="modal-title">Task Details</h2>
+            <span class="close" onclick="closeTaskModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="task-form">
+                <input type="hidden" id="task-id">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-name">Task Name *</label>
+                        <input type="text" id="task-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-priority">Priority</label>
+                        <select id="task-priority">
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                            <option value="URGENT">Urgent</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="task-description">Description</label>
+                    <textarea id="task-description" rows="4"></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-project">Project</label>
+                        <select id="task-project">
+                            <option value="">Select Project</option>
+                            {% for project in available_projects %}
+                            <option value="{{ project.id }}">{{ project.code }} - {{ project.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-assignee">Assigned To</label>
+                        <select id="task-assignee">
+                            <option value="">Unassigned</option>
+                            {% for user in team_members %}
+                            <option value="{{ user.id }}">{{ user.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-sprint">Sprint</label>
+                        <select id="task-sprint">
+                            <option value="">No Sprint</option>
+                            <!-- Sprint options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-estimated-hours">Estimated Hours</label>
+                        <input type="number" id="task-estimated-hours" min="0" step="0.5">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-due-date">Due Date</label>
+                        <input type="date" id="task-due-date">
+                    </div>
+                    <div class="form-group">
+                        <label for="task-estimated-hours">Estimated Hours</label>
+                        <input type="number" id="task-estimated-hours" min="0" step="0.5">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="task-status">Status</label>
+                    <select id="task-status">
+                        <option value="NOT_STARTED">Not Started</option>
+                        <option value="IN_PROGRESS">In Progress</option>
+                        <option value="ON_HOLD">On Hold</option>
+                        <option value="COMPLETED">Completed</option>
+                    </select>
+                </div>
+                
+                <!-- Subtasks Section -->
+                <div class="subtasks-section">
+                    <h3>Subtasks</h3>
+                    <div id="subtasks-container">
+                        <!-- Subtasks will be populated here -->
+                    </div>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addSubtask()">+ Add Subtask</button>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeTaskModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveTask()">Save Task</button>
+            <button type="button" class="btn btn-danger" onclick="deleteTask()" id="delete-task-btn" style="display: none;">Delete Task</button>
+        </div>
+    </div>
+</div>
+
+<!-- Styles -->
+<style>
+.task-management-container {
+    padding: 1rem;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.task-header h1 {
+    margin: 0;
+    color: #333;
+}
+
+.task-controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.view-switcher {
+    display: flex;
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.view-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.view-btn.active {
+    background: #007bff;
+    color: white;
+}
+
+.view-btn:hover:not(.active) {
+    background: #e9ecef;
+}
+
+.task-filters {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.filter-input {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.date-range-filters {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.date-range-filters label {
+    font-size: 0.875rem;
+    color: #666;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.task-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.task-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #007bff;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+
+.kanban-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.kanban-column {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    min-height: 500px;
+}
+
+.column-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #ddd;
+}
+
+.column-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #333;
+}
+
+.task-count {
+    background: #007bff;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+.column-content {
+    min-height: 400px;
+    padding: 0.5rem 0;
+}
+
+.task-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.1s;
+}
+
+.task-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
+.task-card.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+}
+
+.task-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.task-title {
+    font-weight: bold;
+    margin: 0;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.task-priority {
+    padding: 0.125rem 0.375rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.task-priority.LOW { background: #d4edda; color: #155724; }
+.task-priority.MEDIUM { background: #fff3cd; color: #856404; }
+.task-priority.HIGH { background: #f8d7da; color: #721c24; }
+.task-priority.URGENT { background: #f5c6cb; color: #721c24; }
+
+.task-project {
+    font-size: 0.8rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+.task-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.task-assignee {
+    font-weight: 500;
+}
+
+.task-due-date {
+    color: #666;
+}
+
+.task-due-date.overdue {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.loading-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #007bff;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.error-alert {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 1rem;
+    border-radius: 6px;
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.modal.large .modal-content {
+    max-width: 800px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.subtasks-section {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+}
+
+.subtasks-section h3 {
+    margin-bottom: 1rem;
+    color: #333;
+}
+
+.subtask-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.subtask-item input[type="text"] {
+    flex: 1;
+    margin: 0;
+}
+
+.subtask-item button {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+@media (max-width: 768px) {
+    .task-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .task-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .view-switcher {
+        justify-content: center;
+    }
+    
+    .kanban-board {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<!-- SortableJS for drag and drop -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+<script>
+// Task Management Controller
+class UnifiedTaskManager {
+    constructor() {
+        this.tasks = [];
+        this.currentView = 'all';
+        this.filters = {
+            project: '',
+            assignee: '',
+            priority: '',
+            startDate: '',
+            endDate: '',
+            dateField: 'created',
+            sprint: ''
+        };
+        this.currentTask = null;
+        this.sortableInstances = [];
+    }
+
+    async init() {
+        this.setupEventListeners();
+        this.setupSortable();
+        await this.loadSprints();
+        await this.loadTasks();
+    }
+
+    setupEventListeners() {
+        // View switcher
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.switchView(e.target.dataset.view);
+            });
+        });
+
+        // Filters
+        document.getElementById('project-filter').addEventListener('change', () => {
+            this.filters.project = document.getElementById('project-filter').value;
+            this.applyFilters();
+        });
+
+        document.getElementById('assignee-filter').addEventListener('change', () => {
+            this.filters.assignee = document.getElementById('assignee-filter').value;
+            this.applyFilters();
+        });
+
+        document.getElementById('priority-filter').addEventListener('change', () => {
+            this.filters.priority = document.getElementById('priority-filter').value;
+            this.applyFilters();
+        });
+
+        // Date range filters
+        document.getElementById('start-date-filter').addEventListener('change', () => {
+            this.filters.startDate = document.getElementById('start-date-filter').value;
+            this.applyFilters();
+        });
+
+        document.getElementById('end-date-filter').addEventListener('change', () => {
+            this.filters.endDate = document.getElementById('end-date-filter').value;
+            this.applyFilters();
+        });
+
+        document.getElementById('date-field-filter').addEventListener('change', () => {
+            this.filters.dateField = document.getElementById('date-field-filter').value;
+            this.applyFilters();
+        });
+
+        // Sprint filter
+        document.getElementById('sprint-filter').addEventListener('change', () => {
+            this.filters.sprint = document.getElementById('sprint-filter').value;
+            this.applyFilters();
+        });
+
+        // Actions
+        document.getElementById('add-task-btn').addEventListener('click', () => {
+            this.openTaskModal();
+        });
+
+        document.getElementById('refresh-tasks').addEventListener('click', () => {
+            this.loadTasks();
+        });
+    }
+
+    setupSortable() {
+        const columns = document.querySelectorAll('.column-content');
+        columns.forEach(column => {
+            const sortable = Sortable.create(column, {
+                group: 'tasks',
+                animation: 150,
+                onEnd: (evt) => {
+                    this.handleTaskMove(evt);
+                }
+            });
+            this.sortableInstances.push(sortable);
+        });
+    }
+
+    switchView(view) {
+        // Update button states
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-view="${view}"]`).classList.add('active');
+        
+        this.currentView = view;
+        this.applyFilters();
+    }
+
+    async loadSprints() {
+        try {
+            const response = await fetch('/api/sprints');
+            const data = await response.json();
+            
+            if (data.success) {
+                const sprintFilter = document.getElementById('sprint-filter');
+                
+                // Clear existing options except the default ones
+                const defaultOptions = Array.from(sprintFilter.children).slice(0, 3);
+                sprintFilter.innerHTML = '';
+                defaultOptions.forEach(option => sprintFilter.appendChild(option));
+                
+                // Add sprint options
+                data.sprints.forEach(sprint => {
+                    const option = document.createElement('option');
+                    option.value = sprint.id;
+                    option.textContent = `${sprint.name} (${sprint.status})`;
+                    sprintFilter.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading sprints:', error);
+        }
+    }
+
+    async loadTasks() {
+        document.getElementById('loading-indicator').style.display = 'flex';
+        document.getElementById('error-message').style.display = 'none';
+
+        try {
+            const response = await fetch('/api/tasks/unified');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.tasks = data.tasks;
+                this.renderTasks();
+                this.updateStatistics();
+            } else {
+                throw new Error(data.message || 'Failed to load tasks');
+            }
+        } catch (error) {
+            console.error('Error loading tasks:', error);
+            document.getElementById('error-message').style.display = 'block';
+        } finally {
+            document.getElementById('loading-indicator').style.display = 'none';
+        }
+    }
+
+    renderTasks() {
+        // Clear all columns
+        document.querySelectorAll('.column-content').forEach(column => {
+            column.innerHTML = '';
+        });
+
+        // Filter tasks based on current view and filters
+        const filteredTasks = this.getFilteredTasks();
+        
+        // Group tasks by status
+        const tasksByStatus = {
+            'NOT_STARTED': [],
+            'IN_PROGRESS': [],
+            'ON_HOLD': [],
+            'COMPLETED': []
+        };
+
+        filteredTasks.forEach(task => {
+            if (tasksByStatus[task.status]) {
+                tasksByStatus[task.status].push(task);
+            }
+        });
+
+        // Render tasks in each column
+        Object.keys(tasksByStatus).forEach(status => {
+            const column = document.getElementById(`column-${status}`);
+            const tasks = tasksByStatus[status];
+            
+            tasks.forEach(task => {
+                const taskCard = this.createTaskCard(task);
+                column.appendChild(taskCard);
+            });
+            
+            // Update task count
+            const countElement = column.parentElement.querySelector('.task-count');
+            countElement.textContent = tasks.length;
+        });
+    }
+
+    getFilteredTasks() {
+        return this.tasks.filter(task => {
+            // View filter
+            if (this.currentView === 'personal' && task.assigned_to_id !== {{ g.user.id }}) {
+                return false;
+            }
+            if (this.currentView === 'team' && !task.is_team_task) {
+                return false;
+            }
+            if (this.currentView === 'project' && !task.project_id) {
+                return false;
+            }
+
+            // Project filter
+            if (this.filters.project && task.project_id != this.filters.project) {
+                return false;
+            }
+
+            // Assignee filter
+            if (this.filters.assignee) {
+                if (this.filters.assignee === 'unassigned' && task.assigned_to_id) {
+                    return false;
+                }
+                if (this.filters.assignee !== 'unassigned' && task.assigned_to_id != this.filters.assignee) {
+                    return false;
+                }
+            }
+
+            // Priority filter
+            if (this.filters.priority && task.priority !== this.filters.priority) {
+                return false;
+            }
+
+            // Date range filter
+            if (this.filters.startDate || this.filters.endDate) {
+                let taskDate = null;
+                
+                switch (this.filters.dateField) {
+                    case 'created':
+                        taskDate = task.created_at ? new Date(task.created_at) : null;
+                        break;
+                    case 'due':
+                        taskDate = task.due_date ? new Date(task.due_date) : null;
+                        break;
+                    case 'completed':
+                        taskDate = task.completed_date ? new Date(task.completed_date) : null;
+                        break;
+                }
+                
+                if (taskDate) {
+                    if (this.filters.startDate && taskDate < new Date(this.filters.startDate)) {
+                        return false;
+                    }
+                    if (this.filters.endDate && taskDate > new Date(this.filters.endDate)) {
+                        return false;
+                    }
+                } else if (this.filters.startDate || this.filters.endDate) {
+                    // If we're filtering by date but task has no date in the selected field, exclude it
+                    return false;
+                }
+            }
+
+            // Sprint filter
+            if (this.filters.sprint) {
+                if (this.filters.sprint === 'no-sprint' && task.sprint_id) {
+                    return false;
+                }
+                if (this.filters.sprint === 'current' && !task.is_current_sprint) {
+                    return false;
+                }
+                if (this.filters.sprint !== 'no-sprint' && this.filters.sprint !== 'current' && 
+                    task.sprint_id != this.filters.sprint) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }
+
+    createTaskCard(task) {
+        const card = document.createElement('div');
+        card.className = 'task-card';
+        card.dataset.taskId = task.id;
+        card.addEventListener('click', () => this.openTaskModal(task));
+
+        const dueDate = task.due_date ? new Date(task.due_date) : null;
+        const isOverdue = dueDate && dueDate < new Date() && task.status !== 'COMPLETED';
+
+        card.innerHTML = `
+            <div class="task-card-header">
+                <h4 class="task-title">${task.name}</h4>
+                <span class="task-priority ${task.priority}">${task.priority}</span>
+            </div>
+            ${task.project_name ? `<div class="task-project">${task.project_code} - ${task.project_name}</div>` : ''}
+            <div class="task-meta">
+                <span class="task-assignee">${task.assigned_to_name || 'Unassigned'}</span>
+                ${dueDate ? `<span class="task-due-date ${isOverdue ? 'overdue' : ''}">${dueDate.toLocaleDateString()}</span>` : ''}
+            </div>
+        `;
+
+        return card;
+    }
+
+    applyFilters() {
+        this.renderTasks();
+    }
+
+    updateStatistics() {
+        const total = this.tasks.length;
+        const completed = this.tasks.filter(t => t.status === 'COMPLETED').length;
+        const inProgress = this.tasks.filter(t => t.status === 'IN_PROGRESS').length;
+        const overdue = this.tasks.filter(t => {
+            const dueDate = t.due_date ? new Date(t.due_date) : null;
+            return dueDate && dueDate < new Date() && t.status !== 'COMPLETED';
+        }).length;
+
+        document.getElementById('total-tasks').textContent = total;
+        document.getElementById('completed-tasks').textContent = completed;
+        document.getElementById('in-progress-tasks').textContent = inProgress;
+        document.getElementById('overdue-tasks').textContent = overdue;
+    }
+
+    async handleTaskMove(evt) {
+        const taskId = evt.item.dataset.taskId;
+        const newStatus = evt.to.id.replace('column-', '');
+        
+        try {
+            const response = await fetch(`/api/tasks/${taskId}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                // Update local task data
+                const task = this.tasks.find(t => t.id == taskId);
+                if (task) {
+                    task.status = newStatus;
+                    this.updateStatistics();
+                }
+            } else {
+                throw new Error(data.message || 'Failed to update task');
+            }
+        } catch (error) {
+            console.error('Error updating task status:', error);
+            // Revert the move
+            this.renderTasks();
+        }
+    }
+
+    openTaskModal(task = null) {
+        this.currentTask = task;
+        const modal = document.getElementById('task-modal');
+        
+        if (task) {
+            document.getElementById('modal-title').textContent = 'Edit Task';
+            document.getElementById('task-id').value = task.id;
+            document.getElementById('task-name').value = task.name;
+            document.getElementById('task-description').value = task.description || '';
+            document.getElementById('task-priority').value = task.priority;
+            document.getElementById('task-project').value = task.project_id || '';
+            document.getElementById('task-assignee').value = task.assigned_to_id || '';
+            document.getElementById('task-due-date').value = task.due_date || '';
+            document.getElementById('task-estimated-hours').value = task.estimated_hours || '';
+            document.getElementById('task-status').value = task.status;
+            document.getElementById('delete-task-btn').style.display = 'inline-block';
+        } else {
+            document.getElementById('modal-title').textContent = 'Add New Task';
+            document.getElementById('task-form').reset();
+            document.getElementById('task-id').value = '';
+            document.getElementById('delete-task-btn').style.display = 'none';
+        }
+        
+        modal.style.display = 'block';
+    }
+
+    async saveTask() {
+        const taskData = {
+            name: document.getElementById('task-name').value,
+            description: document.getElementById('task-description').value,
+            priority: document.getElementById('task-priority').value,
+            project_id: document.getElementById('task-project').value || null,
+            assigned_to_id: document.getElementById('task-assignee').value || null,
+            due_date: document.getElementById('task-due-date').value || null,
+            estimated_hours: document.getElementById('task-estimated-hours').value || null,
+            status: document.getElementById('task-status').value
+        };
+
+        const taskId = document.getElementById('task-id').value;
+        const isEdit = taskId !== '';
+
+        try {
+            const response = await fetch(`/api/tasks${isEdit ? `/${taskId}` : ''}`, {
+                method: isEdit ? 'PUT' : 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(taskData)
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                closeTaskModal();
+                await this.loadTasks();
+            } else {
+                throw new Error(data.message || 'Failed to save task');
+            }
+        } catch (error) {
+            console.error('Error saving task:', error);
+            alert('Failed to save task: ' + error.message);
+        }
+    }
+
+    async deleteTask() {
+        if (!this.currentTask) return;
+        
+        if (confirm('Are you sure you want to delete this task?')) {
+            try {
+                const response = await fetch(`/api/tasks/${this.currentTask.id}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    closeTaskModal();
+                    await this.loadTasks();
+                } else {
+                    throw new Error(data.message || 'Failed to delete task');
+                }
+            } catch (error) {
+                console.error('Error deleting task:', error);
+                alert('Failed to delete task: ' + error.message);
+            }
+        }
+    }
+}
+
+// Global functions
+let taskManager;
+
+document.addEventListener('DOMContentLoaded', function() {
+    taskManager = new UnifiedTaskManager();
+    taskManager.init();
+});
+
+function closeTaskModal() {
+    document.getElementById('task-modal').style.display = 'none';
+    taskManager.currentTask = null;
+}
+
+function saveTask() {
+    taskManager.saveTask();
+}
+
+function deleteTask() {
+    taskManager.deleteTask();
+}
+
+function addSubtask() {
+    // TODO: Implement subtask functionality
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('task-modal');
+    if (event.target === modal) {
+        closeTaskModal();
+    }
+};
+</script>
+{% endblock %}

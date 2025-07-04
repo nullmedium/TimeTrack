@@ -42,7 +42,8 @@
                 {% if g.user %}
                     <li><a href="{{ url_for('home') }}" data-tooltip="Home"><i class="nav-icon">🏠</i><span class="nav-text">Home</span></a></li>
                     <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📊</i><span class="nav-text">Dashboard</span></a></li>
-                    <li><a href="{{ url_for('kanban_overview') }}" data-tooltip="Kanban Board"><i class="nav-icon">📋</i><span class="nav-text">Kanban Board</span></a></li>
+                    <li><a href="{{ url_for('unified_task_management') }}" data-tooltip="Task Management"><i class="nav-icon">📋</i><span class="nav-text">Task Management</span></a></li>
+                    <li><a href="{{ url_for('sprint_management') }}" data-tooltip="Sprint Management"><i class="nav-icon">🏃‍♂️</i><span class="nav-text">Sprints</span></a></li>
                     <li><a href="{{ url_for('analytics') }}" data-tooltip="Time Analytics"><i class="nav-icon">📊</i><span class="nav-text">Analytics</span></a></li>
                     
                     <!-- Role-based menu items -->

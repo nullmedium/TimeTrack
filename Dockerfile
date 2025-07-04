@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+ENV LANG=en_US.UTF-8
+ENV TZ=Europe/Berlin
+
 # Create www-data user and log directory
 RUN groupadd -r www-data && useradd -r -g www-data www-data || true
 RUN mkdir -p /var/log/uwsgi && chown -R www-data:www-data /var/log/uwsgi

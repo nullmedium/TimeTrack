@@ -1,0 +1,726 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="sprint-management-container">
+    <!-- Header Section -->
+    <div class="sprint-header">
+        <h1>🏃‍♂️ Sprint Management</h1>
+        <div class="sprint-controls">
+            <!-- View Switcher -->
+            <div class="view-switcher">
+                <button class="view-btn active" data-view="active">Active Sprints</button>
+                <button class="view-btn" data-view="all">All Sprints</button>
+                <button class="view-btn" data-view="planning">Planning</button>
+                <button class="view-btn" data-view="completed">Completed</button>
+            </div>
+            
+            <!-- Actions -->
+            <div class="sprint-actions">
+                <button id="add-sprint-btn" class="btn btn-primary">+ New Sprint</button>
+                <button id="refresh-sprints" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sprint Statistics -->
+    <div class="sprint-stats">
+        <div class="stat-card">
+            <div class="stat-number" id="total-sprints">0</div>
+            <div class="stat-label">Total Sprints</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="active-sprints">0</div>
+            <div class="stat-label">Active</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="completed-sprints">0</div>
+            <div class="stat-label">Completed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="total-tasks">0</div>
+            <div class="stat-label">Total Tasks</div>
+        </div>
+    </div>
+
+    <!-- Sprint Grid -->
+    <div class="sprint-grid" id="sprint-grid">
+        <!-- Sprint cards will be populated here -->
+    </div>
+
+    <!-- Loading and Error States -->
+    <div id="loading-indicator" class="loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading sprints...</p>
+    </div>
+    
+    <div id="error-message" class="error-alert" style="display: none;">
+        <p>Failed to load sprints. Please try again.</p>
+    </div>
+</div>
+
+<!-- Sprint Modal -->
+<div id="sprint-modal" class="modal" style="display: none;">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h2 id="modal-title">Sprint Details</h2>
+            <span class="close" onclick="closeSprintModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="sprint-form">
+                <input type="hidden" id="sprint-id">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sprint-name">Sprint Name *</label>
+                        <input type="text" id="sprint-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sprint-status">Status</label>
+                        <select id="sprint-status">
+                            <option value="PLANNING">Planning</option>
+                            <option value="ACTIVE">Active</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="CANCELLED">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="sprint-description">Description</label>
+                    <textarea id="sprint-description" rows="3"></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sprint-project">Project (Optional)</label>
+                        <select id="sprint-project">
+                            <option value="">Company-wide Sprint</option>
+                            {% for project in available_projects %}
+                            <option value="{{ project.id }}">{{ project.code }} - {{ project.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="sprint-capacity">Capacity (Hours)</label>
+                        <input type="number" id="sprint-capacity" min="0" step="1">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sprint-start-date">Start Date *</label>
+                        <input type="date" id="sprint-start-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sprint-end-date">End Date *</label>
+                        <input type="date" id="sprint-end-date" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="sprint-goal">Sprint Goal</label>
+                    <textarea id="sprint-goal" rows="3" placeholder="What is the main objective of this sprint?"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeSprintModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveSprint()">Save Sprint</button>
+            <button type="button" class="btn btn-danger" onclick="deleteSprint()" id="delete-sprint-btn" style="display: none;">Delete Sprint</button>
+        </div>
+    </div>
+</div>
+
+<!-- Styles -->
+<style>
+.sprint-management-container {
+    padding: 1rem;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.sprint-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.sprint-header h1 {
+    margin: 0;
+    color: #333;
+}
+
+.sprint-controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.view-switcher {
+    display: flex;
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.view-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    color: #495057;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.view-btn.active {
+    background: #007bff;
+    color: white;
+}
+
+.view-btn:hover:not(.active) {
+    background: #e9ecef;
+    color: #212529;
+}
+
+.sprint-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sprint-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #007bff;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+
+.sprint-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.sprint-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.1s;
+    position: relative;
+}
+
+.sprint-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+.sprint-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.sprint-name {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin: 0;
+    color: #333;
+}
+
+.sprint-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.sprint-status.PLANNING { background: #fff3cd; color: #856404; }
+.sprint-status.ACTIVE { background: #d1ecf1; color: #0c5460; }
+.sprint-status.COMPLETED { background: #d4edda; color: #155724; }
+.sprint-status.CANCELLED { background: #f8d7da; color: #721c24; }
+
+.sprint-dates {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+.sprint-progress {
+    margin-bottom: 1rem;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+
+.sprint-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.metric {
+    text-align: center;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.metric-number {
+    font-weight: bold;
+    color: #007bff;
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.sprint-goal {
+    font-size: 0.9rem;
+    color: #666;
+    font-style: italic;
+    line-height: 1.4;
+}
+
+.loading-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #007bff;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.error-alert {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 1rem;
+    border-radius: 6px;
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.modal.large .modal-content {
+    max-width: 800px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+@media (max-width: 768px) {
+    .sprint-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .sprint-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .view-switcher {
+        justify-content: center;
+    }
+    
+    .sprint-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .sprint-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+</style>
+
+<script>
+// Sprint Management Controller
+class SprintManager {
+    constructor() {
+        this.sprints = [];
+        this.currentView = 'active';
+        this.currentSprint = null;
+    }
+
+    async init() {
+        this.setupEventListeners();
+        await this.loadSprints();
+    }
+
+    setupEventListeners() {
+        // View switcher
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.switchView(e.target.dataset.view);
+            });
+        });
+
+        // Actions
+        document.getElementById('add-sprint-btn').addEventListener('click', () => {
+            this.openSprintModal();
+        });
+
+        document.getElementById('refresh-sprints').addEventListener('click', () => {
+            this.loadSprints();
+        });
+
+        // Modal close handlers
+        document.querySelectorAll('.close').forEach(closeBtn => {
+            closeBtn.addEventListener('click', (e) => {
+                e.target.closest('.modal').style.display = 'none';
+            });
+        });
+
+        // Click outside modal to close
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+            }
+        });
+    }
+
+    switchView(view) {
+        // Update button states
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-view="${view}"]`).classList.add('active');
+        
+        this.currentView = view;
+        this.renderSprints();
+    }
+
+    async loadSprints() {
+        document.getElementById('loading-indicator').style.display = 'flex';
+        document.getElementById('error-message').style.display = 'none';
+
+        try {
+            const response = await fetch('/api/sprints');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.sprints = data.sprints;
+                this.renderSprints();
+                this.updateStatistics();
+            } else {
+                throw new Error(data.message || 'Failed to load sprints');
+            }
+        } catch (error) {
+            console.error('Error loading sprints:', error);
+            document.getElementById('error-message').style.display = 'block';
+        } finally {
+            document.getElementById('loading-indicator').style.display = 'none';
+        }
+    }
+
+    renderSprints() {
+        const grid = document.getElementById('sprint-grid');
+        grid.innerHTML = '';
+
+        const filteredSprints = this.getFilteredSprints();
+        
+        if (filteredSprints.length === 0) {
+            grid.innerHTML = '<div class="empty-state">No sprints found for the selected view.</div>';
+            return;
+        }
+
+        filteredSprints.forEach(sprint => {
+            const sprintCard = this.createSprintCard(sprint);
+            grid.appendChild(sprintCard);
+        });
+    }
+
+    getFilteredSprints() {
+        return this.sprints.filter(sprint => {
+            switch (this.currentView) {
+                case 'active':
+                    return sprint.status === 'ACTIVE';
+                case 'planning':
+                    return sprint.status === 'PLANNING';
+                case 'completed':
+                    return sprint.status === 'COMPLETED';
+                case 'all':
+                default:
+                    return true;
+            }
+        });
+    }
+
+    createSprintCard(sprint) {
+        const card = document.createElement('div');
+        card.className = 'sprint-card';
+        card.addEventListener('click', () => this.openSprintModal(sprint));
+
+        const startDate = new Date(sprint.start_date);
+        const endDate = new Date(sprint.end_date);
+        const today = new Date();
+        
+        // Calculate progress
+        let progressPercentage = 0;
+        if (today >= startDate && today <= endDate) {
+            const totalDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+            const elapsedDays = (today - startDate) / (1000 * 60 * 60 * 24);
+            progressPercentage = Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
+        } else if (today > endDate) {
+            progressPercentage = 100;
+        }
+
+        card.innerHTML = `
+            <div class="sprint-card-header">
+                <h3 class="sprint-name">${sprint.name}</h3>
+                <span class="sprint-status ${sprint.status}">${sprint.status}</span>
+            </div>
+            
+            <div class="sprint-dates">
+                📅 ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}
+                ${sprint.days_remaining > 0 ? `(${sprint.days_remaining} days left)` : ''}
+            </div>
+            
+            <div class="sprint-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${progressPercentage}%"></div>
+                </div>
+                <div class="progress-text">${Math.round(progressPercentage)}% complete</div>
+            </div>
+            
+            <div class="sprint-metrics">
+                <div class="metric">
+                    <div class="metric-number">${sprint.task_summary.total}</div>
+                    <div class="metric-label">Total</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-number">${sprint.task_summary.completed}</div>
+                    <div class="metric-label">Done</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-number">${sprint.task_summary.in_progress}</div>
+                    <div class="metric-label">Active</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-number">${sprint.task_summary.not_started}</div>
+                    <div class="metric-label">Todo</div>
+                </div>
+            </div>
+            
+            ${sprint.goal ? `<div class="sprint-goal">"${sprint.goal}"</div>` : ''}
+        `;
+
+        return card;
+    }
+
+    updateStatistics() {
+        const totalSprints = this.sprints.length;
+        const activeSprints = this.sprints.filter(s => s.status === 'ACTIVE').length;
+        const completedSprints = this.sprints.filter(s => s.status === 'COMPLETED').length;
+        const totalTasks = this.sprints.reduce((sum, s) => sum + s.task_summary.total, 0);
+
+        document.getElementById('total-sprints').textContent = totalSprints;
+        document.getElementById('active-sprints').textContent = activeSprints;
+        document.getElementById('completed-sprints').textContent = completedSprints;
+        document.getElementById('total-tasks').textContent = totalTasks;
+    }
+
+    openSprintModal(sprint = null) {
+        this.currentSprint = sprint;
+        const modal = document.getElementById('sprint-modal');
+        
+        if (sprint) {
+            document.getElementById('modal-title').textContent = 'Edit Sprint';
+            document.getElementById('sprint-id').value = sprint.id;
+            document.getElementById('sprint-name').value = sprint.name;
+            document.getElementById('sprint-description').value = sprint.description || '';
+            document.getElementById('sprint-status').value = sprint.status;
+            document.getElementById('sprint-project').value = sprint.project_id || '';
+            document.getElementById('sprint-capacity').value = sprint.capacity_hours || '';
+            document.getElementById('sprint-start-date').value = sprint.start_date;
+            document.getElementById('sprint-end-date').value = sprint.end_date;
+            document.getElementById('sprint-goal').value = sprint.goal || '';
+            document.getElementById('delete-sprint-btn').style.display = 'inline-block';
+        } else {
+            document.getElementById('modal-title').textContent = 'Create New Sprint';
+            document.getElementById('sprint-form').reset();
+            document.getElementById('sprint-id').value = '';
+            
+            // Set default dates (next 2 weeks)
+            const today = new Date();
+            const twoWeeksLater = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+            document.getElementById('sprint-start-date').value = today.toISOString().split('T')[0];
+            document.getElementById('sprint-end-date').value = twoWeeksLater.toISOString().split('T')[0];
+            
+            document.getElementById('delete-sprint-btn').style.display = 'none';
+        }
+        
+        modal.style.display = 'block';
+    }
+
+    async saveSprint() {
+        const sprintData = {
+            name: document.getElementById('sprint-name').value,
+            description: document.getElementById('sprint-description').value,
+            status: document.getElementById('sprint-status').value,
+            project_id: document.getElementById('sprint-project').value || null,
+            capacity_hours: document.getElementById('sprint-capacity').value || null,
+            start_date: document.getElementById('sprint-start-date').value,
+            end_date: document.getElementById('sprint-end-date').value,
+            goal: document.getElementById('sprint-goal').value || null
+        };
+
+        const sprintId = document.getElementById('sprint-id').value;
+        const isEdit = sprintId !== '';
+
+        try {
+            const response = await fetch(`/api/sprints${isEdit ? `/${sprintId}` : ''}`, {
+                method: isEdit ? 'PUT' : 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(sprintData)
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                closeSprintModal();
+                await this.loadSprints();
+            } else {
+                throw new Error(data.message || 'Failed to save sprint');
+            }
+        } catch (error) {
+            console.error('Error saving sprint:', error);
+            alert('Failed to save sprint: ' + error.message);
+        }
+    }
+
+    async deleteSprint() {
+        if (!this.currentSprint) return;
+        
+        if (confirm(`Are you sure you want to delete sprint "${this.currentSprint.name}"? This will also remove the sprint assignment from all tasks.`)) {
+            try {
+                const response = await fetch(`/api/sprints/${this.currentSprint.id}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    closeSprintModal();
+                    await this.loadSprints();
+                } else {
+                    throw new Error(data.message || 'Failed to delete sprint');
+                }
+            } catch (error) {
+                console.error('Error deleting sprint:', error);
+                alert('Failed to delete sprint: ' + error.message);
+            }
+        }
+    }
+}
+
+// Global functions
+let sprintManager;
+
+document.addEventListener('DOMContentLoaded', function() {
+    sprintManager = new SprintManager();
+    sprintManager.init();
+});
+
+function closeSprintModal() {
+    document.getElementById('sprint-modal').style.display = 'none';
+    sprintManager.currentSprint = null;
+}
+
+function saveSprint() {
+    sprintManager.saveSprint();
+}
+
+function deleteSprint() {
+    sprintManager.deleteSprint();
+}
+</script>
+{% endblock %}

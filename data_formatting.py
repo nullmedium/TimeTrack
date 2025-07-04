@@ -145,3 +145,64 @@ def format_team_data(entries, granularity='daily'):
         })
     
     return {'team_data': team_data}
+
+
+def format_burndown_data(tasks, start_date, end_date):
+    """Format data for burndown chart visualization."""
+    from datetime import datetime, timedelta
+    from models import Task, TaskStatus
+    
+    if not tasks:
+        return {'burndown': {'dates': [], 'remaining': [], 'ideal': []}}
+    
+    # Convert string dates to datetime objects if needed
+    if isinstance(start_date, str):
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+    if isinstance(end_date, str):
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+    
+    # Generate date range
+    current_date = start_date
+    dates = []
+    while current_date <= end_date:
+        dates.append(current_date.strftime('%Y-%m-%d'))
+        current_date += timedelta(days=1)
+    
+    total_tasks = len(tasks)
+    if total_tasks == 0:
+        return {'burndown': {'dates': dates, 'remaining': [0] * len(dates), 'ideal': [0] * len(dates)}}
+    
+    # Calculate ideal burndown (linear decrease from total to 0)
+    total_days = len(dates)
+    ideal_burndown = []
+    for i in range(total_days):
+        remaining_ideal = total_tasks - (total_tasks * i / (total_days - 1)) if total_days > 1 else 0
+        ideal_burndown.append(max(0, round(remaining_ideal, 1)))
+    
+    # Calculate actual remaining tasks for each date
+    actual_remaining = []
+    for date_str in dates:
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        # Count tasks not completed by this date
+        remaining_count = 0
+        for task in tasks:
+            # Task is remaining if:
+            # 1. It's not completed, OR
+            # 2. It was completed after this date
+            if task.status != TaskStatus.COMPLETED:
+                remaining_count += 1
+            elif task.completed_date and task.completed_date > date_obj:
+                remaining_count += 1
+        
+        actual_remaining.append(remaining_count)
+    
+    return {
+        'burndown': {
+            'dates': dates,
+            'remaining': actual_remaining,
+            'ideal': ideal_burndown,
+            'total_tasks': total_tasks,
+            'tasks_completed': total_tasks - (actual_remaining[-1] if actual_remaining else total_tasks)
+        }
+    }
