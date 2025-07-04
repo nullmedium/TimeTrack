@@ -123,7 +123,7 @@
             </div>
             <div class="info-card">
                 <h4>Database</h4>
-                <p>SQLite</p>
+                <p>PostgreSQL</p>
             </div>
             <div class="info-card">
                 <h4>System Admin Access</h4>
@@ -155,9 +155,9 @@
                     <p>Run diagnostic checks to identify potential issues with the system.</p>
                 </div>
                 <div class="danger-actions">
-                    <button class="btn btn-warning" onclick="alert('System health check functionality would be implemented here.')">
+                    <a href="{{ url_for('system_admin_health') }}" class="btn btn-warning">
                         Run Health Check
-                    </button>
+                    </a>
                 </div>
             </div>
         </div>

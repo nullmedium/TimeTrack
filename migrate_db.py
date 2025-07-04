@@ -15,7 +15,7 @@ try:
     from app import app, db
     from models import (User, TimeEntry, WorkConfig, SystemSettings, Team, Role, Project, 
                        Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, 
-                       ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement)
+                       ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent)
     from werkzeug.security import generate_password_hash
     FLASK_AVAILABLE = True
 except ImportError:
@@ -71,6 +71,7 @@ def run_all_migrations(db_path=None):
     migrate_to_company_model(db_path)
     migrate_work_config_data(db_path)
     migrate_task_system(db_path)
+    migrate_system_events(db_path)
     
     if FLASK_AVAILABLE:
         with app.app_context():
@@ -678,6 +679,54 @@ def migrate_task_system(db_path):
         conn.close()
 
 
+def migrate_system_events(db_path):
+    """Create system_event table for activity logging."""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        # Check if system_event table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='system_event'")
+        if not cursor.fetchone():
+            print("Creating system_event table...")
+            cursor.execute("""
+            CREATE TABLE system_event (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type VARCHAR(50) NOT NULL,
+                event_category VARCHAR(30) NOT NULL,
+                description TEXT NOT NULL,
+                severity VARCHAR(20) DEFAULT 'info',
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER,
+                company_id INTEGER,
+                event_metadata TEXT,
+                ip_address VARCHAR(45),
+                user_agent TEXT,
+                FOREIGN KEY (user_id) REFERENCES user (id),
+                FOREIGN KEY (company_id) REFERENCES company (id)
+            )
+            """)
+            
+            # Add an initial system event if Flask is available
+            if FLASK_AVAILABLE:
+                # We'll add the initial event after the table is created
+                cursor.execute("""
+                INSERT INTO system_event (event_type, event_category, description, severity, timestamp)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, ('system_migration', 'system', 'SystemEvent table created and initialized', 'info'))
+                print("Added initial system event")
+
+        conn.commit()
+        print("System events migration completed successfully!")
+
+    except Exception as e:
+        print(f"Error during system events migration: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def migrate_data():
     """Handle data migration with Flask app context."""
     if not FLASK_AVAILABLE:
@@ -847,6 +896,8 @@ def main():
                        help='Run only company model migration')
     parser.add_argument('--basic', '-b', action='store_true',
                        help='Run only basic table migrations')
+    parser.add_argument('--system-events', '-s', action='store_true',
+                       help='Run only system events migration')
     
     args = parser.parse_args()
     
@@ -875,6 +926,9 @@ def main():
             
         elif args.basic:
             run_basic_migrations(db_path)
+            
+        elif args.system_events:
+            migrate_system_events(db_path)
             
         else:
             # Default: run all migrations

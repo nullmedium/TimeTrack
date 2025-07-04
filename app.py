@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data
@@ -481,15 +481,52 @@ def login():
                     session['username'] = user.username
                     session['role'] = user.role.value
 
+                    # Log successful login
+                    SystemEvent.log_event(
+                        'user_login',
+                        f'User {user.username} logged in successfully',
+                        'auth',
+                        'info',
+                        user_id=user.id,
+                        company_id=user.company_id,
+                        ip_address=request.remote_addr,
+                        user_agent=request.headers.get('User-Agent')
+                    )
+
                     flash('Login successful!', 'success')
                     return redirect(url_for('home'))
 
+        # Log failed login attempt
+        SystemEvent.log_event(
+            'login_failed',
+            f'Failed login attempt for username: {username}',
+            'auth',
+            'warning',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent')
+        )
+        
         flash('Invalid username or password', 'error')
 
     return render_template('login.html', title='Login')
 
 @app.route('/logout')
 def logout():
+    # Log logout event before clearing session
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
+        if user:
+            SystemEvent.log_event(
+                'user_logout',
+                f'User {user.username} logged out',
+                'auth',
+                'info',
+                user_id=user.id,
+                company_id=user.company_id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+    
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
@@ -1195,9 +1232,33 @@ def verify_2fa():
             session['username'] = user.username
             session['role'] = user.role.value
 
+            # Log successful 2FA login
+            SystemEvent.log_event(
+                'user_login_2fa',
+                f'User {user.username} logged in successfully with 2FA',
+                'auth',
+                'info',
+                user_id=user.id,
+                company_id=user.company_id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+
             flash('Login successful!', 'success')
             return redirect(url_for('home'))
         else:
+            # Log failed 2FA attempt
+            SystemEvent.log_event(
+                '2fa_failed',
+                f'Failed 2FA verification for user {user.username}',
+                'auth',
+                'warning',
+                user_id=user.id,
+                company_id=user.company_id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+            
             flash('Invalid verification code. Please try again.', 'error')
 
     return render_template('verify_2fa.html', title='Two-Factor Authentication')
@@ -2046,6 +2107,72 @@ def system_admin_settings():
                          total_companies=total_companies,
                          total_users=total_users,
                          total_system_admins=total_system_admins)
+
+@app.route('/system-admin/health')
+@system_admin_required  
+def system_admin_health():
+    """System Admin: System health check and event log"""
+    # Get system health summary
+    health_summary = SystemEvent.get_system_health_summary()
+    
+    # Get recent events (last 7 days)
+    recent_events = SystemEvent.get_recent_events(days=7, limit=100)
+    
+    # Get events by severity for quick stats
+    errors = SystemEvent.get_events_by_severity('error', days=7, limit=20)
+    warnings = SystemEvent.get_events_by_severity('warning', days=7, limit=20)
+    
+    # System metrics
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    
+    # Database connection test
+    db_healthy = True
+    db_error = None
+    try:
+        db.session.execute('SELECT 1')
+    except Exception as e:
+        db_healthy = False
+        db_error = str(e)
+        SystemEvent.log_event(
+            'database_check_failed',
+            f'Database health check failed: {str(e)}',
+            'system',
+            'error'
+        )
+    
+    # Application uptime (approximate based on first event)
+    first_event = SystemEvent.query.order_by(SystemEvent.timestamp.asc()).first()
+    uptime_start = first_event.timestamp if first_event else now
+    uptime_duration = now - uptime_start
+    
+    # Recent activity stats
+    today = now.date()
+    today_events = SystemEvent.query.filter(
+        func.date(SystemEvent.timestamp) == today
+    ).count()
+    
+    # Log the health check
+    SystemEvent.log_event(
+        'system_health_check',
+        f'System health check performed by {session.get("username", "unknown")}',
+        'system',
+        'info',
+        user_id=session.get('user_id'),
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent')
+    )
+    
+    return render_template('system_admin_health.html',
+                         title='System Health Check',
+                         health_summary=health_summary,
+                         recent_events=recent_events,
+                         errors=errors,
+                         warnings=warnings,
+                         db_healthy=db_healthy,
+                         db_error=db_error,
+                         uptime_duration=uptime_duration,
+                         today_events=today_events)
 
 @app.route('/system-admin/announcements')
 @system_admin_required
