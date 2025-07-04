@@ -1,8 +1,8 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="timetrack-container">
-    <div class="task-header">
+<div class="page-container timetrack-container">
+    <div class="page-header task-header">
         <div class="project-info">
             <h2>Tasks for Project: {{ project.code }} - {{ project.name }}</h2>
             <p class="project-description">{{ project.description or 'No description available' }}</p>
@@ -12,7 +12,7 @@
             </span>
             {% endif %}
         </div>
-        <div class="task-actions">
+        <div class="page-actions task-actions">
             <button id="create-task-btn" class="btn btn-success">Create New Task</button>
             <a href="{{ url_for('admin_projects') }}" class="btn btn-secondary">Back to Projects</a>
         </div>

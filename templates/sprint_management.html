@@ -1,11 +1,11 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="sprint-management-container">
+<div class="management-container sprint-management-container">
     <!-- Header Section -->
-    <div class="sprint-header">
+    <div class="management-header sprint-header">
         <h1>🏃‍♂️ Sprint Management</h1>
-        <div class="sprint-controls">
+        <div class="management-controls sprint-controls">
             <!-- View Switcher -->
             <div class="view-switcher">
                 <button class="view-btn active" data-view="active">Active Sprints</button>
@@ -15,7 +15,7 @@
             </div>
             
             <!-- Actions -->
-            <div class="sprint-actions">
+            <div class="management-actions sprint-actions">
                 <button id="add-sprint-btn" class="btn btn-primary">+ New Sprint</button>
                 <button id="refresh-sprints" class="btn btn-secondary">🔄 Refresh</button>
             </div>
@@ -23,7 +23,7 @@
     </div>
 
     <!-- Sprint Statistics -->
-    <div class="sprint-stats">
+    <div class="management-stats sprint-stats">
         <div class="stat-card">
             <div class="stat-number" id="total-sprints">0</div>
             <div class="stat-label">Total Sprints</div>
@@ -43,7 +43,7 @@
     </div>
 
     <!-- Sprint Grid -->
-    <div class="sprint-grid" id="sprint-grid">
+    <div class="management-grid sprint-grid" id="sprint-grid">
         <!-- Sprint cards will be populated here -->
     </div>
 
@@ -228,18 +228,7 @@
 }
 
 .sprint-card {
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 1.5rem;
-    cursor: pointer;
-    transition: box-shadow 0.2s, transform 0.1s;
-    position: relative;
-}
-
-.sprint-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    transform: translateY(-2px);
+    /* Sprint card inherits from .management-card */
 }
 
 .sprint-card-header {
@@ -256,18 +245,10 @@
     color: #333;
 }
 
-.sprint-status {
+.status-badge {
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-transform: uppercase;
 }
-
-.sprint-status.PLANNING { background: #fff3cd; color: #856404; }
-.sprint-status.ACTIVE { background: #d1ecf1; color: #0c5460; }
-.sprint-status.COMPLETED { background: #d4edda; color: #155724; }
-.sprint-status.CANCELLED { background: #f8d7da; color: #721c24; }
 
 .sprint-dates {
     font-size: 0.9rem;
@@ -279,25 +260,6 @@
     margin-bottom: 1rem;
 }
 
-.progress-bar {
-    width: 100%;
-    height: 8px;
-    background: #e9ecef;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #007bff, #0056b3);
-    transition: width 0.3s ease;
-}
-
-.progress-text {
-    font-size: 0.8rem;
-    color: #666;
-    margin-top: 0.25rem;
-}
 
 .sprint-metrics {
     display: grid;
@@ -330,91 +292,9 @@
     line-height: 1.4;
 }
 
-.loading-spinner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-}
 
-.spinner {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #007bff;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.error-alert {
-    background: #f8d7da;
-    color: #721c24;
-    padding: 1rem;
-    border-radius: 6px;
-    text-align: center;
-    margin: 1rem 0;
-}
-
-.modal.large .modal-content {
-    max-width: 800px;
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-}
-
-.form-group {
-    margin-bottom: 1rem;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 0.25rem;
-    font-weight: 500;
-    color: #333;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
 
 @media (max-width: 768px) {
-    .sprint-header {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .sprint-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .view-switcher {
-        justify-content: center;
-    }
-    
-    .sprint-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-    
     .sprint-metrics {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -536,7 +416,7 @@ class SprintManager {
 
     createSprintCard(sprint) {
         const card = document.createElement('div');
-        card.className = 'sprint-card';
+        card.className = 'management-card sprint-card';
         card.addEventListener('click', () => this.openSprintModal(sprint));
 
         const startDate = new Date(sprint.start_date);

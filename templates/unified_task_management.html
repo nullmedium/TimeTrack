@@ -1,11 +1,11 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="task-management-container">
+<div class="management-container task-management-container">
     <!-- Header Section -->
-    <div class="task-header">
+    <div class="management-header task-header">
         <h1>📋 Task Management</h1>
-        <div class="task-controls">
+        <div class="management-controls task-controls">
             <!-- View Switcher -->
             <div class="view-switcher">
                 <button class="view-btn active" data-view="all">All Tasks</button>
@@ -66,7 +66,7 @@
             </div>
             
             <!-- Actions -->
-            <div class="task-actions">
+            <div class="management-actions task-actions">
                 <button id="add-task-btn" class="btn btn-primary">+ Add Task</button>
                 <button id="refresh-tasks" class="btn btn-secondary">🔄 Refresh</button>
             </div>
@@ -74,7 +74,7 @@
     </div>
 
     <!-- Task Statistics -->
-    <div class="task-stats">
+    <div class="management-stats task-stats">
         <div class="stat-card">
             <div class="stat-number" id="total-tasks">0</div>
             <div class="stat-label">Total Tasks</div>
@@ -255,58 +255,7 @@
 
 <!-- Styles -->
 <style>
-.task-management-container {
-    padding: 1rem;
-    max-width: 100%;
-    margin: 0 auto;
-}
-
-.task-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.task-header h1 {
-    margin: 0;
-    color: #333;
-}
-
-.task-controls {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    align-items: center;
-}
-
-.view-switcher {
-    display: flex;
-    background: #f8f9fa;
-    border-radius: 6px;
-    padding: 2px;
-}
-
-.view-btn {
-    padding: 0.5rem 1rem;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.2s;
-}
-
-.view-btn.active {
-    background: #007bff;
-    color: white;
-}
-
-.view-btn:hover:not(.active) {
-    background: #e9ecef;
-}
-
+/* Task-specific filters */
 .task-filters {
     display: flex;
     gap: 0.5rem;
@@ -342,38 +291,6 @@
     color: #666;
     margin: 0;
     white-space: nowrap;
-}
-
-.task-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.task-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.stat-card {
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 1rem;
-    text-align: center;
-}
-
-.stat-number {
-    font-size: 2rem;
-    font-weight: bold;
-    color: #007bff;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    color: #666;
-    margin-top: 0.25rem;
 }
 
 .kanban-board {
@@ -452,17 +369,6 @@
     font-size: 0.95rem;
 }
 
-.task-priority {
-    padding: 0.125rem 0.375rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.task-priority.LOW { background: #d4edda; color: #155724; }
-.task-priority.MEDIUM { background: #fff3cd; color: #856404; }
-.task-priority.HIGH { background: #f8d7da; color: #721c24; }
-.task-priority.URGENT { background: #f5c6cb; color: #721c24; }
 
 .task-project {
     font-size: 0.8rem;
@@ -491,67 +397,7 @@
     font-weight: bold;
 }
 
-.loading-spinner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-}
 
-.spinner {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #007bff;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.error-alert {
-    background: #f8d7da;
-    color: #721c24;
-    padding: 1rem;
-    border-radius: 6px;
-    text-align: center;
-    margin: 1rem 0;
-}
-
-.modal.large .modal-content {
-    max-width: 800px;
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-}
-
-.form-group {
-    margin-bottom: 1rem;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 0.25rem;
-    font-weight: 500;
-    color: #333;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
 
 .subtasks-section {
     margin-top: 1.5rem;
@@ -585,25 +431,7 @@
 }
 
 @media (max-width: 768px) {
-    .task-header {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .task-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .view-switcher {
-        justify-content: center;
-    }
-    
     .kanban-board {
-        grid-template-columns: 1fr;
-    }
-    
-    .form-row {
         grid-template-columns: 1fr;
     }
 }
@@ -889,7 +717,7 @@ class UnifiedTaskManager {
 
     createTaskCard(task) {
         const card = document.createElement('div');
-        card.className = 'task-card';
+        card.className = 'management-card task-card';
         card.dataset.taskId = task.id;
         card.addEventListener('click', () => this.openTaskModal(task));
 
@@ -899,7 +727,7 @@ class UnifiedTaskManager {
         card.innerHTML = `
             <div class="task-card-header">
                 <h4 class="task-title">${task.name}</h4>
-                <span class="task-priority ${task.priority}">${task.priority}</span>
+                <span class="priority-badge ${task.priority}">${task.priority}</span>
             </div>
             ${task.project_name ? `<div class="task-project">${task.project_code} - ${task.project_name}</div>` : ''}
             <div class="task-meta">

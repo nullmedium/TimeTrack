@@ -1,8 +1,8 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="kanban-overview-container">
-    <div class="overview-header">
+<div class="page-container kanban-overview-container">
+    <div class="page-header overview-header">
         <h2>Unified Kanban Boards</h2>
         <p class="overview-description">Organize tasks from any project on shared company-wide boards</p>
     </div>
@@ -39,8 +39,8 @@
     {% if boards %}
     <div class="boards-grid">
         {% for board in boards %}
-        <div class="board-card">
-            <div class="board-header">
+        <div class="card board-card">
+            <div class="card-header board-header">
                 <div class="board-info">
                     <h3 class="board-name">
                         {{ board.name }}
@@ -197,18 +197,9 @@
 </div>
 
 <style>
-.kanban-overview-container {
-    padding: 1rem;
-}
-
+/* Container and header styles now inherited from common styles.css */
 .overview-header {
-    margin-bottom: 2rem;
     text-align: center;
-}
-
-.overview-header h2 {
-    margin: 0 0 0.5rem 0;
-    color: #333;
 }
 
 .overview-description {
@@ -223,16 +214,8 @@
 }
 
 .board-card {
-    background: white;
-    border: 1px solid #dee2e6;
+    /* Card styling now inherited from common .card class */
     border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: box-shadow 0.2s ease;
-}
-
-.board-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .board-header {

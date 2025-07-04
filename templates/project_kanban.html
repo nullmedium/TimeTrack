@@ -1,13 +1,13 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="kanban-container">
+<div class="page-container kanban-container">
     <div class="kanban-header">
         <div class="project-info">
             <h2>Unified Kanban Board</h2>
             <p class="project-description">Organize tasks from any project on shared boards</p>
             {% if project %}
-            <div class="project-context">
+            <div class="context-info project-context">
                 <span class="context-label">Project Context:</span>
                 <span class="project-code">{{ project.code }}</span>
                 <span class="project-name">{{ project.name }}</span>
@@ -19,7 +19,7 @@
             </div>
             {% endif %}
         </div>
-        <div class="kanban-actions">
+        <div class="page-actions kanban-actions">
             {% if g.user.role.value in ['Team Leader', 'Supervisor', 'Administrator', 'System Administrator'] %}
             <button id="create-board-btn" class="btn btn-md btn-success">Create Board</button>
             <button id="manage-columns-btn" class="btn btn-md btn-warning" style="display: none;">Manage Columns</button>
@@ -260,42 +260,9 @@
     margin: 0 0 0.5rem 0;
 }
 
-.project-context {
-    margin-top: 1rem;
-    padding: 0.75rem;
-    background: #f8f9fa;
-    border-radius: 6px;
-    border-left: 4px solid #007bff;
-}
+/* Project context styles now inherited from common styles.css */
 
-.context-label {
-    font-weight: 600;
-    color: #333;
-    margin-right: 0.5rem;
-}
-
-.project-code {
-    background: #007bff;
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    margin-right: 0.5rem;
-}
-
-.project-name {
-    font-weight: 500;
-    color: #333;
-    margin-right: 0.5rem;
-}
-
-.kanban-actions {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
+/* Kanban actions styles now inherited from common .page-actions */
 
 /* Button styles now centralized in main style.css */
 
