@@ -30,7 +30,7 @@
                     
                     <div class="form-group">
                         <label for="task-description">Description</label>
-                        <textarea id="task-description" rows="3"></textarea>
+                        <textarea id="task-description" rows="2"></textarea>
                     </div>
                     
                     <div class="form-group">
@@ -210,21 +210,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Task Modal Styles -->
 <style>
-/* Task Modal Specific Styles */
+/* Task Modal Specific Styles - Compact Design */
 .task-modal .modal-content {
     width: 95%;
-    max-width: 1000px;
-    max-height: 95vh;
+    max-width: 900px;
+    max-height: 90vh;
     overflow-y: auto;
 }
 
+.task-modal .modal-header {
+    padding: 0.75rem 1rem;
+}
+
+.task-modal .modal-header h2 {
+    font-size: 1.25rem;
+    margin: 0;
+}
+
 .task-modal-content .modal-body {
-    padding: 1.5rem;
+    padding: 1rem;
 }
 
 .form-section {
-    margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
     border-bottom: 1px solid #e9ecef;
 }
 
@@ -234,57 +243,57 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .form-section h3 {
-    margin: 0 0 1rem 0;
+    margin: 0 0 0.75rem 0;
     color: #495057;
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
-    padding-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
     border-bottom: 2px solid #f8f9fa;
 }
 
-/* Dependencies Grid */
+/* Dependencies Grid - Compact */
 .dependencies-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+    gap: 1rem;
 }
 
 .dependency-column {
     background: #f8f9fa;
-    border-radius: 8px;
-    padding: 1rem;
+    border-radius: 6px;
+    padding: 0.75rem;
 }
 
 .dependency-column h4 {
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 0.25rem 0;
     color: #495057;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 600;
 }
 
 .dependency-help {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: #6c757d;
-    margin: 0 0 1rem 0;
-    line-height: 1.4;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.3;
 }
 
 .dependency-list {
-    min-height: 60px;
-    margin-bottom: 1rem;
+    min-height: 40px;
+    margin-bottom: 0.5rem;
 }
 
 .dependency-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.6rem;
+    padding: 0.4rem 0.5rem;
     background: white;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-bottom: 0.3rem;
+    font-size: 0.85rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .dependency-task-info {
@@ -332,15 +341,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .add-dependency-form {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.3rem;
 }
 
 .dependency-input {
     flex: 1;
-    padding: 0.5rem;
+    padding: 0.3rem 0.5rem;
     border: 1px solid #ddd;
     border-radius: 4px;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-family: 'Courier New', monospace;
     background: white;
 }
@@ -356,13 +365,13 @@ document.addEventListener('DOMContentLoaded', function() {
     font-style: italic;
 }
 
-/* Subtasks Section */
+/* Subtasks Section - Compact */
 .subtask-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-    padding: 0.5rem;
+    gap: 0.3rem;
+    margin-bottom: 0.3rem;
+    padding: 0.3rem 0.5rem;
     background: #f8f9fa;
     border-radius: 4px;
 }
@@ -370,11 +379,13 @@ document.addEventListener('DOMContentLoaded', function() {
 .subtask-item input[type="text"] {
     flex: 1;
     margin: 0;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
 }
 
 .subtask-item button {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.7rem;
 }
 
 /* Hybrid Date Input Styles */
@@ -422,6 +433,70 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .calendar-picker-btn:hover {
     background: #e9ecef;
+}
+
+/* Compact Form Styles */
+.form-group {
+    margin-bottom: 0.75rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #495057;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    transition: border-color 0.15s ease-in-out;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.1rem rgba(0, 123, 255, 0.25);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 50px;
+}
+
+.form-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.form-row .form-group {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+/* Compact button styles */
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+.modal-footer {
+    padding: 0.75rem 1rem;
+    gap: 0.5rem;
+}
+
+.modal-footer .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
 }
 
 /* Mobile Responsiveness */

@@ -246,6 +246,39 @@
     flex-shrink: 0;
 }
 
+/* Subtask progress styles */
+.task-subtasks {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.subtask-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.subtask-progress-bar {
+    flex: 1;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.subtask-progress-fill {
+    height: 100%;
+    background: #28a745;
+    transition: width 0.3s ease;
+}
+
+.subtask-count {
+    font-size: 0.75rem;
+    color: #6c757d;
+    white-space: nowrap;
+}
+
 @media (max-width: 768px) {
     .task-controls {
         flex-direction: column;
@@ -1538,12 +1571,32 @@ class UnifiedTaskManager {
                 <span class="task-assignee">${task.assigned_to_name || 'Unassigned'}</span>
                 ${dueDate ? `<span class="task-due-date ${isOverdue ? 'overdue' : ''}">${formatUserDate(task.due_date)}</span>` : ''}
             </div>
+            ${task.subtasks && task.subtasks.length > 0 ? this.renderSubtaskProgress(task.subtasks) : ''}
             ${task.status === 'COMPLETED' ? `<div class="task-completed-date">Completed: ${formatUserDate(task.completed_date)}</div>` : ''}
             ${task.status === 'ARCHIVED' ? `<div class="task-archived-date">Archived: ${formatUserDate(task.archived_date)}</div>` : ''}
             ${actionButtons}
         `;
 
         return card;
+    }
+
+    renderSubtaskProgress(subtasks) {
+        if (!subtasks || subtasks.length === 0) return '';
+        
+        const completedCount = subtasks.filter(s => s.status === 'COMPLETED').length;
+        const totalCount = subtasks.length;
+        const percentage = Math.round((completedCount / totalCount) * 100);
+        
+        return `
+            <div class="task-subtasks">
+                <div class="subtask-progress">
+                    <div class="subtask-progress-bar">
+                        <div class="subtask-progress-fill" style="width: ${percentage}%"></div>
+                    </div>
+                    <span class="subtask-count">${completedCount}/${totalCount} subtasks</span>
+                </div>
+            </div>
+        `;
     }
 
     applyFilters() {
@@ -1634,6 +1687,31 @@ class UnifiedTaskManager {
         }
     }
 
+    async refreshTaskCard(taskId) {
+        // Fetch updated task data
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`);
+            const task = await response.json();
+            
+            if (task) {
+                // Find and replace the task card
+                const oldCard = document.querySelector(`[data-task-id="${taskId}"]`);
+                if (oldCard) {
+                    const newCard = this.createTaskCard(task);
+                    oldCard.replaceWith(newCard);
+                }
+                
+                // Update task in local array
+                const index = this.tasks.findIndex(t => t.id == taskId);
+                if (index !== -1) {
+                    this.tasks[index] = task;
+                }
+            }
+        } catch (error) {
+            console.error('Error refreshing task card:', error);
+        }
+    }
+
     async handleTaskMove(evt) {
         const taskId = evt.item.dataset.taskId;
         const newStatus = evt.to.id.replace('column-', '');
@@ -1688,6 +1766,9 @@ class UnifiedTaskManager {
             
             // Load dependencies
             await this.loadDependencies(task.id);
+            
+            // Initialize subtasks
+            initializeSubtasks(task.id);
         } else {
             document.getElementById('modal-title').textContent = 'Add New Task';
             document.getElementById('task-form').reset();
@@ -1696,6 +1777,9 @@ class UnifiedTaskManager {
             
             // Clear dependencies
             this.clearDependencies();
+            
+            // Initialize empty subtasks
+            initializeSubtasks(null);
         }
         
         modal.style.display = 'block';
@@ -1737,6 +1821,12 @@ class UnifiedTaskManager {
             
             const data = await response.json();
             if (data.success) {
+                // Save subtasks if we have a task ID
+                const savedTaskId = isEdit ? taskId : data.task.id;
+                if (savedTaskId) {
+                    await saveSubtasks(savedTaskId);
+                }
+                
                 closeTaskModal();
                 await this.loadTasks();
             } else {
@@ -1948,5 +2038,18 @@ window.onclick = function(event) {
         closeTaskModal();
     }
 };
+
+// Make team members available globally for subtasks
+window.teamMembers = {{ team_members | tojson }};
+
+// Make refreshTaskCard available globally
+window.refreshTaskCard = function(taskId) {
+    if (window.taskManager) {
+        window.taskManager.refreshTaskCard(taskId);
+    }
+};
 </script>
+
+<!-- Include subtasks functionality -->
+<script src="{{ url_for('static', filename='js/subtasks.js') }}"></script>
 {% endblock %}

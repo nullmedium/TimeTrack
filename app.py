@@ -3725,10 +3725,18 @@ def unified_task_management():
             User.role.in_([Role.ADMIN, Role.SUPERVISOR])
         ).order_by(User.username).all()
     
+    # Convert team members to JSON-serializable format
+    team_members_data = [{
+        'id': member.id,
+        'username': member.username,
+        'email': member.email,
+        'role': member.role.value if member.role else 'Team Member'
+    } for member in team_members]
+    
     return render_template('unified_task_management.html',
                          title='Task Management',
                          available_projects=available_projects,
-                         team_members=team_members)
+                         team_members=team_members_data)
 
 # Sprint Management Route
 @app.route('/sprints')
@@ -3815,7 +3823,14 @@ def create_task():
         db.session.add(task)
         db.session.commit()
 
-        return jsonify({'success': True, 'message': 'Task created successfully'})
+        return jsonify({
+            'success': True, 
+            'message': 'Task created successfully',
+            'task': {
+                'id': task.id,
+                'task_number': task.task_number
+            }
+        })
 
     except Exception as e:
         db.session.rollback()
@@ -3836,17 +3851,33 @@ def get_task(task_id):
 
         task_data = {
             'id': task.id,
+            'task_number': getattr(task, 'task_number', f'TSK-{task.id:03d}'),
             'name': task.name,
             'description': task.description,
             'status': task.status.name,
             'priority': task.priority.name,
             'estimated_hours': task.estimated_hours,
             'assigned_to_id': task.assigned_to_id,
+            'assigned_to_name': task.assigned_to.username if task.assigned_to else None,
+            'project_id': task.project_id,
+            'project_name': task.project.name if task.project else None,
+            'project_code': task.project.code if task.project else None,
             'start_date': task.start_date.isoformat() if task.start_date else None,
-            'due_date': task.due_date.isoformat() if task.due_date else None
+            'due_date': task.due_date.isoformat() if task.due_date else None,
+            'completed_date': task.completed_date.isoformat() if task.completed_date else None,
+            'archived_date': task.archived_date.isoformat() if task.archived_date else None,
+            'sprint_id': task.sprint_id,
+            'subtasks': [{
+                'id': subtask.id,
+                'name': subtask.name,
+                'status': subtask.status.name,
+                'priority': subtask.priority.name,
+                'assigned_to_id': subtask.assigned_to_id,
+                'assigned_to_name': subtask.assigned_to.username if subtask.assigned_to else None
+            } for subtask in task.subtasks] if task.subtasks else []
         }
 
-        return jsonify({'success': True, 'task': task_data})
+        return jsonify(task_data)
 
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
@@ -3977,6 +4008,14 @@ def get_unified_tasks():
                 'created_at': task.created_at.isoformat(),
                 'is_team_task': is_team_task,
                 'subtask_count': len(task.subtasks) if task.subtasks else 0,
+                'subtasks': [{
+                    'id': subtask.id,
+                    'name': subtask.name,
+                    'status': subtask.status.name,
+                    'priority': subtask.priority.name,
+                    'assigned_to_id': subtask.assigned_to_id,
+                    'assigned_to_name': subtask.assigned_to.username if subtask.assigned_to else None
+                } for subtask in task.subtasks] if task.subtasks else [],
                 'sprint_id': task.sprint_id,
                 'sprint_name': task.sprint.name if task.sprint else None,
                 'is_current_sprint': task.sprint.is_current if task.sprint else False

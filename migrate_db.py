@@ -684,11 +684,21 @@ def migrate_task_system(db_path):
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 created_by_id INTEGER NOT NULL,
-                FOREIGN KEY (task_id) REFERENCES task (id),
+                FOREIGN KEY (task_id) REFERENCES task (id) ON DELETE CASCADE,
                 FOREIGN KEY (assigned_to_id) REFERENCES user (id),
                 FOREIGN KEY (created_by_id) REFERENCES user (id)
             )
             """)
+            
+            # Create index for better performance
+            print("Creating index on sub_task.task_id...")
+            cursor.execute("CREATE INDEX idx_subtask_task_id ON sub_task(task_id)")
+        else:
+            # Check if the index exists
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_subtask_task_id'")
+            if not cursor.fetchone():
+                print("Creating missing index on sub_task.task_id...")
+                cursor.execute("CREATE INDEX idx_subtask_task_id ON sub_task(task_id)")
 
         # Check if task_dependency table exists
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_dependency'")
@@ -1071,6 +1081,41 @@ def migrate_postgresql_schema():
                         CHECK (blocked_task_id <> blocking_task_id)
                     )
                 """))
+                db.session.commit()
+            
+            # Check if sub_task table exists
+            result = db.session.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_name = 'sub_task'
+            """))
+            
+            if not result.fetchone():
+                print("Creating sub_task table...")
+                db.session.execute(text("""
+                    CREATE TABLE sub_task (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(200) NOT NULL,
+                        description TEXT,
+                        status taskstatus DEFAULT 'NOT_STARTED',
+                        priority taskpriority DEFAULT 'MEDIUM',
+                        estimated_hours FLOAT,
+                        task_id INTEGER NOT NULL,
+                        assigned_to_id INTEGER,
+                        start_date DATE,
+                        due_date DATE,
+                        completed_date DATE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        created_by_id INTEGER NOT NULL,
+                        FOREIGN KEY (task_id) REFERENCES task (id) ON DELETE CASCADE,
+                        FOREIGN KEY (assigned_to_id) REFERENCES "user" (id),
+                        FOREIGN KEY (created_by_id) REFERENCES "user" (id)
+                    )
+                """))
+                
+                # Create index for better performance
+                db.session.execute(text("CREATE INDEX idx_subtask_task_id ON sub_task(task_id)"))
                 db.session.commit()
             
             print("PostgreSQL schema migration completed successfully!")
