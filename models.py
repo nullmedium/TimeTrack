@@ -421,6 +421,7 @@ class TaskStatus(enum.Enum):
     IN_PROGRESS = "In Progress"
     ON_HOLD = "On Hold"
     COMPLETED = "Completed"
+    ARCHIVED = "Archived"
     CANCELLED = "Cancelled"
 
 # Task priority enumeration
@@ -455,6 +456,7 @@ class Task(db.Model):
     start_date = db.Column(db.Date, nullable=True)
     due_date = db.Column(db.Date, nullable=True)
     completed_date = db.Column(db.Date, nullable=True)
+    archived_date = db.Column(db.Date, nullable=True)
 
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.now)

@@ -22,6 +22,7 @@
             <div class="management-actions task-actions">
                 <button id="add-task-btn" class="btn btn-primary">+ Add Task</button>
                 <button id="refresh-tasks" class="btn btn-secondary">🔄 Refresh</button>
+                <button id="toggle-archived" class="btn btn-outline" title="Show/Hide Archived Tasks">📦 Show Archived</button>
             </div>
         </div>
     </div>
@@ -43,6 +44,10 @@
         <div class="stat-card">
             <div class="stat-number" id="overdue-tasks">0</div>
             <div class="stat-label">Overdue</div>
+        </div>
+        <div class="stat-card" id="archived-stat-card" style="display: none;">
+            <div class="stat-number" id="archived-tasks">0</div>
+            <div class="stat-label">Archived</div>
         </div>
     </div>
 
@@ -85,6 +90,16 @@
             </div>
             <div class="column-content" id="column-COMPLETED">
                 <!-- Task cards will be populated here -->
+            </div>
+        </div>
+        
+        <div class="task-column archived-column" data-status="ARCHIVED" style="display: none;">
+            <div class="column-header">
+                <h3>📦 Archived</h3>
+                <span class="task-count">0</span>
+            </div>
+            <div class="column-content" id="column-ARCHIVED">
+                <!-- Archived task cards will be populated here -->
             </div>
         </div>
     </div>
@@ -281,6 +296,88 @@
     padding: 0.25rem 0.5rem;
     border-radius: 12px;
     font-size: 0.8rem;
+}
+
+/* Archived Column Styles */
+.archived-column {
+    background: #f1f3f4;
+    border: 2px dashed #9aa0a6;
+    opacity: 0.8;
+}
+
+.archived-column .column-header {
+    border-bottom-color: #9aa0a6;
+}
+
+.archived-column .task-count {
+    background: #9aa0a6;
+}
+
+/* Archived Task Card Styles */
+.archived-column .task-card {
+    opacity: 0.7;
+    border-left: 4px solid #9aa0a6;
+}
+
+/* Button Styles */
+.btn.btn-outline {
+    background: transparent;
+    border: 1px solid #6c757d;
+    color: #6c757d;
+}
+
+.btn.btn-outline:hover {
+    background: #6c757d;
+    color: white;
+}
+
+.btn.btn-outline.active {
+    background: #6c757d;
+    color: white;
+}
+
+/* Task Action Buttons */
+.task-actions {
+    margin-top: 0.5rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.25rem;
+}
+
+.archive-btn, .restore-btn {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.archive-btn:hover {
+    background: #f8f9fa;
+    border-color: #6c757d;
+}
+
+.restore-btn:hover {
+    background: #e3f2fd;
+    border-color: #007bff;
+}
+
+/* Task Date Displays */
+.task-completed-date, .task-archived-date {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+    font-style: italic;
+}
+
+.task-completed-date {
+    color: #28a745;
+}
+
+.task-archived-date {
+    color: #9aa0a6;
 }
 
 .column-content {
@@ -879,6 +976,7 @@ class UnifiedTaskManager {
         };
         this.currentTask = null;
         this.sortableInstances = [];
+        this.showArchived = false;
         this.currentUserId = {{ g.user.id|tojson }};
         this.smartSearch = new SmartTaskSearch();
         this.searchQuery = '';
@@ -904,6 +1002,10 @@ class UnifiedTaskManager {
 
         document.getElementById('refresh-tasks').addEventListener('click', () => {
             this.loadTasks();
+        });
+
+        document.getElementById('toggle-archived').addEventListener('click', () => {
+            this.toggleArchivedView();
         });
         
         // Date validation
@@ -1287,7 +1389,8 @@ class UnifiedTaskManager {
             'NOT_STARTED': [],
             'IN_PROGRESS': [],
             'ON_HOLD': [],
-            'COMPLETED': []
+            'COMPLETED': [],
+            'ARCHIVED': []
         };
 
         filteredTasks.forEach(task => {
@@ -1404,8 +1507,24 @@ class UnifiedTaskManager {
         card.addEventListener('click', () => this.openTaskModal(task));
 
         const dueDate = task.due_date ? new Date(task.due_date) : null;
-        const isOverdue = dueDate && dueDate < new Date() && task.status !== 'COMPLETED';
-
+        const isOverdue = dueDate && dueDate < new Date() && task.status !== 'COMPLETED' && task.status !== 'ARCHIVED';
+        
+        // Add archive/restore buttons for completed and archived tasks
+        let actionButtons = '';
+        if (task.status === 'COMPLETED') {
+            actionButtons = `
+                <div class="task-actions">
+                    <button class="archive-btn" onclick="taskManager.archiveTask(${task.id}); event.stopPropagation();" title="Archive Task">📦</button>
+                </div>
+            `;
+        } else if (task.status === 'ARCHIVED') {
+            actionButtons = `
+                <div class="task-actions">
+                    <button class="restore-btn" onclick="taskManager.restoreTask(${task.id}); event.stopPropagation();" title="Restore Task">↩️</button>
+                </div>
+            `;
+        }
+        
         card.innerHTML = `
             <div class="task-card-header">
                 <div class="task-title-section">
@@ -1419,6 +1538,9 @@ class UnifiedTaskManager {
                 <span class="task-assignee">${task.assigned_to_name || 'Unassigned'}</span>
                 ${dueDate ? `<span class="task-due-date ${isOverdue ? 'overdue' : ''}">${formatUserDate(task.due_date)}</span>` : ''}
             </div>
+            ${task.status === 'COMPLETED' ? `<div class="task-completed-date">Completed: ${formatUserDate(task.completed_date)}</div>` : ''}
+            ${task.status === 'ARCHIVED' ? `<div class="task-archived-date">Archived: ${formatUserDate(task.archived_date)}</div>` : ''}
+            ${actionButtons}
         `;
 
         return card;
@@ -1432,15 +1554,84 @@ class UnifiedTaskManager {
         const total = this.tasks.length;
         const completed = this.tasks.filter(t => t.status === 'COMPLETED').length;
         const inProgress = this.tasks.filter(t => t.status === 'IN_PROGRESS').length;
+        const archived = this.tasks.filter(t => t.status === 'ARCHIVED').length;
         const overdue = this.tasks.filter(t => {
             const dueDate = t.due_date ? new Date(t.due_date) : null;
-            return dueDate && dueDate < new Date() && t.status !== 'COMPLETED';
+            return dueDate && dueDate < new Date() && t.status !== 'COMPLETED' && t.status !== 'ARCHIVED';
         }).length;
 
         document.getElementById('total-tasks').textContent = total;
         document.getElementById('completed-tasks').textContent = completed;
         document.getElementById('in-progress-tasks').textContent = inProgress;
         document.getElementById('overdue-tasks').textContent = overdue;
+        document.getElementById('archived-tasks').textContent = archived;
+    }
+
+    toggleArchivedView() {
+        this.showArchived = !this.showArchived;
+        const toggleBtn = document.getElementById('toggle-archived');
+        const archivedColumn = document.querySelector('.archived-column');
+        const archivedStatCard = document.getElementById('archived-stat-card');
+        
+        if (this.showArchived) {
+            toggleBtn.textContent = '📦 Hide Archived';
+            toggleBtn.classList.add('active');
+            archivedColumn.style.display = 'block';
+            archivedStatCard.style.display = 'block';
+        } else {
+            toggleBtn.textContent = '📦 Show Archived';
+            toggleBtn.classList.remove('active');
+            archivedColumn.style.display = 'none';
+            archivedStatCard.style.display = 'none';
+        }
+        
+        this.renderTasks();
+    }
+
+    async archiveTask(taskId) {
+        if (confirm('Are you sure you want to archive this task? It will be moved to the archived section.')) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}/archive`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    await this.loadTasks();
+                } else {
+                    alert('Failed to archive task: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error archiving task:', error);
+                alert('Failed to archive task: ' + error.message);
+            }
+        }
+    }
+
+    async restoreTask(taskId) {
+        if (confirm('Are you sure you want to restore this task? It will be moved back to completed status.')) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}/restore`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    await this.loadTasks();
+                } else {
+                    alert('Failed to restore task: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error restoring task:', error);
+                alert('Failed to restore task: ' + error.message);
+            }
+        }
     }
 
     async handleTaskMove(evt) {

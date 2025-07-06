@@ -69,6 +69,15 @@ def run_migrations():
         with app.app_context():
             db.create_all()
             init_system_settings()
+            
+            # Run PostgreSQL-specific migrations
+            try:
+                from migrate_db import migrate_postgresql_schema
+                migrate_postgresql_schema()
+            except ImportError:
+                print("PostgreSQL migration function not available")
+            except Exception as e:
+                print(f"Warning: PostgreSQL migration failed: {e}")
         print("PostgreSQL setup completed successfully!")
     else:
         print("Using SQLite - running SQLite migrations...")
@@ -3996,6 +4005,13 @@ def update_task_status(task_id):
             # Clear completion date if moving away from completed
             task.completed_date = None
         
+        # Set archived date if status is ARCHIVED
+        if task_status == TaskStatus.ARCHIVED:
+            task.archived_date = datetime.now().date()
+        elif old_status == TaskStatus.ARCHIVED:
+            # Clear archived date if moving away from archived
+            task.archived_date = None
+        
         db.session.commit()
         
         return jsonify({
@@ -4196,6 +4212,78 @@ def remove_task_dependency(task_id, dependency_task_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error removing task dependency: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+# Task Archive/Restore APIs
+@app.route('/api/tasks/<int:task_id>/archive', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def archive_task(task_id):
+    """Archive a completed task"""
+    try:
+        # Get the task and verify ownership through project
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        if not task:
+            return jsonify({'success': False, 'message': 'Task not found'})
+        
+        # Only allow archiving completed tasks
+        if task.status != TaskStatus.COMPLETED:
+            return jsonify({'success': False, 'message': 'Only completed tasks can be archived'})
+        
+        # Archive the task
+        task.status = TaskStatus.ARCHIVED
+        task.archived_date = datetime.now().date()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Task archived successfully',
+            'archived_date': task.archived_date.isoformat()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error archiving task: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/api/tasks/<int:task_id>/restore', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def restore_task(task_id):
+    """Restore an archived task to completed status"""
+    try:
+        # Get the task and verify ownership through project
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        if not task:
+            return jsonify({'success': False, 'message': 'Task not found'})
+        
+        # Only allow restoring archived tasks
+        if task.status != TaskStatus.ARCHIVED:
+            return jsonify({'success': False, 'message': 'Only archived tasks can be restored'})
+        
+        # Restore the task to completed status
+        task.status = TaskStatus.COMPLETED
+        task.archived_date = None
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Task restored successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error restoring task: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
 

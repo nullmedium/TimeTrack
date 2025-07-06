@@ -74,6 +74,10 @@ def run_all_migrations(db_path=None):
     migrate_task_system(db_path)
     migrate_system_events(db_path)
     migrate_dashboard_system(db_path)
+    
+    # Run PostgreSQL-specific migrations if applicable
+    if FLASK_AVAILABLE:
+        migrate_postgresql_schema()
 
     if FLASK_AVAILABLE:
         with app.app_context():
@@ -604,24 +608,61 @@ def migrate_task_system(db_path):
             cursor.execute("""
             CREATE TABLE task (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_number VARCHAR(20) NOT NULL UNIQUE,
                 name VARCHAR(200) NOT NULL,
                 description TEXT,
                 status VARCHAR(50) DEFAULT 'Not Started',
                 priority VARCHAR(50) DEFAULT 'Medium',
                 estimated_hours FLOAT,
                 project_id INTEGER NOT NULL,
+                sprint_id INTEGER,
                 assigned_to_id INTEGER,
                 start_date DATE,
                 due_date DATE,
                 completed_date DATE,
+                archived_date DATE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 created_by_id INTEGER NOT NULL,
                 FOREIGN KEY (project_id) REFERENCES project (id),
+                FOREIGN KEY (sprint_id) REFERENCES sprint (id),
                 FOREIGN KEY (assigned_to_id) REFERENCES user (id),
                 FOREIGN KEY (created_by_id) REFERENCES user (id)
             )
             """)
+        else:
+            # Add missing columns to existing task table
+            cursor.execute("PRAGMA table_info(task)")
+            task_columns = [column[1] for column in cursor.fetchall()]
+            
+            task_migrations = [
+                ('task_number', "ALTER TABLE task ADD COLUMN task_number VARCHAR(20)"),
+                ('sprint_id', "ALTER TABLE task ADD COLUMN sprint_id INTEGER"),
+                ('archived_date', "ALTER TABLE task ADD COLUMN archived_date DATE")
+            ]
+            
+            for column_name, sql_command in task_migrations:
+                if column_name not in task_columns:
+                    print(f"Adding {column_name} column to task table...")
+                    cursor.execute(sql_command)
+            
+            # Add unique constraint for task_number if it was just added
+            if 'task_number' not in task_columns:
+                print("Adding unique constraint for task_number...")
+                # For SQLite, we need to recreate the table to add unique constraint
+                cursor.execute("CREATE UNIQUE INDEX idx_task_number ON task(task_number)")
+                
+                # Generate task numbers for existing tasks that don't have them
+                print("Generating task numbers for existing tasks...")
+                cursor.execute("SELECT id FROM task WHERE task_number IS NULL ORDER BY id")
+                tasks_without_numbers = cursor.fetchall()
+                
+                for i, (task_id,) in enumerate(tasks_without_numbers, 1):
+                    task_number = f"TSK-{i:03d}"
+                    cursor.execute("UPDATE task SET task_number = ? WHERE id = ?", (task_number, task_id))
+                
+                if tasks_without_numbers:
+                    print(f"Generated {len(tasks_without_numbers)} task numbers")
 
         # Check if sub_task table exists
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sub_task'")
@@ -646,6 +687,49 @@ def migrate_task_system(db_path):
                 FOREIGN KEY (task_id) REFERENCES task (id),
                 FOREIGN KEY (assigned_to_id) REFERENCES user (id),
                 FOREIGN KEY (created_by_id) REFERENCES user (id)
+            )
+            """)
+
+        # Check if task_dependency table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_dependency'")
+        if not cursor.fetchone():
+            print("Creating task_dependency table...")
+            cursor.execute("""
+            CREATE TABLE task_dependency (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                blocked_task_id INTEGER NOT NULL,
+                blocking_task_id INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (blocked_task_id) REFERENCES task (id),
+                FOREIGN KEY (blocking_task_id) REFERENCES task (id),
+                UNIQUE(blocked_task_id, blocking_task_id),
+                CHECK (blocked_task_id != blocking_task_id)
+            )
+            """)
+
+        # Check if sprint table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sprint'")
+        if not cursor.fetchone():
+            print("Creating sprint table...")
+            cursor.execute("""
+            CREATE TABLE sprint (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(200) NOT NULL,
+                description TEXT,
+                status VARCHAR(50) DEFAULT 'PLANNING',
+                goal TEXT,
+                start_date DATE NOT NULL,
+                end_date DATE NOT NULL,
+                capacity_hours INTEGER,
+                project_id INTEGER,
+                company_id INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by_id INTEGER NOT NULL,
+                FOREIGN KEY (project_id) REFERENCES project (id),
+                FOREIGN KEY (company_id) REFERENCES company (id),
+                FOREIGN KEY (created_by_id) REFERENCES user (id),
+                UNIQUE(company_id, name)
             )
             """)
 
@@ -884,6 +968,120 @@ def create_all_tables(cursor):
     print("All tables created")
 
 
+def migrate_postgresql_schema():
+    """Migrate PostgreSQL schema for archive functionality."""
+    if not FLASK_AVAILABLE:
+        print("Skipping PostgreSQL migration - Flask not available")
+        return
+    
+    try:
+        import psycopg2
+        from sqlalchemy import text
+        
+        with app.app_context():
+            # Check if we're using PostgreSQL
+            database_url = app.config['SQLALCHEMY_DATABASE_URI']
+            if not ('postgresql://' in database_url or 'postgres://' in database_url):
+                print("Not using PostgreSQL - skipping PostgreSQL migration")
+                return
+            
+            print("Running PostgreSQL schema migrations...")
+            
+            # Check if archived_date column exists
+            result = db.session.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'task' AND column_name = 'archived_date'
+            """))
+            
+            if not result.fetchone():
+                print("Adding archived_date column to task table...")
+                db.session.execute(text("ALTER TABLE task ADD COLUMN archived_date DATE"))
+                db.session.commit()
+            
+            # Check if ARCHIVED status exists in enum
+            result = db.session.execute(text("""
+                SELECT enumlabel 
+                FROM pg_enum 
+                WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'taskstatus') 
+                AND enumlabel = 'ARCHIVED'
+            """))
+            
+            if not result.fetchone():
+                print("Adding ARCHIVED status to TaskStatus enum...")
+                db.session.execute(text("ALTER TYPE taskstatus ADD VALUE 'ARCHIVED'"))
+                db.session.commit()
+            
+            # Check if task_number column exists  
+            result = db.session.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'task' AND column_name = 'task_number'
+            """))
+            
+            if not result.fetchone():
+                print("Adding task_number column to task table...")
+                db.session.execute(text("ALTER TABLE task ADD COLUMN task_number VARCHAR(20) UNIQUE"))
+                
+                # Generate task numbers for existing tasks
+                print("Generating task numbers for existing tasks...")
+                result = db.session.execute(text("SELECT id FROM task WHERE task_number IS NULL ORDER BY id"))
+                tasks_without_numbers = result.fetchall()
+                
+                for i, (task_id,) in enumerate(tasks_without_numbers, 1):
+                    task_number = f"TSK-{i:03d}"
+                    db.session.execute(text("UPDATE task SET task_number = :task_number WHERE id = :task_id"), 
+                                     {"task_number": task_number, "task_id": task_id})
+                
+                db.session.commit()
+                if tasks_without_numbers:
+                    print(f"Generated {len(tasks_without_numbers)} task numbers")
+            
+            # Check if sprint_id column exists
+            result = db.session.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'task' AND column_name = 'sprint_id'
+            """))
+            
+            if not result.fetchone():
+                print("Adding sprint_id column to task table...")
+                db.session.execute(text("ALTER TABLE task ADD COLUMN sprint_id INTEGER"))
+                db.session.execute(text("ALTER TABLE task ADD CONSTRAINT fk_task_sprint FOREIGN KEY (sprint_id) REFERENCES sprint (id)"))
+                db.session.commit()
+            
+            # Check if task_dependency table exists
+            result = db.session.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_name = 'task_dependency'
+            """))
+            
+            if not result.fetchone():
+                print("Creating task_dependency table...")
+                db.session.execute(text("""
+                    CREATE TABLE task_dependency (
+                        id SERIAL PRIMARY KEY,
+                        blocked_task_id INTEGER NOT NULL,
+                        blocking_task_id INTEGER NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (blocked_task_id) REFERENCES task (id),
+                        FOREIGN KEY (blocking_task_id) REFERENCES task (id),
+                        UNIQUE(blocked_task_id, blocking_task_id),
+                        CHECK (blocked_task_id <> blocking_task_id)
+                    )
+                """))
+                db.session.commit()
+            
+            print("PostgreSQL schema migration completed successfully!")
+            
+    except Exception as e:
+        print(f"Error during PostgreSQL migration: {e}")
+        if FLASK_AVAILABLE:
+            db.session.rollback()
+        raise
+
+
 def migrate_dashboard_system(db_file=None):
     """Migrate to add Dashboard widget system."""
     db_path = get_db_path(db_file)
@@ -1045,6 +1243,8 @@ def main():
                        help='Run only system events migration')
     parser.add_argument('--dashboard', '--dash', action='store_true',
                        help='Run only dashboard system migration')
+    parser.add_argument('--postgresql', '--pg', action='store_true',
+                       help='Run only PostgreSQL schema migration')
 
     args = parser.parse_args()
 
@@ -1080,6 +1280,9 @@ def main():
 
         elif args.dashboard:
             migrate_dashboard_system(db_path)
+
+        elif args.postgresql:
+            migrate_postgresql_schema()
 
         else:
             # Default: run all migrations
