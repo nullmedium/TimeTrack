@@ -77,6 +77,7 @@ def run_all_migrations(db_path=None):
     migrate_dashboard_system(db_path)
     migrate_comment_system(db_path)
     migrate_notes_system(db_path)
+    update_note_link_cascade(db_path)
     
     # Run PostgreSQL-specific migrations if applicable
     if FLASK_AVAILABLE:
@@ -1751,6 +1752,72 @@ def migrate_notes_system(db_file=None):
 
     finally:
         conn.close()
+
+
+def update_note_link_cascade(db_path):
+    """Update note_link table to ensure CASCADE delete is enabled."""
+    print("Checking note_link cascade delete constraints...")
+    
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Check if note_link table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='note_link'")
+        if not cursor.fetchone():
+            print("note_link table does not exist, skipping cascade update")
+            return
+        
+        # Check current foreign key constraints
+        cursor.execute("PRAGMA foreign_key_list(note_link)")
+        fk_info = cursor.fetchall()
+        
+        # Check if CASCADE is already set
+        has_cascade = any('CASCADE' in str(fk) for fk in fk_info)
+        
+        if not has_cascade:
+            print("Updating note_link table with CASCADE delete...")
+            
+            # SQLite doesn't support ALTER TABLE for foreign keys, so recreate the table
+            cursor.execute("""
+            CREATE TABLE note_link_temp (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_note_id INTEGER NOT NULL,
+                target_note_id INTEGER NOT NULL,
+                link_type VARCHAR(50) DEFAULT 'related',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by_id INTEGER NOT NULL,
+                FOREIGN KEY (source_note_id) REFERENCES note(id) ON DELETE CASCADE,
+                FOREIGN KEY (target_note_id) REFERENCES note(id) ON DELETE CASCADE,
+                FOREIGN KEY (created_by_id) REFERENCES user(id),
+                UNIQUE(source_note_id, target_note_id)
+            )
+            """)
+            
+            # Copy data
+            cursor.execute("INSERT INTO note_link_temp SELECT * FROM note_link")
+            
+            # Drop old table and rename new one
+            cursor.execute("DROP TABLE note_link")
+            cursor.execute("ALTER TABLE note_link_temp RENAME TO note_link")
+            
+            # Recreate indexes
+            cursor.execute("CREATE INDEX idx_note_link_source ON note_link(source_note_id)")
+            cursor.execute("CREATE INDEX idx_note_link_target ON note_link(target_note_id)")
+            
+            print("note_link table updated with CASCADE delete")
+        else:
+            print("note_link table already has CASCADE delete")
+        
+        conn.commit()
+        
+    except Exception as e:
+        print(f"Error updating note_link cascade: {e}")
+        if conn:
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
 
 
 def main():

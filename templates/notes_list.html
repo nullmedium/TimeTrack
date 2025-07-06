@@ -248,6 +248,16 @@
                                     <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
                                 </svg>
                             </a>
+                            <a href="{{ url_for('view_note_mindmap', slug=note.slug) }}" class="btn-action" title="Mind Map">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <circle cx="8" cy="8" r="2"/>
+                                    <circle cx="3" cy="3" r="1.5"/>
+                                    <circle cx="13" cy="3" r="1.5"/>
+                                    <circle cx="3" cy="13" r="1.5"/>
+                                    <circle cx="13" cy="13" r="1.5"/>
+                                    <path d="M6.5 6.5L4 4M9.5 6.5L12 4M6.5 9.5L4 12M9.5 9.5L12 12" stroke="currentColor" fill="none"/>
+                                </svg>
+                            </a>
                             {% if note.can_user_edit(g.user) %}
                             <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn-action" title="Edit">
                                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -326,6 +336,16 @@
                     <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn-action" title="View">
                         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                        </svg>
+                    </a>
+                    <a href="{{ url_for('view_note_mindmap', slug=note.slug) }}" class="btn-action" title="Mind Map">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <circle cx="8" cy="8" r="2"/>
+                            <circle cx="3" cy="3" r="1.5"/>
+                            <circle cx="13" cy="3" r="1.5"/>
+                            <circle cx="3" cy="13" r="1.5"/>
+                            <circle cx="13" cy="13" r="1.5"/>
+                            <path d="M6.5 6.5L4 4M9.5 6.5L12 4M6.5 9.5L4 12M9.5 9.5L12 12" stroke="currentColor" fill="none"/>
                         </svg>
                     </a>
                     {% if note.can_user_edit(g.user) %}
@@ -1006,7 +1026,7 @@
 }
 
 .column-actions {
-    width: 120px;
+    width: 160px;
 }
 
 .note-actions {

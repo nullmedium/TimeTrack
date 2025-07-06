@@ -1368,7 +1368,12 @@ class Note(db.Model):
         """Get a plain text preview of the note content"""
         # Strip markdown formatting for preview
         import re
-        text = self.content
+        from frontmatter_utils import parse_frontmatter
+        
+        # Extract body content without frontmatter
+        _, body = parse_frontmatter(self.content)
+        text = body
+        
         # Remove headers
         text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
         # Remove emphasis
@@ -1390,30 +1395,84 @@ class Note(db.Model):
         """Render markdown content to HTML"""
         try:
             import markdown
+            from frontmatter_utils import parse_frontmatter
+            # Extract body content without frontmatter
+            _, body = parse_frontmatter(self.content)
             # Use extensions for better markdown support
-            html = markdown.markdown(self.content, extensions=['extra', 'codehilite', 'toc'])
+            html = markdown.markdown(body, extensions=['extra', 'codehilite', 'toc'])
             return html
         except ImportError:
             # Fallback if markdown not installed
             return f'<pre>{self.content}</pre>'
+    
+    def get_frontmatter(self):
+        """Get frontmatter metadata from content"""
+        from frontmatter_utils import parse_frontmatter
+        metadata, _ = parse_frontmatter(self.content)
+        return metadata
+    
+    def update_frontmatter(self):
+        """Update content with current metadata as frontmatter"""
+        from frontmatter_utils import update_frontmatter
+        metadata = {
+            'title': self.title,
+            'visibility': self.visibility.value.lower(),
+            'folder': self.folder,
+            'tags': self.get_tags_list() if self.tags else None,
+            'project': self.project.code if self.project else None,
+            'task_id': self.task_id,
+            'pinned': self.is_pinned if self.is_pinned else None,
+            'created': self.created_at.isoformat() if self.created_at else None,
+            'updated': self.updated_at.isoformat() if self.updated_at else None,
+            'author': self.created_by.username if self.created_by else None
+        }
+        # Remove None values
+        metadata = {k: v for k, v in metadata.items() if v is not None}
+        self.content = update_frontmatter(self.content, metadata)
+    
+    def sync_from_frontmatter(self):
+        """Update model fields from frontmatter in content"""
+        from frontmatter_utils import parse_frontmatter
+        metadata, _ = parse_frontmatter(self.content)
+        
+        if metadata:
+            # Update fields from frontmatter
+            if 'title' in metadata:
+                self.title = metadata['title']
+            if 'visibility' in metadata:
+                try:
+                    self.visibility = NoteVisibility[metadata['visibility'].upper()]
+                except KeyError:
+                    pass
+            if 'folder' in metadata:
+                self.folder = metadata['folder']
+            if 'tags' in metadata:
+                if isinstance(metadata['tags'], list):
+                    self.set_tags_list(metadata['tags'])
+                elif isinstance(metadata['tags'], str):
+                    self.tags = metadata['tags']
+            if 'pinned' in metadata:
+                self.is_pinned = bool(metadata['pinned'])
 
 
 class NoteLink(db.Model):
     """Links between notes for creating relationships"""
     id = db.Column(db.Integer, primary_key=True)
     
-    # Source and target notes
-    source_note_id = db.Column(db.Integer, db.ForeignKey('note.id'), nullable=False)
-    target_note_id = db.Column(db.Integer, db.ForeignKey('note.id'), nullable=False)
+    # Source and target notes with cascade deletion
+    source_note_id = db.Column(db.Integer, db.ForeignKey('note.id', ondelete='CASCADE'), nullable=False)
+    target_note_id = db.Column(db.Integer, db.ForeignKey('note.id', ondelete='CASCADE'), nullable=False)
     
     # Link metadata
     link_type = db.Column(db.String(50), default='related')  # related, parent, child, etc.
     created_at = db.Column(db.DateTime, default=datetime.now)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     
-    # Relationships
-    source_note = db.relationship('Note', foreign_keys=[source_note_id], backref='outgoing_links')
-    target_note = db.relationship('Note', foreign_keys=[target_note_id], backref='incoming_links')
+    # Relationships with cascade deletion
+    source_note = db.relationship('Note', foreign_keys=[source_note_id], 
+                                backref=db.backref('outgoing_links', cascade='all, delete-orphan'))
+    target_note = db.relationship('Note', foreign_keys=[target_note_id], 
+                                backref=db.backref('incoming_links', cascade='all, delete-orphan'))
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     
     # Unique constraint to prevent duplicate links

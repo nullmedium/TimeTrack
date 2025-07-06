@@ -1794,6 +1794,9 @@ def create_note():
                 company_id=g.user.company_id
             )
             
+            # Sync metadata from frontmatter if present
+            note.sync_from_frontmatter()
+            
             # Set team_id if visibility is Team
             if visibility == 'Team' and g.user.team_id:
                 note.team_id = g.user.team_id
@@ -1867,11 +1870,11 @@ def view_note(slug):
     incoming_links = []
     
     for link in note.outgoing_links:
-        if link.target_note.can_user_view(g.user):
+        if link.target_note.can_user_view(g.user) and not link.target_note.is_archived:
             outgoing_links.append(link)
     
     for link in note.incoming_links:
-        if link.source_note.can_user_view(g.user):
+        if link.source_note.can_user_view(g.user) and not link.source_note.is_archived:
             incoming_links.append(link)
     
     # Get linkable notes for the modal
@@ -1894,6 +1897,22 @@ def view_note(slug):
                          incoming_links=incoming_links,
                          linkable_notes=linkable_notes,
                          can_edit=note.can_user_edit(g.user))
+
+
+@app.route('/notes/<slug>/mindmap')
+@login_required
+@company_required
+def view_note_mindmap(slug):
+    """View a note as a mind map"""
+    note = Note.query.filter_by(slug=slug, company_id=g.user.company_id).first_or_404()
+    
+    # Check permissions
+    if not note.can_user_view(g.user):
+        abort(403)
+    
+    return render_template('note_mindmap.html',
+                         title=f"{note.title} - Mind Map",
+                         note=note)
 
 
 @app.route('/notes/<slug>/edit', methods=['GET', 'POST'])
@@ -1937,6 +1956,9 @@ def edit_note(slug):
             note.visibility = NoteVisibility[visibility.upper()]  # Convert to uppercase for enum access
             note.folder = folder if folder else None
             note.tags = ','.join(tag_list) if tag_list else None
+            
+            # Sync metadata from frontmatter if present
+            note.sync_from_frontmatter()
             
             # Update team_id if visibility is Team
             if visibility == 'Team' and g.user.team_id:

@@ -1,0 +1,401 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="timetrack-container note-mindmap-container">
+    <div class="mindmap-header">
+        <h2>{{ note.title }} - Mind Map View</h2>
+        <div class="mindmap-actions">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="resetZoom()">
+                Reset Zoom
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="toggleFullscreen()">
+                Fullscreen
+            </button>
+            <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn btn-sm btn-info">
+                Back to Note
+            </a>
+        </div>
+    </div>
+
+    <div id="mindmap-container" class="mindmap-container">
+        <svg id="mindmap-svg"></svg>
+    </div>
+</div>
+
+<style>
+.note-mindmap-container {
+    max-width: none !important;
+    width: 100% !important;
+    padding: 1rem !important;
+    margin: 0 !important;
+    height: calc(100vh - 100px);
+    display: flex;
+    flex-direction: column;
+}
+
+.mindmap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.mindmap-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.mindmap-container {
+    flex: 1;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+#mindmap-svg {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+
+#mindmap-svg.grabbing {
+    cursor: grabbing;
+}
+
+.node {
+    cursor: pointer;
+}
+
+.node circle {
+    fill: #fff;
+    stroke: steelblue;
+    stroke-width: 3px;
+}
+
+.node rect {
+    fill: #f9f9f9;
+    stroke: steelblue;
+    stroke-width: 2px;
+    rx: 5px;
+}
+
+.node text {
+    font: 12px sans-serif;
+    pointer-events: none;
+}
+
+.link {
+    fill: none;
+    stroke: #ccc;
+    stroke-width: 2px;
+}
+
+.node.collapsed circle {
+    fill: steelblue;
+}
+
+.node.root rect {
+    fill: #4CAF50;
+    stroke: #45a049;
+}
+
+.node.root text {
+    fill: white;
+    font-weight: bold;
+}
+
+.node.level1 rect {
+    fill: #e3f2fd;
+    stroke: #2196F3;
+}
+
+.node.level2 rect {
+    fill: #f3e5f5;
+    stroke: #9C27B0;
+}
+
+.node.level3 rect {
+    fill: #fff3e0;
+    stroke: #FF9800;
+}
+
+/* Fullscreen styles */
+.mindmap-container.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    margin: 0;
+    border-radius: 0;
+}
+</style>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// Parse markdown content to extract structure
+const markdownContent = {{ note.content | tojson }};
+
+function parseMarkdownToTree(markdown) {
+    const lines = markdown.split('\n');
+    const root = {
+        name: '{{ note.title }}',
+        children: [],
+        level: 0
+    };
+    
+    const stack = [root];
+    let currentList = null;
+    
+    lines.forEach(line => {
+        // Check for headers
+        const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
+        if (headerMatch) {
+            const level = headerMatch[1].length;
+            const text = headerMatch[2];
+            
+            // Pop stack until we find parent level
+            while (stack.length > level) {
+                stack.pop();
+            }
+            
+            const node = {
+                name: text,
+                children: [],
+                level: level
+            };
+            
+            const parent = stack[stack.length - 1];
+            if (!parent.children) parent.children = [];
+            parent.children.push(node);
+            stack.push(node);
+            currentList = null;
+        }
+        
+        // Check for list items
+        const listMatch = line.match(/^(\s*)[*\-+]\s+(.+)$/);
+        if (listMatch) {
+            const indent = listMatch[1].length;
+            const text = listMatch[2];
+            
+            const node = {
+                name: text,
+                children: [],
+                level: stack[stack.length - 1].level + 1,
+                isList: true
+            };
+            
+            const parent = stack[stack.length - 1];
+            if (!parent.children) parent.children = [];
+            parent.children.push(node);
+        }
+        
+        // Check for numbered lists
+        const numberedListMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
+        if (numberedListMatch) {
+            const text = numberedListMatch[2];
+            
+            const node = {
+                name: text,
+                children: [],
+                level: stack[stack.length - 1].level + 1,
+                isList: true
+            };
+            
+            const parent = stack[stack.length - 1];
+            if (!parent.children) parent.children = [];
+            parent.children.push(node);
+        }
+    });
+    
+    return root;
+}
+
+// D3 Mind Map Implementation
+const treeData = parseMarkdownToTree(markdownContent);
+
+const margin = {top: 20, right: 120, bottom: 20, left: 120};
+const width = document.getElementById('mindmap-container').clientWidth;
+const height = document.getElementById('mindmap-container').clientHeight;
+
+const svg = d3.select("#mindmap-svg")
+    .attr("viewBox", [-width / 2, -height / 2, width, height]);
+
+const g = svg.append("g");
+
+// Add zoom behavior
+const zoom = d3.zoom()
+    .scaleExtent([0.1, 3])
+    .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+    });
+
+svg.call(zoom);
+
+// Create tree layout
+const tree = d3.tree()
+    .size([height - margin.top - margin.bottom, width - margin.left - margin.right]);
+
+// Create hierarchy
+const root = d3.hierarchy(treeData);
+root.x0 = 0;
+root.y0 = 0;
+
+// Collapse after the second level
+root.descendants().forEach((d, i) => {
+    d.id = i;
+    if (d.depth && d.depth > 1) {
+        d._children = d.children;
+        d.children = null;
+    }
+});
+
+update(root);
+
+function update(source) {
+    const duration = 750;
+    
+    // Compute tree layout
+    const treeData = tree(root);
+    const nodes = treeData.descendants();
+    const links = treeData.links();
+    
+    // Normalize for fixed-depth
+    nodes.forEach(d => {
+        d.y = d.depth * 180;
+    });
+    
+    // Update nodes
+    const node = g.selectAll("g.node")
+        .data(nodes, d => d.id);
+    
+    const nodeEnter = node.enter().append("g")
+        .attr("class", d => `node level${Math.min(d.depth, 3)}`)
+        .attr("transform", d => `translate(${source.y0},${source.x0})`)
+        .on("click", click);
+    
+    // Add rectangles for nodes
+    nodeEnter.append("rect")
+        .attr("width", 1e-6)
+        .attr("height", 1e-6)
+        .attr("x", -1)
+        .attr("y", -1)
+        .attr("class", d => d.depth === 0 ? "root" : "");
+    
+    // Add text
+    nodeEnter.append("text")
+        .attr("dy", ".35em")
+        .attr("text-anchor", "middle")
+        .text(d => d.data.name)
+        .style("fill-opacity", 1e-6);
+    
+    // Transition nodes to their new position
+    const nodeUpdate = nodeEnter.merge(node);
+    
+    nodeUpdate.transition()
+        .duration(duration)
+        .attr("transform", d => `translate(${d.y},${d.x})`);
+    
+    nodeUpdate.select("rect")
+        .attr("width", d => {
+            const textLength = d.data.name.length * 8 + 20;
+            return Math.max(textLength, 100);
+        })
+        .attr("height", 30)
+        .attr("x", d => {
+            const textLength = d.data.name.length * 8 + 20;
+            return -Math.max(textLength, 100) / 2;
+        })
+        .attr("y", -15)
+        .attr("class", d => d._children ? "collapsed" : "");
+    
+    nodeUpdate.select("text")
+        .style("fill-opacity", 1);
+    
+    // Remove exiting nodes
+    const nodeExit = node.exit().transition()
+        .duration(duration)
+        .attr("transform", d => `translate(${source.y},${source.x})`)
+        .remove();
+    
+    nodeExit.select("rect")
+        .attr("width", 1e-6)
+        .attr("height", 1e-6);
+    
+    nodeExit.select("text")
+        .style("fill-opacity", 1e-6);
+    
+    // Update links
+    const link = g.selectAll("path.link")
+        .data(links, d => d.target.id);
+    
+    const linkEnter = link.enter().insert("path", "g")
+        .attr("class", "link")
+        .attr("d", d => {
+            const o = {x: source.x0, y: source.y0};
+            return diagonal({source: o, target: o});
+        });
+    
+    const linkUpdate = linkEnter.merge(link);
+    
+    linkUpdate.transition()
+        .duration(duration)
+        .attr("d", diagonal);
+    
+    const linkExit = link.exit().transition()
+        .duration(duration)
+        .attr("d", d => {
+            const o = {x: source.x, y: source.y};
+            return diagonal({source: o, target: o});
+        })
+        .remove();
+    
+    // Store old positions
+    nodes.forEach(d => {
+        d.x0 = d.x;
+        d.y0 = d.y;
+    });
+}
+
+function diagonal(d) {
+    return `M ${d.source.y} ${d.source.x}
+            C ${(d.source.y + d.target.y) / 2} ${d.source.x},
+              ${(d.source.y + d.target.y) / 2} ${d.target.x},
+              ${d.target.y} ${d.target.x}`;
+}
+
+function click(event, d) {
+    if (d.children) {
+        d._children = d.children;
+        d.children = null;
+    } else {
+        d.children = d._children;
+        d._children = null;
+    }
+    update(d);
+}
+
+function resetZoom() {
+    svg.transition()
+        .duration(750)
+        .call(zoom.transform, d3.zoomIdentity);
+}
+
+function toggleFullscreen() {
+    const container = document.getElementById('mindmap-container');
+    container.classList.toggle('fullscreen');
+    
+    // Recalculate dimensions
+    const newWidth = container.clientWidth;
+    const newHeight = container.clientHeight;
+    svg.attr("viewBox", [-newWidth / 2, -newHeight / 2, newWidth, newHeight]);
+}
+
+// Center the tree initially
+svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.8));
+</script>
+
+{% endblock %}

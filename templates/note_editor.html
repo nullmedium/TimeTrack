@@ -89,6 +89,10 @@
                 
                 <div class="form-group editor-group">
                     <div class="editor-toolbar">
+                        <button type="button" class="toolbar-btn" onclick="toggleFrontmatter()" title="Toggle Frontmatter" style="background: #e3f2fd;">
+                            <span style="font-family: monospace;">---</span>
+                        </button>
+                        <span class="toolbar-separator"></span>
                         <button type="button" class="toolbar-btn toolbar-bold" onclick="insertMarkdown('**', '**')" title="Bold">
                             <b>B</b>
                         </button>
@@ -635,6 +639,25 @@
 // Global Ace Editor instance
 let aceEditor;
 
+// Toggle frontmatter visibility
+function toggleFrontmatter() {
+    if (!aceEditor) return;
+    
+    const content = aceEditor.getValue();
+    
+    if (content.trim().startsWith('---')) {
+        // Frontmatter exists, just move cursor to it
+        aceEditor.moveCursorTo(0, 0);
+        aceEditor.focus();
+    } else {
+        // Add frontmatter
+        const newContent = updateContentFrontmatter(content);
+        aceEditor.setValue(newContent, -1);
+        aceEditor.moveCursorTo(0, 0);
+        aceEditor.focus();
+    }
+}
+
 // Markdown toolbar functions for Ace Editor
 function insertMarkdown(before, after) {
     if (!aceEditor) return;
@@ -666,14 +689,39 @@ function insertMarkdown(before, after) {
     syncContentAndUpdatePreview();
 }
 
-// Extract title from first line of content
+// Extract title from content (frontmatter or first line)
 function extractTitleFromContent(content) {
+    // Check for frontmatter first
+    if (content.trim().startsWith('---')) {
+        const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+        if (frontmatterMatch) {
+            const frontmatterContent = frontmatterMatch[1];
+            const titleMatch = frontmatterContent.match(/title:\s*(.+)/);
+            if (titleMatch) {
+                // Remove quotes if present
+                return titleMatch[1].replace(/^["']|["']$/g, '').trim();
+            }
+        }
+    }
+    
+    // Otherwise extract from first line
     const lines = content.split('\n');
     let firstLine = '';
     
-    // Find the first non-empty line
-    for (let line of lines) {
-        const trimmed = line.trim();
+    // Skip frontmatter if present
+    let skipUntil = 0;
+    if (lines[0].trim() === '---') {
+        for (let i = 1; i < lines.length; i++) {
+            if (lines[i].trim() === '---') {
+                skipUntil = i + 1;
+                break;
+            }
+        }
+    }
+    
+    // Find the first non-empty line after frontmatter
+    for (let i = skipUntil; i < lines.length; i++) {
+        const trimmed = lines[i].trim();
         if (trimmed) {
             // Remove markdown headers if present
             firstLine = trimmed.replace(/^#+\s*/, '');
@@ -685,14 +733,101 @@ function extractTitleFromContent(content) {
     return firstLine || 'Untitled Note';
 }
 
+// Update or create frontmatter in content
+function updateContentFrontmatter(content) {
+    const settings = {
+        visibility: document.getElementById('visibility').value.toLowerCase(),
+        folder: document.getElementById('folder').value || undefined,
+        tags: document.getElementById('tags').value ? 
+            document.getElementById('tags').value.split(',').map(t => t.trim()).filter(t => t) : undefined,
+        project: document.getElementById('project_id').selectedOptions[0]?.text.split(' - ')[0] || undefined,
+        task_id: parseInt(document.getElementById('task_id').value) || undefined,
+        pinned: false
+    };
+    
+    // Remove undefined values
+    Object.keys(settings).forEach(key => settings[key] === undefined && delete settings[key]);
+    
+    // Parse existing frontmatter
+    let body = content;
+    let existingFrontmatter = {};
+    
+    if (content.trim().startsWith('---')) {
+        const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
+        if (match) {
+            try {
+                // Simple YAML parsing for our use case
+                const yamlContent = match[1];
+                yamlContent.split('\n').forEach(line => {
+                    const colonIndex = line.indexOf(':');
+                    if (colonIndex > 0) {
+                        const key = line.substring(0, colonIndex).trim();
+                        const value = line.substring(colonIndex + 1).trim();
+                        existingFrontmatter[key] = value.replace(/^["']|["']$/g, '');
+                    }
+                });
+                body = match[2];
+            } catch (e) {
+                console.error('Error parsing frontmatter:', e);
+            }
+        }
+    }
+    
+    // Merge settings with existing frontmatter
+    const frontmatter = { ...existingFrontmatter, ...settings };
+    
+    // Add title from content or form field
+    const titleField = document.getElementById('title').value;
+    if (titleField && titleField !== 'Untitled Note') {
+        frontmatter.title = titleField;
+    } else {
+        frontmatter.title = extractTitleFromContent(body);
+    }
+    
+    // Build new frontmatter
+    let yamlContent = '---\n';
+    Object.entries(frontmatter).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            if (Array.isArray(value)) {
+                yamlContent += `${key}:\n`;
+                value.forEach(item => {
+                    yamlContent += `  - ${item}\n`;
+                });
+            } else if (typeof value === 'string' && (value.includes(':') || value.includes('"'))) {
+                yamlContent += `${key}: "${value}"\n`;
+            } else {
+                yamlContent += `${key}: ${value}\n`;
+            }
+        }
+    });
+    yamlContent += '---\n\n';
+    
+    return yamlContent + body;
+}
+
 // Sync Ace Editor content with hidden textarea and update preview
-function syncContentAndUpdatePreview() {
+let frontmatterUpdateTimer;
+function syncContentAndUpdatePreview(updateFrontmatter = true) {
     if (!aceEditor) return;
     
-    const content = aceEditor.getValue();
+    let content = aceEditor.getValue();
+    
+    // Only update frontmatter when settings change, not on every keystroke
+    if (updateFrontmatter) {
+        clearTimeout(frontmatterUpdateTimer);
+        frontmatterUpdateTimer = setTimeout(() => {
+            const newContent = updateContentFrontmatter(aceEditor.getValue());
+            if (aceEditor.getValue() !== newContent) {
+                const currentPosition = aceEditor.getCursorPosition();
+                aceEditor.setValue(newContent, -1);
+                aceEditor.moveCursorToPosition(currentPosition);
+            }
+        }, 2000); // Wait 2 seconds after typing stops
+    }
+    
     document.getElementById('content').value = content;
     
-    // Update title from first line
+    // Update title from content
     const title = extractTitleFromContent(content);
     document.getElementById('title').value = title;
     
@@ -703,7 +838,59 @@ function syncContentAndUpdatePreview() {
         headerTitle.textContent = title ? (isEdit ? `Edit: ${title}` : title) : (isEdit ? 'Edit Note' : 'Create Note');
     }
     
+    // Sync settings from frontmatter
+    syncSettingsFromFrontmatter(content);
+    
     updatePreview();
+}
+
+// Sync settings UI from frontmatter
+function syncSettingsFromFrontmatter(content) {
+    if (!content.trim().startsWith('---')) return;
+    
+    const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
+    if (!match) return;
+    
+    const yamlContent = match[1];
+    const frontmatter = {};
+    
+    // Simple YAML parsing
+    yamlContent.split('\n').forEach(line => {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex > 0) {
+            const key = line.substring(0, colonIndex).trim();
+            let value = line.substring(colonIndex + 1).trim();
+            
+            // Handle arrays (tags)
+            if (key === 'tags' && !value) {
+                // Multi-line array, skip for now
+                return;
+            }
+            
+            value = value.replace(/^["']|["']$/g, '');
+            frontmatter[key] = value;
+        }
+    });
+    
+    // Update UI elements
+    if (frontmatter.visibility) {
+        const visibilitySelect = document.getElementById('visibility');
+        const capitalizedVisibility = frontmatter.visibility.charAt(0).toUpperCase() + frontmatter.visibility.slice(1);
+        for (let option of visibilitySelect.options) {
+            if (option.value === capitalizedVisibility) {
+                visibilitySelect.value = capitalizedVisibility;
+                break;
+            }
+        }
+    }
+    
+    if (frontmatter.folder !== undefined) {
+        document.getElementById('folder').value = frontmatter.folder;
+    }
+    
+    if (frontmatter.tags !== undefined) {
+        document.getElementById('tags').value = frontmatter.tags;
+    }
 }
 
 // Live preview update
@@ -747,7 +934,7 @@ function initializeAceEditor() {
     // Set theme (use github theme for light mode)
     aceEditor.setTheme("ace/theme/github");
     
-    // Set markdown mode
+    // Set markdown mode (which includes YAML frontmatter highlighting)
     aceEditor.session.setMode("ace/mode/markdown");
     
     // Configure editor options
@@ -770,15 +957,43 @@ function initializeAceEditor() {
     const initialContent = document.getElementById('content').value;
     aceEditor.setValue(initialContent, -1); // -1 moves cursor to start
     
-    // If editing and has content, extract title
+    // If editing and has content, sync from frontmatter
     if (initialContent) {
-        const title = extractTitleFromContent(initialContent);
+        // If editing existing note without frontmatter, add it
+        if (!initialContent.trim().startsWith('---')) {
+            const newContent = updateContentFrontmatter(initialContent);
+            aceEditor.setValue(newContent, -1);
+        }
+        syncSettingsFromFrontmatter(aceEditor.getValue());
+        const title = extractTitleFromContent(aceEditor.getValue());
         document.getElementById('title').value = title;
     }
     
     // Listen for changes in Ace Editor
     aceEditor.on('change', function() {
-        syncContentAndUpdatePreview();
+        syncContentAndUpdatePreview(false); // Don't update frontmatter on every keystroke
+    });
+    
+    // If this is a new note, add initial frontmatter
+    if (!initialContent || initialContent.trim() === '') {
+        const newContent = updateContentFrontmatter('# New Note\n\nStart writing here...');
+        aceEditor.setValue(newContent, -1);
+        syncContentAndUpdatePreview(false);
+    }
+    
+    // Listen for changes in settings to update frontmatter
+    ['visibility', 'folder', 'tags', 'project_id', 'task_id'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', function() {
+                // Force immediate frontmatter update when settings change
+                const content = updateContentFrontmatter(aceEditor.getValue());
+                const currentPosition = aceEditor.getCursorPosition();
+                aceEditor.setValue(content, -1);
+                aceEditor.moveCursorToPosition(currentPosition);
+                syncContentAndUpdatePreview(false);
+            });
+        }
     });
     
     // Handle form submission - ensure content is synced
