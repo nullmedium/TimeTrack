@@ -258,6 +258,12 @@
                                     <path d="M6.5 6.5L4 4M9.5 6.5L12 4M6.5 9.5L4 12M9.5 9.5L12 12" stroke="currentColor" fill="none"/>
                                 </svg>
                             </a>
+                            <a href="{{ url_for('download_note', slug=note.slug, format='md') }}" class="btn-action" title="Download as Markdown">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                    <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                                </svg>
+                            </a>
                             {% if note.can_user_edit(g.user) %}
                             <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn-action" title="Edit">
                                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -348,6 +354,12 @@
                             <path d="M6.5 6.5L4 4M9.5 6.5L12 4M6.5 9.5L4 12M9.5 9.5L12 12" stroke="currentColor" fill="none"/>
                         </svg>
                     </a>
+                    <a href="{{ url_for('download_note', slug=note.slug, format='md') }}" class="btn-action" title="Download as Markdown">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                            <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                        </svg>
+                    </a>
                     {% if note.can_user_edit(g.user) %}
                     <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn-action" title="Edit">
                         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -378,6 +390,13 @@
         </div> <!-- End notes-content -->
     </div> <!-- End notes-layout -->
 </div> <!-- End notes-list-container -->
+
+<!-- Folder Download Dropdown (Hidden, positioned dynamically) -->
+<div id="folder-download-dropdown" class="folder-download-dropdown">
+    <a href="#" data-format="md">Download as Markdown</a>
+    <a href="#" data-format="html">Download as HTML</a>
+    <a href="#" data-format="txt">Download as Text</a>
+</div>
 
 <style>
 /* Notes list specific styles */
@@ -542,6 +561,55 @@
     font-size: 0.85rem;
     color: #666;
     margin-left: 0.5rem;
+}
+
+.folder-download-btn {
+    margin-left: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+    cursor: pointer;
+    padding: 0.2rem;
+    border-radius: 3px;
+}
+
+.folder-content:hover .folder-download-btn {
+    opacity: 0.7;
+}
+
+.folder-download-btn:hover {
+    opacity: 1 !important;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* Folder download dropdown */
+.folder-download-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 1000;
+    min-width: 150px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: none;
+}
+
+.folder-download-dropdown.show {
+    display: block;
+}
+
+.folder-download-dropdown a {
+    display: block;
+    padding: 0.5rem 1rem;
+    color: #333;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.folder-download-dropdown a:hover {
+    background: #f8f9fa;
 }
 
 .folder-children {
@@ -1026,7 +1094,7 @@
 }
 
 .column-actions {
-    width: 160px;
+    width: 200px;
 }
 
 .note-actions {
@@ -1460,6 +1528,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Enable drag and drop for notes
     enableDragAndDrop();
+    
+    // Setup folder download dropdown
+    setupFolderDownload();
 });
 
 // Folder tree functions
@@ -1784,6 +1855,63 @@ function addTagsToNotes() {
         alert('Error adding tags to notes');
     });
 }
+
+// Folder download functions
+function setupFolderDownload() {
+    const dropdown = document.getElementById('folder-download-dropdown');
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.folder-download-btn') && !dropdown.contains(e.target)) {
+            dropdown.classList.remove('show');
+        }
+    });
+    
+    // Setup download links
+    dropdown.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const format = this.getAttribute('data-format');
+            const folder = dropdown.getAttribute('data-folder');
+            if (folder) {
+                downloadFolder(folder, format);
+            }
+            dropdown.classList.remove('show');
+        });
+    });
+}
+
+function showFolderDownloadMenu(event, folderPath) {
+    event.stopPropagation();
+    const dropdown = document.getElementById('folder-download-dropdown');
+    const btn = event.currentTarget;
+    
+    // Position dropdown near the button
+    const rect = btn.getBoundingClientRect();
+    dropdown.style.position = 'fixed';
+    dropdown.style.left = rect.left + 'px';
+    dropdown.style.top = (rect.bottom + 5) + 'px';
+    
+    // Store the folder path
+    dropdown.setAttribute('data-folder', folderPath);
+    
+    // Show dropdown
+    dropdown.classList.add('show');
+}
+
+function downloadFolder(folderPath, format) {
+    // Encode the folder path for URL
+    const encodedPath = encodeURIComponent(folderPath);
+    const url = `/notes/folder/${encodedPath}/download/${format}`;
+    
+    // Create a temporary link and click it
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
 </script>
 
 {% endblock %}
@@ -1791,13 +1919,21 @@ function addTagsToNotes() {
 {% macro render_folder_tree(tree, level=0) %}
     {% for folder, children in tree.items() %}
         <div class="folder-item {% if children %}has-children{% endif %}" data-folder="{{ folder }}">
-            <div class="folder-content {% if folder_filter == folder %}active{% endif %}" onclick="filterByFolder('{{ folder }}')">
+            <div class="folder-content {% if folder_filter == folder %}active{% endif %}">
                 {% if children %}
                     <span onclick="toggleFolder(event, '{{ folder }}')" style="position: absolute; left: -15px; cursor: pointer;">▶</span>
                 {% endif %}
-                <span class="folder-icon">📁</span>
-                <span class="folder-name">{{ folder.split('/')[-1] }}</span>
+                <span class="folder-icon" onclick="filterByFolder('{{ folder }}')" style="cursor: pointer;">📁</span>
+                <span class="folder-name" onclick="filterByFolder('{{ folder }}')" style="cursor: pointer;">{{ folder.split('/')[-1] }}</span>
                 <span class="folder-count">({{ folder_counts.get(folder, 0) }})</span>
+                {% if folder_counts.get(folder, 0) > 0 %}
+                <div class="folder-download-btn" onclick="showFolderDownloadMenu(event, '{{ folder }}')">
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                        <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                    </svg>
+                </div>
+                {% endif %}
             </div>
             {% if children %}
                 <div class="folder-children">
