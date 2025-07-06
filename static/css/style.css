@@ -2396,7 +2396,8 @@ input[type="time"]::-webkit-datetime-edit {
 
 /* User Dropdown Styles */
 .user-dropdown-toggle {
-    display: block;
+    display: flex;
+    align-items: center;
     padding: 0.5rem 1.25rem;
     color: #495057;
     text-decoration: none;
@@ -2412,9 +2413,7 @@ input[type="time"]::-webkit-datetime-edit {
     color: #333;
 }
 
-.user-dropdown-toggle .nav-icon {
-    margin-right: 1rem;
-}
+/* Removed nav-icon style as we're using avatar instead */
 
 .sidebar.collapsed .user-dropdown-toggle .nav-text {
     display: none;
@@ -2464,6 +2463,7 @@ input[type="time"]::-webkit-datetime-edit {
     color: #333;
     border-radius: 4px 4px 0 0;
     border-bottom: 1px solid #e0e0e0;
+    text-align: center;
 }
 
 .user-dropdown-header h3 {
@@ -2542,6 +2542,40 @@ input[type="time"]::-webkit-datetime-edit {
         width: 90%;
         max-width: 400px;
     }
+}
+
+/* User Avatar Styles */
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 0.75rem;
+    border: 2px solid #e9ecef;
+    vertical-align: middle;
+}
+
+.user-avatar-large {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin: 0 auto 0.75rem;
+    display: block;
+    border: 3px solid #dee2e6;
+}
+
+.sidebar.collapsed .user-avatar {
+    margin-right: 0;
+    width: 28px;
+    height: 28px;
+}
+
+.user-dropdown-toggle .nav-text {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 /* Password Strength Indicator Styles */

@@ -161,6 +161,9 @@ class User(db.Model):
     # Two-Factor Authentication fields
     two_factor_enabled = db.Column(db.Boolean, default=False)
     two_factor_secret = db.Column(db.String(32), nullable=True)  # Base32 encoded secret
+    
+    # Avatar field
+    avatar_url = db.Column(db.String(255), nullable=True)  # URL to user's avatar image
 
     # Relationships
     time_entries = db.relationship('TimeEntry', backref='user', lazy=True)
@@ -214,6 +217,42 @@ class User(db.Model):
         import pyotp
         totp = pyotp.TOTP(self.two_factor_secret)
         return totp.verify(token, valid_window=1)  # Allow 1 window tolerance
+
+    def get_avatar_url(self, size=40):
+        """Get user's avatar URL or generate a default one"""
+        if self.avatar_url:
+            return self.avatar_url
+        
+        # Generate a default avatar using DiceBear Avatars (similar to GitHub's identicons)
+        # Using initials style for a clean, professional look
+        import hashlib
+        
+        # Create a hash from username for consistent colors
+        hash_input = f"{self.username}_{self.id}".encode('utf-8')
+        hash_hex = hashlib.md5(hash_input).hexdigest()
+        
+        # Use DiceBear API for avatar generation
+        # For initials style, we need to provide the actual initials
+        initials = self.get_initials()
+        
+        # Generate avatar URL with initials
+        # Using a color based on the hash for consistency
+        bg_colors = ['0ea5e9', '8b5cf6', 'ec4899', 'f59e0b', '10b981', 'ef4444', '3b82f6', '6366f1']
+        color_index = int(hash_hex[:2], 16) % len(bg_colors)
+        bg_color = bg_colors[color_index]
+        
+        avatar_url = f"https://api.dicebear.com/7.x/initials/svg?seed={initials}&size={size}&backgroundColor={bg_color}&fontSize=50"
+        
+        return avatar_url
+    
+    def get_initials(self):
+        """Get user initials for avatar display"""
+        parts = self.username.split()
+        if len(parts) >= 2:
+            return f"{parts[0][0]}{parts[-1][0]}".upper()
+        elif self.username:
+            return self.username[:2].upper()
+        return "??"
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -361,6 +400,42 @@ class CompanyWorkConfig(db.Model):
             }
         }
         return presets.get(region, presets[WorkRegion.GERMANY])
+
+# Comment visibility enumeration
+class CommentVisibility(enum.Enum):
+    TEAM = "Team"  # Only visible to team members
+    COMPANY = "Company"  # Visible to all company members
+
+# Company Settings (General company preferences)
+class CompanySettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
+    
+    # Comment settings
+    default_comment_visibility = db.Column(db.Enum(CommentVisibility), default=CommentVisibility.COMPANY)
+    allow_team_visibility_comments = db.Column(db.Boolean, default=True)  # Allow users to set comments as team-only
+    
+    # Task settings
+    require_task_assignment = db.Column(db.Boolean, default=False)  # Tasks must be assigned before work can begin
+    allow_task_creation_by_members = db.Column(db.Boolean, default=True)  # Team members can create tasks
+    
+    # Project settings
+    restrict_project_access_by_team = db.Column(db.Boolean, default=False)  # Only team members can access team projects
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    
+    # Relationships
+    company = db.relationship('Company', backref=db.backref('settings', uselist=False))
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    
+    # Unique constraint - one settings per company
+    __table_args__ = (db.UniqueConstraint('company_id', name='uq_company_settings'),)
+    
+    def __repr__(self):
+        return f'<CompanySettings {self.company.name}>'
 
 # User Preferences (User-configurable display settings)
 class UserPreferences(db.Model):
@@ -596,6 +671,72 @@ class SubTask(db.Model):
     def can_user_access(self, user):
         """Check if a user can access this subtask"""
         return self.parent_task.can_user_access(user)
+
+# Comment model for task discussions
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)
+    
+    # Task association
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
+    
+    # Parent comment for thread support
+    parent_comment_id = db.Column(db.Integer, db.ForeignKey('comment.id'), nullable=True)
+    
+    # Visibility setting
+    visibility = db.Column(db.Enum(CommentVisibility), default=CommentVisibility.COMPANY)
+    
+    # Edit tracking
+    is_edited = db.Column(db.Boolean, default=False)
+    edited_at = db.Column(db.DateTime, nullable=True)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Relationships
+    task = db.relationship('Task', backref=db.backref('comments', lazy='dynamic', cascade='all, delete-orphan'))
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='comments')
+    replies = db.relationship('Comment', backref=db.backref('parent_comment', remote_side=[id]))
+    
+    def __repr__(self):
+        return f'<Comment {self.id} on Task {self.task_id}>'
+    
+    def can_user_view(self, user):
+        """Check if a user can view this comment based on visibility settings"""
+        # First check if user can access the task
+        if not self.task.can_user_access(user):
+            return False
+        
+        # Then check visibility settings
+        if self.visibility == CommentVisibility.TEAM:
+            # Check if user is in the same team as the task's project
+            if self.task.project.team_id:
+                return user.team_id == self.task.project.team_id
+            # If no team assigned to project, fall back to company visibility
+            return user.company_id == self.task.project.company_id
+        elif self.visibility == CommentVisibility.COMPANY:
+            # Check if user is in the same company
+            return user.company_id == self.task.project.company_id
+        
+        return False
+    
+    def can_user_edit(self, user):
+        """Check if a user can edit this comment"""
+        # Only the comment creator can edit their own comments
+        return user.id == self.created_by_id
+    
+    def can_user_delete(self, user):
+        """Check if a user can delete this comment"""
+        # Comment creator can delete their own comments
+        if user.id == self.created_by_id:
+            return True
+        
+        # Admins and supervisors can delete any comment in their company
+        if user.role in [Role.ADMIN, Role.SUPERVISOR]:
+            return user.company_id == self.task.project.company_id
+        
+        return False
 
 # Announcement model for system-wide announcements
 class Announcement(db.Model):

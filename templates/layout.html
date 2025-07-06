@@ -40,13 +40,14 @@
             {% if g.user %}
             <!-- User Account Menu -->
             <a href="#" class="user-dropdown-toggle" id="user-dropdown-toggle" data-tooltip="{{ g.user.username }}">
-            <i class="nav-icon">👤</i>
+            <img src="{{ g.user.get_avatar_url(32) }}" alt="{{ g.user.username }}" class="user-avatar">
             <span class="nav-text">{{ g.user.username }}<span class="dropdown-arrow">▼</span></span>
             </a>
             
             <!-- User Dropdown Context Menu -->
             <div class="user-dropdown-modal" id="user-dropdown-modal">
                 <div class="user-dropdown-header">
+                    <img src="{{ g.user.get_avatar_url(64) }}" alt="{{ g.user.username }}" class="user-avatar-large">
                     <h3>{{ g.user.username }}</h3>
                     <div class="user-info">
                         {% if g.user.email %}

@@ -14,9 +14,9 @@ from datetime import datetime
 try:
     from app import app, db
     from models import (User, TimeEntry, WorkConfig, SystemSettings, Team, Role, Project,
-                       Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType,
+                       Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType,
                        ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent,
-                       WidgetType, UserDashboard, DashboardWidget, WidgetTemplate)
+                       WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility)
     from werkzeug.security import generate_password_hash
     FLASK_AVAILABLE = True
 except ImportError:
@@ -74,6 +74,7 @@ def run_all_migrations(db_path=None):
     migrate_task_system(db_path)
     migrate_system_events(db_path)
     migrate_dashboard_system(db_path)
+    migrate_comment_system(db_path)
     
     # Run PostgreSQL-specific migrations if applicable
     if FLASK_AVAILABLE:
@@ -174,7 +175,8 @@ def run_basic_migrations(db_path):
             ('business_name', "ALTER TABLE user ADD COLUMN business_name VARCHAR(100)"),
             ('company_id', "ALTER TABLE user ADD COLUMN company_id INTEGER"),
             ('two_factor_enabled', "ALTER TABLE user ADD COLUMN two_factor_enabled BOOLEAN DEFAULT 0"),
-            ('two_factor_secret', "ALTER TABLE user ADD COLUMN two_factor_secret VARCHAR(32)")
+            ('two_factor_secret', "ALTER TABLE user ADD COLUMN two_factor_secret VARCHAR(32)"),
+            ('avatar_url', "ALTER TABLE user ADD COLUMN avatar_url VARCHAR(255)")
         ]
 
         for column_name, sql_command in user_migrations:
@@ -300,6 +302,28 @@ def create_missing_tables(cursor):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created_by_id INTEGER NOT NULL,
             FOREIGN KEY (created_by_id) REFERENCES user (id)
+        )
+        """)
+
+    # Company Settings table
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='company_settings'")
+    if not cursor.fetchone():
+        print("Creating company_settings table...")
+        cursor.execute("""
+        CREATE TABLE company_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL,
+            default_comment_visibility VARCHAR(20) DEFAULT 'Company',
+            allow_team_visibility_comments BOOLEAN DEFAULT 1,
+            require_task_assignment BOOLEAN DEFAULT 0,
+            allow_task_creation_by_members BOOLEAN DEFAULT 1,
+            restrict_project_access_by_team BOOLEAN DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_by_id INTEGER,
+            FOREIGN KEY (company_id) REFERENCES company (id),
+            FOREIGN KEY (created_by_id) REFERENCES user (id),
+            UNIQUE(company_id)
         )
         """)
 
@@ -460,6 +484,7 @@ def migrate_user_roles(cursor):
             business_name VARCHAR(100),
             two_factor_enabled BOOLEAN DEFAULT 0,
             two_factor_secret VARCHAR(32),
+            avatar_url VARCHAR(255),
             FOREIGN KEY (company_id) REFERENCES company (id),
             FOREIGN KEY (team_id) REFERENCES team (id)
         )
@@ -485,7 +510,7 @@ def migrate_user_roles(cursor):
                    WHEN account_type IN (?, ?) THEN account_type
                    ELSE ?
                END as account_type,
-               business_name, two_factor_enabled, two_factor_secret
+               business_name, two_factor_enabled, two_factor_secret, avatar_url
         FROM user
         """, (default_company_id, Role.TEAM_MEMBER.value, Role.TEAM_LEADER.value, Role.SUPERVISOR.value,
               Role.ADMIN.value, Role.SYSTEM_ADMIN.value, Role.TEAM_MEMBER.value,
@@ -969,6 +994,7 @@ def create_all_tables(cursor):
         business_name VARCHAR(100),
         two_factor_enabled BOOLEAN DEFAULT 0,
         two_factor_secret VARCHAR(32),
+        avatar_url VARCHAR(255),
         FOREIGN KEY (company_id) REFERENCES company (id),
         FOREIGN KEY (team_id) REFERENCES team (id)
     )
@@ -1118,6 +1144,89 @@ def migrate_postgresql_schema():
                 db.session.execute(text("CREATE INDEX idx_subtask_task_id ON sub_task(task_id)"))
                 db.session.commit()
             
+            # Check if avatar_url column exists in user table
+            result = db.session.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'user' AND column_name = 'avatar_url'
+            """))
+            
+            if not result.fetchone():
+                print("Adding avatar_url column to user table...")
+                db.session.execute(text('ALTER TABLE "user" ADD COLUMN avatar_url VARCHAR(255)'))
+                db.session.commit()
+            
+            # Check if comment table exists
+            result = db.session.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_name = 'comment'
+            """))
+            
+            if not result.fetchone():
+                print("Creating comment table...")
+                
+                # Create comment visibility enum type if it doesn't exist
+                db.session.execute(text("""
+                    DO $$ BEGIN
+                        CREATE TYPE commentvisibility AS ENUM ('TEAM', 'COMPANY');
+                    EXCEPTION
+                        WHEN duplicate_object THEN null;
+                    END $$;
+                """))
+                
+                db.session.execute(text("""
+                    CREATE TABLE comment (
+                        id SERIAL PRIMARY KEY,
+                        content TEXT NOT NULL,
+                        task_id INTEGER NOT NULL,
+                        parent_comment_id INTEGER,
+                        visibility commentvisibility DEFAULT 'COMPANY',
+                        is_edited BOOLEAN DEFAULT FALSE,
+                        edited_at TIMESTAMP,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        created_by_id INTEGER NOT NULL,
+                        FOREIGN KEY (task_id) REFERENCES task (id) ON DELETE CASCADE,
+                        FOREIGN KEY (parent_comment_id) REFERENCES comment (id),
+                        FOREIGN KEY (created_by_id) REFERENCES "user" (id)
+                    )
+                """))
+                
+                # Create indexes for better performance
+                db.session.execute(text("CREATE INDEX idx_comment_task ON comment(task_id)"))
+                db.session.execute(text("CREATE INDEX idx_comment_parent ON comment(parent_comment_id)"))
+                db.session.execute(text("CREATE INDEX idx_comment_created_by ON comment(created_by_id)"))
+                db.session.execute(text("CREATE INDEX idx_comment_created_at ON comment(created_at DESC)"))
+                db.session.commit()
+            
+            # Check if company_settings table exists
+            result = db.session.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_name = 'company_settings'
+            """))
+            
+            if not result.fetchone():
+                print("Creating company_settings table...")
+                db.session.execute(text("""
+                    CREATE TABLE company_settings (
+                        id SERIAL PRIMARY KEY,
+                        company_id INTEGER NOT NULL,
+                        default_comment_visibility commentvisibility DEFAULT 'COMPANY',
+                        allow_team_visibility_comments BOOLEAN DEFAULT TRUE,
+                        require_task_assignment BOOLEAN DEFAULT FALSE,
+                        allow_task_creation_by_members BOOLEAN DEFAULT TRUE,
+                        restrict_project_access_by_team BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        created_by_id INTEGER,
+                        FOREIGN KEY (company_id) REFERENCES company (id),
+                        FOREIGN KEY (created_by_id) REFERENCES "user" (id),
+                        UNIQUE(company_id)
+                    )
+                """))
+                db.session.commit()
+            
             print("PostgreSQL schema migration completed successfully!")
             
     except Exception as e:
@@ -1264,6 +1373,64 @@ def migrate_dashboard_system(db_file=None):
 
     except Exception as e:
         print(f"Error during Dashboard system migration: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def migrate_comment_system(db_file=None):
+    """Migrate to add Comment system for tasks."""
+    db_path = get_db_path(db_file)
+
+    print(f"Migrating Comment system in {db_path}...")
+
+    if not os.path.exists(db_path):
+        print(f"Database file {db_path} does not exist. Run basic migration first.")
+        return False
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        # Check if comment table already exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='comment'")
+        if cursor.fetchone():
+            print("Comment table already exists. Skipping migration.")
+            return True
+
+        print("Creating Comment system table...")
+
+        # Create comment table
+        cursor.execute("""
+        CREATE TABLE comment (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT NOT NULL,
+            task_id INTEGER NOT NULL,
+            parent_comment_id INTEGER,
+            visibility VARCHAR(20) DEFAULT 'Company',
+            is_edited BOOLEAN DEFAULT 0,
+            edited_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_by_id INTEGER NOT NULL,
+            FOREIGN KEY (task_id) REFERENCES task (id) ON DELETE CASCADE,
+            FOREIGN KEY (parent_comment_id) REFERENCES comment (id),
+            FOREIGN KEY (created_by_id) REFERENCES user (id)
+        )
+        """)
+
+        # Create indexes for better performance
+        cursor.execute("CREATE INDEX idx_comment_task ON comment(task_id)")
+        cursor.execute("CREATE INDEX idx_comment_parent ON comment(parent_comment_id)")
+        cursor.execute("CREATE INDEX idx_comment_created_by ON comment(created_by_id)")
+        cursor.execute("CREATE INDEX idx_comment_created_at ON comment(created_at DESC)")
+
+        conn.commit()
+        print("Comment system migration completed successfully!")
+        return True
+
+    except Exception as e:
+        print(f"Error during Comment system migration: {e}")
         conn.rollback()
         raise
     finally:

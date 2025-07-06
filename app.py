@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data, format_burndown_data
@@ -1321,6 +1321,134 @@ def profile():
         flash(error, 'error')
 
     return render_template('profile.html', title='My Profile', user=user)
+
+@app.route('/update-avatar', methods=['POST'])
+@login_required
+def update_avatar():
+    """Update user avatar URL"""
+    user = User.query.get(session['user_id'])
+    avatar_url = request.form.get('avatar_url', '').strip()
+    
+    # Validate URL if provided
+    if avatar_url:
+        # Basic URL validation
+        import re
+        url_pattern = re.compile(
+            r'^https?://'  # http:// or https://
+            r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...
+            r'localhost|'  # localhost...
+            r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+            r'(?::\d+)?'  # optional port
+            r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+        
+        if not url_pattern.match(avatar_url):
+            flash('Please provide a valid URL for your avatar.', 'error')
+            return redirect(url_for('profile'))
+        
+        # Additional validation for image URLs
+        allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']
+        if not any(avatar_url.lower().endswith(ext) for ext in allowed_extensions):
+            # Check if it's a service that doesn't use extensions (like gravatar)
+            allowed_services = ['gravatar.com', 'dicebear.com', 'ui-avatars.com', 'avatars.githubusercontent.com']
+            if not any(service in avatar_url.lower() for service in allowed_services):
+                flash('Avatar URL should point to an image file (JPG, PNG, GIF, WebP, or SVG).', 'error')
+                return redirect(url_for('profile'))
+    
+    # Update avatar URL (empty string removes custom avatar)
+    user.avatar_url = avatar_url if avatar_url else None
+    db.session.commit()
+    
+    if avatar_url:
+        flash('Avatar updated successfully!', 'success')
+    else:
+        flash('Avatar reset to default.', 'success')
+    
+    # Log the avatar change
+    SystemEvent.log_event(
+        event_type='profile_avatar_updated',
+        event_category='user',
+        description=f'User {user.username} updated their avatar',
+        user_id=user.id,
+        company_id=user.company_id
+    )
+    
+    return redirect(url_for('profile'))
+
+@app.route('/upload-avatar', methods=['POST'])
+@login_required
+def upload_avatar():
+    """Handle avatar file upload"""
+    import os
+    from werkzeug.utils import secure_filename
+    import uuid
+    
+    user = User.query.get(session['user_id'])
+    
+    # Check if file was uploaded
+    if 'avatar_file' not in request.files:
+        flash('No file selected.', 'error')
+        return redirect(url_for('profile'))
+    
+    file = request.files['avatar_file']
+    
+    # Check if file is empty
+    if file.filename == '':
+        flash('No file selected.', 'error')
+        return redirect(url_for('profile'))
+    
+    # Validate file extension
+    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+    
+    if file_ext not in allowed_extensions:
+        flash('Invalid file type. Please upload a PNG, JPG, GIF, or WebP image.', 'error')
+        return redirect(url_for('profile'))
+    
+    # Validate file size (5MB max)
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)  # Reset file pointer
+    
+    if file_size > 5 * 1024 * 1024:  # 5MB
+        flash('File size must be less than 5MB.', 'error')
+        return redirect(url_for('profile'))
+    
+    # Generate unique filename
+    unique_filename = f"{user.id}_{uuid.uuid4().hex}.{file_ext}"
+    
+    # Create user avatar directory if it doesn't exist
+    avatar_dir = os.path.join(app.static_folder, 'uploads', 'avatars')
+    os.makedirs(avatar_dir, exist_ok=True)
+    
+    # Save the file
+    file_path = os.path.join(avatar_dir, unique_filename)
+    file.save(file_path)
+    
+    # Delete old avatar file if it exists and is a local upload
+    if user.avatar_url and user.avatar_url.startswith('/static/uploads/avatars/'):
+        old_file_path = os.path.join(app.root_path, user.avatar_url.lstrip('/'))
+        if os.path.exists(old_file_path):
+            try:
+                os.remove(old_file_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete old avatar: {e}")
+    
+    # Update user's avatar URL
+    user.avatar_url = f"/static/uploads/avatars/{unique_filename}"
+    db.session.commit()
+    
+    flash('Avatar uploaded successfully!', 'success')
+    
+    # Log the avatar upload
+    SystemEvent.log_event(
+        event_type='profile_avatar_uploaded',
+        event_category='user',
+        description=f'User {user.username} uploaded a new avatar',
+        user_id=user.id,
+        company_id=user.company_id
+    )
+    
+    return redirect(url_for('profile'))
 
 @app.route('/2fa/setup', methods=['GET', 'POST'])
 @login_required
@@ -3730,7 +3858,8 @@ def unified_task_management():
         'id': member.id,
         'username': member.username,
         'email': member.email,
-        'role': member.role.value if member.role else 'Team Member'
+        'role': member.role.value if member.role else 'Team Member',
+        'avatar_url': member.get_avatar_url(32)
     } for member in team_members]
     
     return render_template('unified_task_management.html',
@@ -4701,6 +4830,239 @@ def delete_subtask(subtask_id):
 
         return jsonify({'success': True, 'message': 'Subtask deleted successfully'})
 
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+# Comment API Routes
+@app.route('/api/tasks/<int:task_id>/comments')
+@login_required
+@company_required
+def get_task_comments(task_id):
+    """Get all comments for a task that the user can view"""
+    try:
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        
+        if not task or not task.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Task not found or access denied'})
+        
+        # Get all comments for the task
+        comments = []
+        for comment in task.comments.order_by(Comment.created_at.desc()):
+            if comment.can_user_view(g.user):
+                comment_data = {
+                    'id': comment.id,
+                    'content': comment.content,
+                    'visibility': comment.visibility.value,
+                    'is_edited': comment.is_edited,
+                    'edited_at': comment.edited_at.isoformat() if comment.edited_at else None,
+                    'created_at': comment.created_at.isoformat(),
+                    'author': {
+                        'id': comment.created_by.id,
+                        'username': comment.created_by.username,
+                        'avatar_url': comment.created_by.get_avatar_url(40)
+                    },
+                    'can_edit': comment.can_user_edit(g.user),
+                    'can_delete': comment.can_user_delete(g.user),
+                    'replies': []
+                }
+                
+                # Add replies if any
+                for reply in comment.replies:
+                    if reply.can_user_view(g.user):
+                        reply_data = {
+                            'id': reply.id,
+                            'content': reply.content,
+                            'is_edited': reply.is_edited,
+                            'edited_at': reply.edited_at.isoformat() if reply.edited_at else None,
+                            'created_at': reply.created_at.isoformat(),
+                            'author': {
+                                'id': reply.created_by.id,
+                                'username': reply.created_by.username,
+                                'avatar_url': reply.created_by.get_avatar_url(40)
+                            },
+                            'can_edit': reply.can_user_edit(g.user),
+                            'can_delete': reply.can_user_delete(g.user)
+                        }
+                        comment_data['replies'].append(reply_data)
+                
+                comments.append(comment_data)
+        
+        # Check if user can use team visibility
+        company_settings = CompanySettings.query.filter_by(company_id=g.user.company_id).first()
+        allow_team_visibility = company_settings.allow_team_visibility_comments if company_settings else True
+        
+        return jsonify({
+            'success': True,
+            'comments': comments,
+            'allow_team_visibility': allow_team_visibility
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/tasks/<int:task_id>/comments', methods=['POST'])
+@login_required
+@company_required
+def create_task_comment(task_id):
+    """Create a new comment on a task"""
+    try:
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        
+        if not task or not task.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Task not found or access denied'})
+        
+        data = request.get_json()
+        content = data.get('content', '').strip()
+        visibility = data.get('visibility', 'COMPANY')
+        parent_comment_id = data.get('parent_comment_id')
+        
+        if not content:
+            return jsonify({'success': False, 'message': 'Comment content is required'})
+        
+        # Check visibility settings
+        company_settings = CompanySettings.query.filter_by(company_id=g.user.company_id).first()
+        if visibility == 'TEAM' and company_settings and not company_settings.allow_team_visibility_comments:
+            visibility = 'COMPANY'
+        
+        # Validate parent comment if provided
+        if parent_comment_id:
+            parent_comment = Comment.query.filter_by(
+                id=parent_comment_id,
+                task_id=task_id
+            ).first()
+            
+            if not parent_comment or not parent_comment.can_user_view(g.user):
+                return jsonify({'success': False, 'message': 'Parent comment not found or access denied'})
+        
+        # Create comment
+        comment = Comment(
+            content=content,
+            task_id=task_id,
+            parent_comment_id=parent_comment_id,
+            visibility=CommentVisibility[visibility],
+            created_by_id=g.user.id
+        )
+        
+        db.session.add(comment)
+        db.session.commit()
+        
+        # Log system event
+        SystemEvent.log_event(
+            event_type='comment_created',
+            event_category='task',
+            description=f'Comment added to task {task.task_number}',
+            user_id=g.user.id,
+            company_id=g.user.company_id,
+            event_metadata={'task_id': task_id, 'comment_id': comment.id}
+        )
+        
+        # Return the created comment
+        comment_data = {
+            'id': comment.id,
+            'content': comment.content,
+            'visibility': comment.visibility.value,
+            'is_edited': comment.is_edited,
+            'created_at': comment.created_at.isoformat(),
+            'author': {
+                'id': comment.created_by.id,
+                'username': comment.created_by.username,
+                'avatar_url': comment.created_by.get_avatar_url(40)
+            },
+            'can_edit': True,
+            'can_delete': True
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'Comment posted successfully',
+            'comment': comment_data
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/comments/<int:comment_id>', methods=['PUT'])
+@login_required
+@company_required
+def update_comment(comment_id):
+    """Update an existing comment"""
+    try:
+        comment = Comment.query.join(Task).join(Project).filter(
+            Comment.id == comment_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        
+        if not comment:
+            return jsonify({'success': False, 'message': 'Comment not found'})
+        
+        if not comment.can_user_edit(g.user):
+            return jsonify({'success': False, 'message': 'You cannot edit this comment'})
+        
+        data = request.get_json()
+        content = data.get('content', '').strip()
+        
+        if not content:
+            return jsonify({'success': False, 'message': 'Comment content is required'})
+        
+        comment.content = content
+        comment.is_edited = True
+        comment.edited_at = datetime.now()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Comment updated successfully',
+            'edited_at': comment.edited_at.isoformat()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/comments/<int:comment_id>', methods=['DELETE'])
+@login_required
+@company_required
+def delete_comment(comment_id):
+    """Delete a comment"""
+    try:
+        comment = Comment.query.join(Task).join(Project).filter(
+            Comment.id == comment_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        
+        if not comment:
+            return jsonify({'success': False, 'message': 'Comment not found'})
+        
+        if not comment.can_user_delete(g.user):
+            return jsonify({'success': False, 'message': 'You cannot delete this comment'})
+        
+        # Log system event before deletion
+        SystemEvent.log_event(
+            event_type='comment_deleted',
+            event_category='task',
+            description=f'Comment deleted from task {comment.task.task_number}',
+            user_id=g.user.id,
+            company_id=g.user.company_id,
+            event_metadata={'task_id': comment.task_id, 'comment_id': comment.id}
+        )
+        
+        db.session.delete(comment)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Comment deleted successfully'
+        })
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)})

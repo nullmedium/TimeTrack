@@ -6,7 +6,6 @@
     <div class="management-header task-header">
         <h1>📋 Task Management</h1>
         <div class="management-controls task-controls">
-            
             <!-- Smart Search -->
             <div class="smart-search-container">
                 <div class="smart-search-box">
@@ -234,16 +233,64 @@
     gap: 1rem;
     align-items: center;
     flex-wrap: wrap;
+    width: 100%;
 }
 
 .task-controls .smart-search-container {
     flex: 1;
     min-width: 300px;
     max-width: 600px;
+    margin-bottom: 0; /* Remove margin to align with buttons */
 }
 
 .task-controls .management-actions {
     flex-shrink: 0;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* Ensure all buttons and search input have same height */
+.smart-search-input,
+.task-controls .btn {
+    height: 38px; /* Standard height for consistency */
+}
+
+.task-controls .btn {
+    padding: 0.5rem 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap; /* Prevent button text from wrapping */
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+    .task-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .task-controls .smart-search-container {
+        max-width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .task-controls .management-actions {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 576px) {
+    .task-controls .management-actions {
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+    
+    .task-controls .btn {
+        font-size: 0.875rem;
+        padding: 0.4rem 0.8rem;
+    }
 }
 
 /* Subtask progress styles */
@@ -371,7 +418,6 @@
 
 /* Task Action Buttons */
 .task-actions {
-    margin-top: 0.5rem;
     display: flex;
     justify-content: flex-end;
     gap: 0.25rem;
@@ -487,6 +533,17 @@
 
 .task-assignee {
     font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.task-assignee-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid #e9ecef;
 }
 
 .task-due-date {
@@ -1020,6 +1077,29 @@ class UnifiedTaskManager {
         this.setupEventListeners();
         this.setupSortable();
         await this.loadTasks();
+    }
+
+    getUserAvatar(userId) {
+        // Find user in team members
+        const user = window.teamMembers.find(member => member.id === userId);
+        if (user && user.avatar_url) {
+            return user.avatar_url;
+        }
+        
+        // Generate default avatar using DiceBear API
+        const username = user ? user.username : `user_${userId}`;
+        const hash = this.hashCode(username + '_' + userId);
+        return `https://api.dicebear.com/7.x/initials/svg?seed=${hash}&size=24&backgroundColor=ffffff`;
+    }
+    
+    hashCode(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        return Math.abs(hash).toString(16);
     }
 
     setupEventListeners() {
@@ -1568,7 +1648,10 @@ class UnifiedTaskManager {
             </div>
             ${task.project_name ? `<div class="task-project">${task.project_code} - ${task.project_name}</div>` : ''}
             <div class="task-meta">
-                <span class="task-assignee">${task.assigned_to_name || 'Unassigned'}</span>
+                <span class="task-assignee">
+                    ${task.assigned_to_id ? `<img src="${this.getUserAvatar(task.assigned_to_id)}" alt="${task.assigned_to_name}" class="task-assignee-avatar">` : ''}
+                    ${task.assigned_to_name || 'Unassigned'}
+                </span>
                 ${dueDate ? `<span class="task-due-date ${isOverdue ? 'overdue' : ''}">${formatUserDate(task.due_date)}</span>` : ''}
             </div>
             ${task.subtasks && task.subtasks.length > 0 ? this.renderSubtaskProgress(task.subtasks) : ''}
@@ -1769,6 +1852,10 @@ class UnifiedTaskManager {
             
             // Initialize subtasks
             initializeSubtasks(task.id);
+            
+            // Show comments section and load comments
+            document.getElementById('comments-section').style.display = 'block';
+            await this.loadComments(task.id);
         } else {
             document.getElementById('modal-title').textContent = 'Add New Task';
             document.getElementById('task-form').reset();
@@ -1780,6 +1867,9 @@ class UnifiedTaskManager {
             
             // Initialize empty subtasks
             initializeSubtasks(null);
+            
+            // Hide comments section for new tasks
+            document.getElementById('comments-section').style.display = 'none';
         }
         
         modal.style.display = 'block';
@@ -1988,6 +2078,320 @@ class UnifiedTaskManager {
             }
         }
     }
+    
+    // Comment management methods
+    async loadComments(taskId) {
+        try {
+            const response = await fetch(`/api/tasks/${taskId}/comments`);
+            const data = await response.json();
+            
+            if (data.success) {
+                this.renderComments(data.comments);
+                
+                // Show/hide team visibility option based on company settings
+                const visibilitySelect = document.getElementById('comment-visibility');
+                if (data.allow_team_visibility) {
+                    visibilitySelect.style.display = 'inline-block';
+                } else {
+                    visibilitySelect.style.display = 'none';
+                }
+            } else {
+                console.error('Failed to load comments:', data.message);
+            }
+        } catch (error) {
+            console.error('Error loading comments:', error);
+        }
+    }
+    
+    renderComments(comments) {
+        const container = document.getElementById('comments-container');
+        container.innerHTML = '';
+        
+        if (comments.length === 0) {
+            container.innerHTML = '<p class="no-comments">No comments yet. Be the first to comment!</p>';
+            return;
+        }
+        
+        comments.forEach(comment => {
+            const commentElement = this.createCommentElement(comment);
+            container.appendChild(commentElement);
+        });
+    }
+    
+    createCommentElement(comment) {
+        const element = document.createElement('div');
+        element.className = 'comment-item';
+        element.dataset.commentId = comment.id;
+        
+        const visibilityBadge = comment.visibility === 'Team' ? 
+            '<span class="comment-visibility-badge team">👥 Team</span>' : '';
+        
+        const editedText = comment.is_edited ? 
+            ` <span class="comment-edited">(edited)</span>` : '';
+        
+        element.innerHTML = `
+            <div class="comment-header">
+                <div class="comment-author-info">
+                    <img src="${comment.author.avatar_url}" alt="${comment.author.username}" class="comment-author-avatar">
+                    <div class="comment-author-details">
+                        <span class="comment-author">${comment.author.username}</span>
+                        <span class="comment-time">${this.formatRelativeTime(comment.created_at)}${editedText}</span>
+                    </div>
+                </div>
+                ${visibilityBadge}
+            </div>
+            <div class="comment-content">${this.escapeHtml(comment.content)}</div>
+            <div class="comment-actions">
+                ${comment.can_edit ? '<button class="comment-action" onclick="taskManager.editComment(' + comment.id + ')">Edit</button>' : ''}
+                ${comment.can_delete ? '<button class="comment-action" onclick="taskManager.deleteComment(' + comment.id + ')">Delete</button>' : ''}
+                <button class="comment-action" onclick="taskManager.replyToComment(${comment.id})">Reply</button>
+            </div>
+            <div class="comment-edit-form" id="comment-edit-${comment.id}" style="display: none;">
+                <textarea class="comment-edit-textarea">${this.escapeHtml(comment.content)}</textarea>
+                <div class="comment-edit-actions">
+                    <button class="btn btn-sm btn-primary" onclick="taskManager.saveCommentEdit(${comment.id})">Save</button>
+                    <button class="btn btn-sm btn-secondary" onclick="taskManager.cancelCommentEdit(${comment.id})">Cancel</button>
+                </div>
+            </div>
+            <div class="comment-reply-form" id="comment-reply-${comment.id}" style="display: none;">
+                <textarea placeholder="Write a reply..." rows="2"></textarea>
+                <div class="comment-edit-actions">
+                    <button class="btn btn-sm btn-primary" onclick="taskManager.saveReply(${comment.id})">Reply</button>
+                    <button class="btn btn-sm btn-secondary" onclick="taskManager.cancelReply(${comment.id})">Cancel</button>
+                </div>
+            </div>
+        `;
+        
+        // Add replies if any
+        if (comment.replies && comment.replies.length > 0) {
+            const repliesContainer = document.createElement('div');
+            repliesContainer.className = 'comment-replies';
+            
+            comment.replies.forEach(reply => {
+                const replyElement = this.createReplyElement(reply);
+                repliesContainer.appendChild(replyElement);
+            });
+            
+            element.appendChild(repliesContainer);
+        }
+        
+        return element;
+    }
+    
+    createReplyElement(reply) {
+        const element = document.createElement('div');
+        element.className = 'comment-reply';
+        element.dataset.commentId = reply.id;
+        
+        const editedText = reply.is_edited ? 
+            ` <span class="comment-edited">(edited)</span>` : '';
+        
+        element.innerHTML = `
+            <div class="comment-header">
+                <div class="comment-author-info">
+                    <img src="${reply.author.avatar_url}" alt="${reply.author.username}" class="comment-author-avatar">
+                    <div class="comment-author-details">
+                        <span class="comment-author">${reply.author.username}</span>
+                        <span class="comment-time">${this.formatRelativeTime(reply.created_at)}${editedText}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="comment-content">${this.escapeHtml(reply.content)}</div>
+            <div class="comment-actions">
+                ${reply.can_edit ? '<button class="comment-action" onclick="taskManager.editComment(' + reply.id + ')">Edit</button>' : ''}
+                ${reply.can_delete ? '<button class="comment-action" onclick="taskManager.deleteComment(' + reply.id + ')">Delete</button>' : ''}
+            </div>
+        `;
+        
+        return element;
+    }
+    
+    async addComment() {
+        const taskId = document.getElementById('task-id').value;
+        const contentTextarea = document.getElementById('new-comment');
+        const content = contentTextarea.value.trim();
+        const visibility = document.getElementById('comment-visibility').value;
+        
+        if (!taskId || !content) {
+            alert('Please enter a comment');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/tasks/${taskId}/comments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: content,
+                    visibility: visibility
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                contentTextarea.value = '';
+                await this.loadComments(taskId);
+            } else {
+                alert('Failed to post comment: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error posting comment:', error);
+            alert('Failed to post comment: ' + error.message);
+        }
+    }
+    
+    editComment(commentId) {
+        const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
+        const editForm = document.getElementById(`comment-edit-${commentId}`);
+        const content = commentElement.querySelector('.comment-content');
+        
+        content.style.display = 'none';
+        editForm.style.display = 'block';
+    }
+    
+    cancelCommentEdit(commentId) {
+        const editForm = document.getElementById(`comment-edit-${commentId}`);
+        const content = document.querySelector(`[data-comment-id="${commentId}"] .comment-content`);
+        
+        content.style.display = 'block';
+        editForm.style.display = 'none';
+    }
+    
+    async saveCommentEdit(commentId) {
+        const editForm = document.getElementById(`comment-edit-${commentId}`);
+        const textarea = editForm.querySelector('textarea');
+        const content = textarea.value.trim();
+        
+        if (!content) {
+            alert('Comment cannot be empty');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/comments/${commentId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: content
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                const taskId = document.getElementById('task-id').value;
+                await this.loadComments(taskId);
+            } else {
+                alert('Failed to update comment: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error updating comment:', error);
+            alert('Failed to update comment: ' + error.message);
+        }
+    }
+    
+    async deleteComment(commentId) {
+        if (!confirm('Are you sure you want to delete this comment?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/comments/${commentId}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                const taskId = document.getElementById('task-id').value;
+                await this.loadComments(taskId);
+            } else {
+                alert('Failed to delete comment: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error deleting comment:', error);
+            alert('Failed to delete comment: ' + error.message);
+        }
+    }
+    
+    replyToComment(commentId) {
+        const replyForm = document.getElementById(`comment-reply-${commentId}`);
+        replyForm.style.display = 'block';
+        replyForm.querySelector('textarea').focus();
+    }
+    
+    cancelReply(commentId) {
+        const replyForm = document.getElementById(`comment-reply-${commentId}`);
+        replyForm.style.display = 'none';
+        replyForm.querySelector('textarea').value = '';
+    }
+    
+    async saveReply(parentCommentId) {
+        const taskId = document.getElementById('task-id').value;
+        const replyForm = document.getElementById(`comment-reply-${parentCommentId}`);
+        const content = replyForm.querySelector('textarea').value.trim();
+        
+        if (!content) {
+            alert('Please enter a reply');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/tasks/${taskId}/comments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: content,
+                    parent_comment_id: parentCommentId,
+                    visibility: 'COMPANY' // Replies inherit parent visibility
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                replyForm.style.display = 'none';
+                replyForm.querySelector('textarea').value = '';
+                await this.loadComments(taskId);
+            } else {
+                alert('Failed to post reply: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error posting reply:', error);
+            alert('Failed to post reply: ' + error.message);
+        }
+    }
+    
+    formatRelativeTime(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffSecs = Math.floor(diffMs / 1000);
+        const diffMins = Math.floor(diffSecs / 60);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+        
+        if (diffSecs < 60) {
+            return 'just now';
+        } else if (diffMins < 60) {
+            return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+        } else if (diffHours < 24) {
+            return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        } else if (diffDays < 7) {
+            return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+        } else {
+            return date.toLocaleDateString();
+        }
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 }
 
 // Global functions
@@ -2009,6 +2413,10 @@ function saveTask() {
 
 function deleteTask() {
     taskManager.deleteTask();
+}
+
+function addComment() {
+    taskManager.addComment();
 }
 
 function addSubtask() {

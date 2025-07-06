@@ -38,6 +38,9 @@ COPY . .
 # Create the SQLite database directory with proper permissions
 RUN mkdir -p /app/instance && chmod 777 /app/instance
 
+# Create uploads directory with proper permissions
+RUN mkdir -p /app/static/uploads/avatars && chmod -R 777 /app/static/uploads
+
 VOLUME /data
 RUN mkdir /data && chmod 777 /data
 
