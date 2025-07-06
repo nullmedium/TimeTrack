@@ -66,9 +66,6 @@
                     {{ g.branding.app_name if g.branding else 'TimeTrack' }}
                 {% endif %}
             </a>
-            {% if g.company %}
-                <small class="company-name">{{ g.company.name }}</small>
-            {% endif %}
         </div>
         <button class="mobile-nav-toggle" id="mobile-nav-toggle">
             <span></span>
@@ -82,7 +79,7 @@
     {% if g.user %}
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h2>
+            <!-- <h2>
                 <a href="{{ url_for('home') }}">
                     {% if g.branding and g.branding.logo_filename %}
                         <img src="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename) }}" 
@@ -92,12 +89,8 @@
                         {{ g.branding.app_name if g.branding else 'TimeTrack' }}
                     {% endif %}
                 </a>
+            -->
             </h2>
-            {% if g.company %}
-                <div class="company-info">
-                    <small class="text-muted">{{ g.company.name }}</small>
-                </div>
-            {% endif %}
             <button class="sidebar-toggle" id="sidebar-toggle">
                 <span></span>
                 <span></span>
@@ -216,8 +209,19 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer>
-        <p>&copy; {{ current_year }} {{ g.branding.app_name }}. All rights reserved.</p>
+    <footer class="site-footer">
+        <div class="footer-content">
+            <div class="footer-info">
+                <p>&copy; {{ current_year }} {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% if g.company %} - {{ g.company.name }}{% endif %}. All rights reserved.</p>
+            </div>
+            <div class="footer-links">
+                <a href="{{ url_for('about') }}">About</a>
+                {% if g.branding and g.branding.imprint_enabled %}
+                    <span class="footer-separator">•</span>
+                    <a href="{{ url_for('imprint') }}">{{ g.branding.imprint_title or 'Imprint' }}</a>
+                {% endif %}
+            </div>
+        </div>
     </footer>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>

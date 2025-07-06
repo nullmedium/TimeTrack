@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file, abort
 from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
@@ -1583,6 +1583,22 @@ def verify_2fa():
 def about():
     return render_template('about.html', title='About')
 
+@app.route('/imprint')
+def imprint():
+    """Display the imprint/legal page if enabled"""
+    branding = BrandingSettings.get_current()
+    
+    # Check if imprint is enabled
+    if not branding or not branding.imprint_enabled:
+        abort(404)
+    
+    title = branding.imprint_title or 'Imprint'
+    content = branding.imprint_content or ''
+    
+    return render_template('imprint.html', 
+                         title=title,
+                         content=content)
+
 @app.route('/contact', methods=['GET', 'POST'])
 @login_required
 def contact():
@@ -2483,6 +2499,12 @@ def system_admin_branding():
         branding.app_name = request.form.get('app_name', g.branding.app_name).strip()
         branding.logo_alt_text = request.form.get('logo_alt_text', '').strip()
         branding.primary_color = request.form.get('primary_color', '#007bff').strip()
+        
+        # Handle imprint settings
+        branding.imprint_enabled = 'imprint_enabled' in request.form
+        branding.imprint_title = request.form.get('imprint_title', 'Imprint').strip()
+        branding.imprint_content = request.form.get('imprint_content', '').strip()
+        
         branding.updated_by_id = g.user.id
         
         # Handle logo upload

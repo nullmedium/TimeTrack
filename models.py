@@ -277,6 +277,11 @@ class BrandingSettings(db.Model):
     favicon_filename = db.Column(db.String(255), nullable=True)  # Filename of uploaded favicon
     primary_color = db.Column(db.String(7), nullable=True, default='#007bff')  # Hex color
     
+    # Imprint/Legal page settings
+    imprint_enabled = db.Column(db.Boolean, default=False)  # Enable/disable imprint page
+    imprint_title = db.Column(db.String(200), nullable=True, default='Imprint')  # Page title
+    imprint_content = db.Column(db.Text, nullable=True)  # HTML content for imprint page
+    
     # Meta fields
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)

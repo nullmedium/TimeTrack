@@ -136,6 +136,46 @@
                     </div>
                 </div>
 
+                <!-- Imprint/Legal Page -->
+                <div class="form-section">
+                    <h3>⚖️ Imprint / Legal Page</h3>
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" name="imprint_enabled" id="imprint_enabled"
+                                   {% if branding.imprint_enabled %}checked{% endif %}>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-text">Enable Imprint Page</span>
+                        </label>
+                        <small class="form-text text-muted">
+                            When enabled, an "Imprint" link will appear in the footer linking to your custom legal page.
+                        </small>
+                    </div>
+                    
+                    <div class="imprint-settings" id="imprint-settings" style="{% if not branding.imprint_enabled %}display: none;{% endif %}">
+                        <div class="form-group">
+                            <label for="imprint_title">Page Title</label>
+                            <input type="text" id="imprint_title" name="imprint_title" 
+                                   value="{{ branding.imprint_title or 'Imprint' }}" 
+                                   class="form-control"
+                                   placeholder="Imprint">
+                            <small class="form-text text-muted">
+                                The title that will be displayed on the imprint page.
+                            </small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="imprint_content">Page Content (HTML supported)</label>
+                            <textarea id="imprint_content" name="imprint_content" 
+                                      class="form-control content-editor"
+                                      rows="15"
+                                      placeholder="Enter your imprint/legal information here...">{{ branding.imprint_content or '' }}</textarea>
+                            <small class="form-text text-muted">
+                                You can use HTML to format your content. Common tags: &lt;h2&gt;, &lt;h3&gt;, &lt;p&gt;, &lt;strong&gt;, &lt;br&gt;, &lt;a href=""&gt;
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Save Button -->
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">💾 Save Branding Settings</button>
@@ -289,6 +329,77 @@
 }
 
 /* Sync color inputs */
+
+/* Toggle label styling - ensuring proper alignment */
+.form-group .toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+    padding: 0;
+}
+
+.toggle-label input[type="checkbox"] {
+    display: none;
+}
+
+.toggle-slider {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    background: #ccc;
+    border-radius: 24px;
+    transition: background 0.3s;
+    flex-shrink: 0;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s;
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider {
+    background: var(--primary-color);
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider::before {
+    transform: translateX(26px);
+}
+
+.toggle-text {
+    font-weight: 500;
+    color: #495057;
+    line-height: 1;
+}
+
+/* Content editor styling */
+.content-editor {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    background: #f8f9fa;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 0.75rem;
+    resize: vertical;
+}
+
+.imprint-settings {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
 </style>
 
 <script>
@@ -304,6 +415,18 @@ document.addEventListener('DOMContentLoaded', function() {
     colorText.addEventListener('input', function() {
         if (this.value.match(/^#[0-9A-Fa-f]{6}$/)) {
             colorPicker.value = this.value;
+        }
+    });
+    
+    // Toggle imprint settings visibility
+    const imprintEnabled = document.getElementById('imprint_enabled');
+    const imprintSettings = document.getElementById('imprint-settings');
+    
+    imprintEnabled.addEventListener('change', function() {
+        if (this.checked) {
+            imprintSettings.style.display = 'block';
+        } else {
+            imprintSettings.style.display = 'none';
         }
     });
 });
