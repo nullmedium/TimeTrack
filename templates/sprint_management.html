@@ -1,0 +1,912 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="management-container sprint-management-container">
+    <!-- Header Section -->
+    <div class="management-header sprint-header">
+        <h1>🏃‍♂️ Sprint Management</h1>
+        <div class="management-controls sprint-controls">
+            <!-- View Switcher -->
+            <div class="view-switcher">
+                <button class="view-btn active" data-view="active">Active Sprints</button>
+                <button class="view-btn" data-view="all">All Sprints</button>
+                <button class="view-btn" data-view="planning">Planning</button>
+                <button class="view-btn" data-view="completed">Completed</button>
+            </div>
+            
+            <!-- Actions -->
+            <div class="management-actions sprint-actions">
+                <button id="add-sprint-btn" class="btn btn-primary">+ New Sprint</button>
+                <button id="refresh-sprints" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sprint Statistics -->
+    <div class="management-stats sprint-stats">
+        <div class="stat-card">
+            <div class="stat-number" id="total-sprints">0</div>
+            <div class="stat-label">Total Sprints</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="active-sprints">0</div>
+            <div class="stat-label">Active</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="completed-sprints">0</div>
+            <div class="stat-label">Completed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="total-tasks">0</div>
+            <div class="stat-label">Total Tasks</div>
+        </div>
+    </div>
+
+    <!-- Sprint Grid -->
+    <div class="management-grid sprint-grid" id="sprint-grid">
+        <!-- Sprint cards will be populated here -->
+    </div>
+
+    <!-- Loading and Error States -->
+    <div id="loading-indicator" class="loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading sprints...</p>
+    </div>
+    
+    <div id="error-message" class="error-alert" style="display: none;">
+        <p>Failed to load sprints. Please try again.</p>
+    </div>
+</div>
+
+<!-- Sprint Modal -->
+<div id="sprint-modal" class="modal" style="display: none;">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h2 id="modal-title">Sprint Details</h2>
+            <span class="close" onclick="closeSprintModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="sprint-form">
+                <input type="hidden" id="sprint-id">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sprint-name">Sprint Name *</label>
+                        <input type="text" id="sprint-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sprint-status">Status</label>
+                        <select id="sprint-status">
+                            <option value="PLANNING">Planning</option>
+                            <option value="ACTIVE">Active</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="CANCELLED">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="sprint-description">Description</label>
+                    <textarea id="sprint-description" rows="3"></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sprint-project">Project (Optional)</label>
+                        <select id="sprint-project">
+                            <option value="">Company-wide Sprint</option>
+                            {% for project in available_projects %}
+                            <option value="{{ project.id }}">{{ project.code }} - {{ project.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="sprint-capacity">Capacity (Hours)</label>
+                        <input type="number" id="sprint-capacity" min="0" step="1">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sprint-start-date">Start Date *</label>
+                        <div class="hybrid-date-input">
+                            <input type="date" id="sprint-start-date-native" class="date-input-native" required>
+                            <input type="text" id="sprint-start-date" class="date-input-formatted" required placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
+                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('sprint-start-date')" title="Open calendar">📅</button>
+                        </div>
+                        <div class="date-error" id="sprint-start-date-error" style="display: none; color: #dc3545; font-size: 0.8rem; margin-top: 0.25rem;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="sprint-end-date">End Date *</label>
+                        <div class="hybrid-date-input">
+                            <input type="date" id="sprint-end-date-native" class="date-input-native" required>
+                            <input type="text" id="sprint-end-date" class="date-input-formatted" required placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
+                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('sprint-end-date')" title="Open calendar">📅</button>
+                        </div>
+                        <div class="date-error" id="sprint-end-date-error" style="display: none; color: #dc3545; font-size: 0.8rem; margin-top: 0.25rem;"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="sprint-goal">Sprint Goal</label>
+                    <textarea id="sprint-goal" rows="3" placeholder="What is the main objective of this sprint?"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeSprintModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveSprint()">Save Sprint</button>
+            <button type="button" class="btn btn-danger" onclick="deleteSprint()" id="delete-sprint-btn" style="display: none;">Delete Sprint</button>
+        </div>
+    </div>
+</div>
+
+<!-- Styles -->
+<style>
+.sprint-management-container {
+    padding: 1rem;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.sprint-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.sprint-header h1 {
+    margin: 0;
+    color: #333;
+}
+
+.sprint-controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.view-switcher {
+    display: flex;
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.view-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    color: #495057;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.view-btn.active {
+    background: #007bff;
+    color: white;
+}
+
+.view-btn:hover:not(.active) {
+    background: #e9ecef;
+    color: #212529;
+}
+
+.sprint-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sprint-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #007bff;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+
+.sprint-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+
+.sprint-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.sprint-name {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin: 0;
+    color: #333;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+}
+
+.sprint-dates {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+.sprint-progress {
+    margin-bottom: 1rem;
+}
+
+
+.sprint-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.metric {
+    text-align: center;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.metric-number {
+    font-weight: bold;
+    color: #007bff;
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.sprint-goal {
+    font-size: 0.9rem;
+    color: #666;
+    font-style: italic;
+    line-height: 1.4;
+}
+
+
+
+/* Hybrid Date Input Styles */
+.hybrid-date-input {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.hybrid-date-input.compact {
+    display: inline-flex;
+}
+
+.date-input-native {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: calc(100% - 35px); /* Leave space for calendar button */
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+    pointer-events: auto;
+}
+
+.date-input-formatted {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+    position: relative;
+    z-index: 2;
+}
+
+.calendar-picker-btn {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.5rem;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+    z-index: 3;
+    position: relative;
+}
+
+.calendar-picker-btn:hover {
+    background: #e9ecef;
+}
+
+.calendar-picker-btn.compact {
+    padding: 0.375rem 0.5rem;
+    font-size: 12px;
+}
+
+.hybrid-date-input.compact .date-input-formatted {
+    padding: 0.375rem;
+    font-size: 12px;
+    width: 100px;
+    flex: none;
+}
+
+@media (max-width: 768px) {
+    .sprint-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+</style>
+
+<script>
+// User preferences for date formatting
+const USER_DATE_FORMAT = '{{ g.user.preferences.date_format if g.user.preferences else "ISO" }}';
+
+// Date formatting utility function
+function formatUserDate(dateString) {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    
+    switch (USER_DATE_FORMAT) {
+        case 'US':
+            return date.toLocaleDateString('en-US'); // MM/DD/YYYY
+        case 'EU':
+        case 'UK':
+            return date.toLocaleDateString('en-GB'); // DD/MM/YYYY
+        case 'Readable':
+            return date.toLocaleDateString('en-US', { 
+                weekday: 'short', 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            }); // Mon, Dec 25, 2024
+        case 'ISO':
+        default:
+            return date.toISOString().split('T')[0]; // YYYY-MM-DD
+    }
+}
+
+// Date input formatting function - formats ISO date for user input
+function formatDateForInput(isoDateString) {
+    if (!isoDateString) return '';
+    
+    const date = new Date(isoDateString);
+    if (isNaN(date.getTime())) return '';
+    
+    return formatUserDate(isoDateString);
+}
+
+// Date parsing function - converts user-formatted date to ISO format
+function parseUserDate(dateString) {
+    if (!dateString || dateString.trim() === '') return null;
+    
+    const trimmed = dateString.trim();
+    let date;
+    
+    switch (USER_DATE_FORMAT) {
+        case 'US': // MM/DD/YYYY
+            const usParts = trimmed.split('/');
+            if (usParts.length === 3) {
+                const month = parseInt(usParts[0], 10);
+                const day = parseInt(usParts[1], 10);
+                const year = parseInt(usParts[2], 10);
+                if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year > 1900) {
+                    date = new Date(year, month - 1, day);
+                }
+            }
+            break;
+            
+        case 'EU':
+        case 'UK': // DD/MM/YYYY
+            const euParts = trimmed.split('/');
+            if (euParts.length === 3) {
+                const day = parseInt(euParts[0], 10);
+                const month = parseInt(euParts[1], 10);
+                const year = parseInt(euParts[2], 10);
+                if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year > 1900) {
+                    date = new Date(year, month - 1, day);
+                }
+            }
+            break;
+            
+        case 'Readable': // Mon, Dec 25, 2024
+            date = new Date(trimmed);
+            break;
+            
+        case 'ISO': // YYYY-MM-DD
+        default:
+            if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+                date = new Date(trimmed);
+            }
+            break;
+    }
+    
+    if (!date || isNaN(date.getTime())) {
+        return null;
+    }
+    
+    return date.toISOString().split('T')[0];
+}
+
+// Date validation function
+function validateDateInput(inputElement, errorElement) {
+    const value = inputElement.value.trim();
+    if (!value) {
+        errorElement.style.display = 'none';
+        return true;
+    }
+    
+    const parsedDate = parseUserDate(value);
+    if (!parsedDate) {
+        let expectedFormat;
+        switch (USER_DATE_FORMAT) {
+            case 'US': expectedFormat = 'MM/DD/YYYY'; break;
+            case 'EU':
+            case 'UK': expectedFormat = 'DD/MM/YYYY'; break;
+            case 'Readable': expectedFormat = 'Mon, Dec 25, 2024'; break;
+            case 'ISO':
+            default: expectedFormat = 'YYYY-MM-DD'; break;
+        }
+        errorElement.textContent = `Invalid date format. Expected: ${expectedFormat}`;
+        errorElement.style.display = 'block';
+        return false;
+    }
+    
+    errorElement.style.display = 'none';
+    return true;
+}
+
+// Date range validation function
+function validateDateRange(startElement, endElement, startErrorElement, endErrorElement) {
+    const startValid = validateDateInput(startElement, startErrorElement);
+    const endValid = validateDateInput(endElement, endErrorElement);
+    
+    if (!startValid || !endValid) {
+        return false;
+    }
+    
+    const startDate = parseUserDate(startElement.value);
+    const endDate = parseUserDate(endElement.value);
+    
+    if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        if (start >= end) {
+            endErrorElement.textContent = 'End date must be after start date';
+            endErrorElement.style.display = 'block';
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Hybrid Date Input Functions
+function setupHybridDateInput(inputId) {
+    const formattedInput = document.getElementById(inputId);
+    const nativeInput = document.getElementById(inputId + '-native');
+    
+    if (!formattedInput || !nativeInput) return;
+    
+    // Sync from native input to formatted input
+    nativeInput.addEventListener('change', function() {
+        if (this.value) {
+            formattedInput.value = formatDateForInput(this.value);
+            // Trigger change event on formatted input
+            formattedInput.dispatchEvent(new Event('change'));
+        }
+    });
+    
+    // Sync from formatted input to native input
+    formattedInput.addEventListener('change', function() {
+        const isoDate = parseUserDate(this.value);
+        if (isoDate) {
+            nativeInput.value = isoDate;
+        } else {
+            nativeInput.value = '';
+        }
+    });
+    
+    // Clear both inputs when formatted input is cleared
+    formattedInput.addEventListener('input', function() {
+        if (this.value === '') {
+            nativeInput.value = '';
+        }
+    });
+}
+
+function openCalendarPicker(inputId) {
+    const nativeInput = document.getElementById(inputId + '-native');
+    if (nativeInput) {
+        // Try multiple methods to open the date picker
+        nativeInput.focus();
+        
+        // For modern browsers
+        if (nativeInput.showPicker) {
+            try {
+                nativeInput.showPicker();
+            } catch (e) {
+                // Fallback to click if showPicker fails
+                nativeInput.click();
+            }
+        } else {
+            // Fallback for older browsers
+            nativeInput.click();
+        }
+    }
+}
+
+// Sprint Management Controller
+class SprintManager {
+    constructor() {
+        this.sprints = [];
+        this.currentView = 'active';
+        this.currentSprint = null;
+    }
+
+    async init() {
+        this.setupEventListeners();
+        await this.loadSprints();
+    }
+
+    setupEventListeners() {
+        // View switcher
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.switchView(e.target.dataset.view);
+            });
+        });
+
+        // Actions
+        document.getElementById('add-sprint-btn').addEventListener('click', () => {
+            this.openSprintModal();
+        });
+
+        document.getElementById('refresh-sprints').addEventListener('click', () => {
+            this.loadSprints();
+        });
+        
+        // Date validation
+        document.getElementById('sprint-start-date').addEventListener('blur', () => {
+            const startInput = document.getElementById('sprint-start-date');
+            const endInput = document.getElementById('sprint-end-date');
+            const startError = document.getElementById('sprint-start-date-error');
+            const endError = document.getElementById('sprint-end-date-error');
+            validateDateRange(startInput, endInput, startError, endError);
+        });
+        
+        document.getElementById('sprint-end-date').addEventListener('blur', () => {
+            const startInput = document.getElementById('sprint-start-date');
+            const endInput = document.getElementById('sprint-end-date');
+            const startError = document.getElementById('sprint-start-date-error');
+            const endError = document.getElementById('sprint-end-date-error');
+            validateDateRange(startInput, endInput, startError, endError);
+        });
+        
+        // Setup hybrid date inputs
+        setupHybridDateInput('sprint-start-date');
+        setupHybridDateInput('sprint-end-date');
+
+        // Modal close handlers
+        document.querySelectorAll('.close').forEach(closeBtn => {
+            closeBtn.addEventListener('click', (e) => {
+                e.target.closest('.modal').style.display = 'none';
+            });
+        });
+
+        // Click outside modal to close
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+            }
+        });
+    }
+
+    switchView(view) {
+        // Update button states
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-view="${view}"]`).classList.add('active');
+        
+        this.currentView = view;
+        this.renderSprints();
+    }
+
+    async loadSprints() {
+        document.getElementById('loading-indicator').style.display = 'flex';
+        document.getElementById('error-message').style.display = 'none';
+
+        try {
+            const response = await fetch('/api/sprints');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.sprints = data.sprints;
+                this.renderSprints();
+                this.updateStatistics();
+            } else {
+                throw new Error(data.message || 'Failed to load sprints');
+            }
+        } catch (error) {
+            console.error('Error loading sprints:', error);
+            document.getElementById('error-message').style.display = 'block';
+        } finally {
+            document.getElementById('loading-indicator').style.display = 'none';
+        }
+    }
+
+    renderSprints() {
+        const grid = document.getElementById('sprint-grid');
+        grid.innerHTML = '';
+
+        const filteredSprints = this.getFilteredSprints();
+        
+        if (filteredSprints.length === 0) {
+            grid.innerHTML = '<div class="empty-state">No sprints found for the selected view.</div>';
+            return;
+        }
+
+        filteredSprints.forEach(sprint => {
+            const sprintCard = this.createSprintCard(sprint);
+            grid.appendChild(sprintCard);
+        });
+    }
+
+    getFilteredSprints() {
+        return this.sprints.filter(sprint => {
+            switch (this.currentView) {
+                case 'active':
+                    return sprint.status === 'ACTIVE';
+                case 'planning':
+                    return sprint.status === 'PLANNING';
+                case 'completed':
+                    return sprint.status === 'COMPLETED';
+                case 'all':
+                default:
+                    return true;
+            }
+        });
+    }
+
+    createSprintCard(sprint) {
+        const card = document.createElement('div');
+        card.className = 'management-card sprint-card';
+        card.addEventListener('click', () => this.openSprintModal(sprint));
+
+        const startDate = new Date(sprint.start_date);
+        const endDate = new Date(sprint.end_date);
+        const today = new Date();
+        
+        // Calculate progress
+        let progressPercentage = 0;
+        if (today >= startDate && today <= endDate) {
+            const totalDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+            const elapsedDays = (today - startDate) / (1000 * 60 * 60 * 24);
+            progressPercentage = Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
+        } else if (today > endDate) {
+            progressPercentage = 100;
+        }
+
+        card.innerHTML = `
+            <div class="sprint-card-header">
+                <h3 class="sprint-name">${sprint.name}</h3>
+                <span class="sprint-status ${sprint.status}">${sprint.status}</span>
+            </div>
+            
+            <div class="sprint-dates">
+                📅 ${formatUserDate(sprint.start_date)} - ${formatUserDate(sprint.end_date)}
+                ${sprint.days_remaining > 0 ? `(${sprint.days_remaining} days left)` : ''}
+            </div>
+            
+            <div class="sprint-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${progressPercentage}%"></div>
+                </div>
+                <div class="progress-text">${Math.round(progressPercentage)}% complete</div>
+            </div>
+            
+            <div class="sprint-metrics">
+                <div class="metric">
+                    <div class="metric-number">${sprint.task_summary.total}</div>
+                    <div class="metric-label">Total</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-number">${sprint.task_summary.completed}</div>
+                    <div class="metric-label">Done</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-number">${sprint.task_summary.in_progress}</div>
+                    <div class="metric-label">Active</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-number">${sprint.task_summary.not_started}</div>
+                    <div class="metric-label">Todo</div>
+                </div>
+            </div>
+            
+            ${sprint.goal ? `<div class="sprint-goal">"${sprint.goal}"</div>` : ''}
+        `;
+
+        return card;
+    }
+
+    updateStatistics() {
+        const totalSprints = this.sprints.length;
+        const activeSprints = this.sprints.filter(s => s.status === 'ACTIVE').length;
+        const completedSprints = this.sprints.filter(s => s.status === 'COMPLETED').length;
+        const totalTasks = this.sprints.reduce((sum, s) => sum + s.task_summary.total, 0);
+
+        document.getElementById('total-sprints').textContent = totalSprints;
+        document.getElementById('active-sprints').textContent = activeSprints;
+        document.getElementById('completed-sprints').textContent = completedSprints;
+        document.getElementById('total-tasks').textContent = totalTasks;
+    }
+
+    openSprintModal(sprint = null) {
+        this.currentSprint = sprint;
+        const modal = document.getElementById('sprint-modal');
+        
+        if (sprint) {
+            document.getElementById('modal-title').textContent = 'Edit Sprint';
+            document.getElementById('sprint-id').value = sprint.id;
+            document.getElementById('sprint-name').value = sprint.name;
+            document.getElementById('sprint-description').value = sprint.description || '';
+            document.getElementById('sprint-status').value = sprint.status;
+            document.getElementById('sprint-project').value = sprint.project_id || '';
+            document.getElementById('sprint-capacity').value = sprint.capacity_hours || '';
+            document.getElementById('sprint-start-date').value = formatDateForInput(sprint.start_date);
+            document.getElementById('sprint-end-date').value = formatDateForInput(sprint.end_date);
+            document.getElementById('sprint-goal').value = sprint.goal || '';
+            document.getElementById('delete-sprint-btn').style.display = 'inline-block';
+        } else {
+            document.getElementById('modal-title').textContent = 'Create New Sprint';
+            document.getElementById('sprint-form').reset();
+            document.getElementById('sprint-id').value = '';
+            
+            // Set default dates (next 2 weeks)
+            const today = new Date();
+            const twoWeeksLater = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+            document.getElementById('sprint-start-date').value = formatDateForInput(today.toISOString().split('T')[0]);
+            document.getElementById('sprint-end-date').value = formatDateForInput(twoWeeksLater.toISOString().split('T')[0]);
+            
+            document.getElementById('delete-sprint-btn').style.display = 'none';
+        }
+        
+        modal.style.display = 'block';
+    }
+
+    async saveSprint() {
+        // Validate date inputs before saving
+        const startInput = document.getElementById('sprint-start-date');
+        const endInput = document.getElementById('sprint-end-date');
+        const startError = document.getElementById('sprint-start-date-error');
+        const endError = document.getElementById('sprint-end-date-error');
+        
+        if (!validateDateRange(startInput, endInput, startError, endError)) {
+            if (startError.style.display !== 'none') {
+                startInput.focus();
+            } else {
+                endInput.focus();
+            }
+            return;
+        }
+        
+        const sprintData = {
+            name: document.getElementById('sprint-name').value,
+            description: document.getElementById('sprint-description').value,
+            status: document.getElementById('sprint-status').value,
+            project_id: document.getElementById('sprint-project').value || null,
+            capacity_hours: document.getElementById('sprint-capacity').value || null,
+            start_date: parseUserDate(document.getElementById('sprint-start-date').value),
+            end_date: parseUserDate(document.getElementById('sprint-end-date').value),
+            goal: document.getElementById('sprint-goal').value || null
+        };
+
+        const sprintId = document.getElementById('sprint-id').value;
+        const isEdit = sprintId !== '';
+
+        try {
+            const response = await fetch(`/api/sprints${isEdit ? `/${sprintId}` : ''}`, {
+                method: isEdit ? 'PUT' : 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(sprintData)
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                closeSprintModal();
+                await this.loadSprints();
+            } else {
+                throw new Error(data.message || 'Failed to save sprint');
+            }
+        } catch (error) {
+            console.error('Error saving sprint:', error);
+            alert('Failed to save sprint: ' + error.message);
+        }
+    }
+
+    async deleteSprint() {
+        if (!this.currentSprint) return;
+        
+        if (confirm(`Are you sure you want to delete sprint "${this.currentSprint.name}"? This will also remove the sprint assignment from all tasks.`)) {
+            try {
+                const response = await fetch(`/api/sprints/${this.currentSprint.id}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    closeSprintModal();
+                    await this.loadSprints();
+                } else {
+                    throw new Error(data.message || 'Failed to delete sprint');
+                }
+            } catch (error) {
+                console.error('Error deleting sprint:', error);
+                alert('Failed to delete sprint: ' + error.message);
+            }
+        }
+    }
+}
+
+// Global functions
+let sprintManager;
+
+document.addEventListener('DOMContentLoaded', function() {
+    sprintManager = new SprintManager();
+    sprintManager.init();
+});
+
+function closeSprintModal() {
+    document.getElementById('sprint-modal').style.display = 'none';
+    sprintManager.currentSprint = null;
+}
+
+function saveSprint() {
+    sprintManager.saveSprint();
+}
+
+function deleteSprint() {
+    sprintManager.deleteSprint();
+}
+</script>
+{% endblock %}

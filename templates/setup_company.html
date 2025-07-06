@@ -4,7 +4,7 @@
 <div class="admin-container">
     <h1>
         {% if is_initial_setup %}
-            Welcome to TimeTrack
+            Welcome to {{ g.branding.app_name }}
         {% else %}
             Create New Company
         {% endif %}
@@ -14,12 +14,12 @@
     {% if is_initial_setup %}
         <div class="info-message">
             <h3>🎉 Let's Get Started!</h3>
-            <p>Set up your company and create the first administrator account to begin using TimeTrack.</p>
+            <p>Set up your company and create the first administrator account to begin using {{ g.branding.app_name }}.</p>
         </div>
     {% elif is_super_admin %}
         <div class="info-message">
             <h3>🏢 New Company Setup</h3>
-            <p>Create a new company with its own administrator. This will be a separate organization within TimeTrack.</p>
+            <p>Create a new company with its own administrator. This will be a separate organization within {{ g.branding.app_name }}.</p>
         </div>
     {% else %}
         <div class="error-message">

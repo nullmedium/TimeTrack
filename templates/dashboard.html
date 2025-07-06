@@ -1,309 +1,1814 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="admin-container">
-    <h1>
-        {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
-            Admin Dashboard
-        {% elif g.user.role == Role.SUPERVISOR %}
-            Supervisor Dashboard
-        {% elif g.user.role == Role.TEAM_LEADER %}
-            Team Leader Dashboard
-        {% else %}
-            Dashboard
-        {% endif %}
-    </h1>
-
-    <!-- Quick Actions section -->
-    <div class="quick-actions">
-        <h2>Quick Actions</h2>
-        <div class="admin-panel">
-            <div class="admin-card">
-                <h2>My Profile</h2>
-                <p>Update your personal information and password.</p>
-                <a href="{{ url_for('profile') }}" class="btn btn-secondary">Edit Profile</a>
-            </div>
-
-            <div class="admin-card">
-                <h2>Configuration</h2>
-                <p>Configure work hours and break settings.</p>
-                <a href="{{ url_for('config') }}" class="btn btn-secondary">Work Config</a>
-            </div>
-
-            <div class="admin-card">
-                <h2>Analytics</h2>
-                <p>View the complete time tracking history.</p>
-                <a href="{{ url_for('analytics') }}" class="btn btn-secondary">View Analytics</a>
-            </div>
+<div class="page-container dashboard-container">
+    <div class="page-header dashboard-header">
+        <h2>My Dashboard</h2>
+        <div class="page-actions dashboard-actions">
+            <button id="customize-btn" class="btn btn-md btn-primary">
+                <i class="fas fa-edit"></i> Customize
+            </button>
+            <button id="add-widget-btn" class="btn btn-md btn-success">
+                <i class="fas fa-plus"></i> Add Widget
+            </button>
         </div>
     </div>
 
-    <!-- Admin-only sections -->
-    {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
-    <div class="stats-section">
-        <h2>System Overview</h2>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>{{ total_users }}</h3>
-                <p>Total Users</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ total_teams }}</h3>
-                <p>Total Teams</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ blocked_users }}</h3>
-                <p>Blocked Users</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ unverified_users }}</h3>
-                <p>Unverified Users</p>
-            </div>
-        </div>
+    <div class="dashboard-grid" id="dashboard-grid">
+        <!-- Widgets will be loaded dynamically -->
     </div>
 
-    <div class="admin-panel">
-        <div class="admin-card">
-            <h2>User Management</h2>
-            <p>Manage user accounts, permissions, and roles.</p>
-            <a href="{{ url_for('admin_users') }}" class="btn btn-primary">Manage Users</a>
-        </div>
-
-        <div class="admin-card">
-            <h2>Project Management</h2>
-            <p>Manage projects, assign teams, and track project status.</p>
-            <a href="{{ url_for('admin_projects') }}" class="btn btn-primary">Manage Projects</a>
-        </div>
-
-        <div class="admin-card">
-            <h2>Team Management</h2>
-            <p>Configure teams and their members.</p>
-            <a href="{{ url_for('admin_teams') }}" class="btn btn-primary">Manage Teams</a>
-        </div>
-
-        <div class="admin-card">
-            <h2>System Settings</h2>
-            <p>Configure application-wide settings like registration and more.</p>
-            <a href="{{ url_for('admin_settings') }}" class="btn btn-primary">System Settings</a>
+    <!-- Empty Dashboard Message -->
+    <div id="empty-dashboard" class="empty-dashboard" style="display: none;">
+        <div class="empty-dashboard-content">
+            <div class="empty-dashboard-icon">📊</div>
+            <h3>Your Dashboard is Empty</h3>
+            <p>Add widgets to create your personalized dashboard.</p>
+            <button id="add-first-widget-btn" class="btn btn-md btn-primary">Add Your First Widget</button>
         </div>
     </div>
-    {% endif %}
+</div>
 
-    <!-- Team Leader and Supervisor sections -->
-    {% if g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN, Role.SYSTEM_ADMIN] %}
-    <div class="team-section">
-        <h2>Team Management</h2>
-
-        {% if teams %}
-        <div class="team-stats">
-            <div class="stat-card">
-                <h3>{{ team_member_count }}</h3>
-                <p>Team Members</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ teams|length }}</h3>
-                <p>Teams Managed</p>
-            </div>
-        </div>
-
-        <div class="admin-panel">
-            {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
-            <div class="admin-card">
-                <h2>Team Configuration</h2>
-                <p>Create and manage team structures.</p>
-                <a href="{{ url_for('admin_teams') }}" class="btn btn-primary">Configure Teams</a>
-            </div>
-            {% endif %}
-        </div>
-
-        <div class="team-members">
-            <h3>Your Team Members</h3>
-            {% if team_members %}
-            <div class="members-grid">
-                {% for member in team_members %}
-                <div class="member-card">
-                    <h4>{{ member.username }}</h4>
-                    <p>{{ member.role.value if member.role else 'Team Member' }}</p>
-                    <p>{{ member.email }}</p>
-                    {% if member.is_blocked %}
-                        <span class="status blocked">Blocked</span>
-                    {% elif not member.is_verified %}
-                        <span class="status unverified">Unverified</span>
-                    {% else %}
-                        <span class="status active">Active</span>
-                    {% endif %}
+<!-- Add Widget Modal -->
+<div id="add-widget-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Add Widget</h3>
+        <div class="widget-gallery">
+            <div class="widget-category">
+                <h4>Time Tracking</h4>
+                <div class="widget-options">
+                    <div class="widget-option" data-type="current_timer">
+                        <div class="widget-preview">
+                            <i class="fas fa-clock"></i>
+                            <div class="widget-info">
+                                <h5>Current Timer</h5>
+                                <p>Quick time tracking with start/stop buttons</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="widget-option" data-type="daily_summary">
+                        <div class="widget-preview">
+                            <i class="fas fa-chart-bar"></i>
+                            <div class="widget-info">
+                                <h5>Daily Summary</h5>
+                                <p>Daily, weekly, and monthly time summaries</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="widget-option" data-type="weekly_chart">
+                        <div class="widget-preview">
+                            <i class="fas fa-chart-line"></i>
+                            <div class="widget-info">
+                                <h5>Weekly Chart</h5>
+                                <p>Visual chart of weekly time patterns</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="widget-option" data-type="break_reminder">
+                        <div class="widget-preview">
+                            <i class="fas fa-bell"></i>
+                            <div class="widget-info">
+                                <h5>Break Reminder</h5>
+                                <p>Notifications for break times</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                {% endfor %}
             </div>
-            {% else %}
-            <p>No team members assigned yet.</p>
-            {% endif %}
+            
+            <div class="widget-category">
+                <h4>Projects & Tasks</h4>
+                <div class="widget-options">
+                    <div class="widget-option" data-type="active_projects">
+                        <div class="widget-preview">
+                            <i class="fas fa-project-diagram"></i>
+                            <div class="widget-info">
+                                <h5>Active Projects</h5>
+                                <p>Quick access to your active projects</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="widget-option" data-type="project_progress">
+                        <div class="widget-preview">
+                            <i class="fas fa-chart-pie"></i>
+                            <div class="widget-info">
+                                <h5>Project Progress</h5>
+                                <p>Progress bars and completion status</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="widget-option" data-type="assigned_tasks">
+                        <div class="widget-preview">
+                            <i class="fas fa-tasks"></i>
+                            <div class="widget-info">
+                                <h5>Assigned Tasks</h5>
+                                <p>View and manage your assigned tasks</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="widget-option" data-type="task_priority">
+                        <div class="widget-preview">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <div class="widget-info">
+                                <h5>Task Priority</h5>
+                                <p>Tasks sorted by priority levels</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="widget-category">
+                <h4>Analytics</h4>
+                <div class="widget-options">
+                    <div class="widget-option" data-type="productivity_metrics">
+                        <div class="widget-preview">
+                            <i class="fas fa-chart-line"></i>
+                            <div class="widget-info">
+                                <h5>Productivity Metrics</h5>
+                                <p>Visual charts of your time tracking data</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="widget-option" data-type="time_distribution">
+                        <div class="widget-preview">
+                            <i class="fas fa-calendar"></i>
+                            <div class="widget-info">
+                                <h5>Time Distribution</h5>
+                                <p>Monthly calendar with time entries</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        {% else %}
-        <div class="no-team">
-            <p>You are not assigned to any team. Contact your administrator to be assigned to a team.</p>
-        </div>
-        {% endif %}
     </div>
-    {% endif %}
+</div>
 
-    <!-- Recent Activity section for all roles -->
-    {% if recent_entries %}
-    <div class="recent-activity">
-        <h2>Recent Time Entries</h2>
-        <div class="entries-table">
-            <table class="time-history">
-                <thead>
-                    <tr>
-                        {% if g.user.role in [Role.ADMIN, Role.TEAM_LEADER, Role.SUPERVISOR] %}
-                        <th>User</th>
-                        {% endif %}
-                        <th>Date</th>
-                        <th>Arrival</th>
-                        <th>Departure</th>
-                        <th>Duration</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for entry in recent_entries %}
-                    <tr>
-                        {% if g.user.role in [Role.ADMIN, Role.TEAM_LEADER, Role.SUPERVISOR] %}
-                        <td>{{ entry.user.username }}</td>
-                        {% endif %}
-                        <td>{{ entry.arrival_time.strftime('%Y-%m-%d') }}</td>
-                        <td>{{ entry.arrival_time.strftime('%H:%M:%S') }}</td>
-                        <td>{{ entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active' }}</td>
-                        <td>
-                            {% if entry.duration %}
-                                {{ '%d:%02d:%02d'|format(entry.duration//3600, (entry.duration%3600)//60, entry.duration%60) }}
-                            {% else %}
-                                In progress
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if not entry.departure_time %}
-                                <span class="status active">Active</span>
-                            {% else %}
-                                <span class="status completed">Completed</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+<!-- Widget Configuration Modal -->
+<div id="widget-config-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Widget Configuration</h3>
+        <form id="widget-config-form">
+            <input type="hidden" id="widget-id" name="widget_id">
+            
+            <div class="form-group">
+                <label for="widget-title">Title</label>
+                <input type="text" id="widget-title" name="title" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="widget-size">Size</label>
+                <select id="widget-size" name="size">
+                    <option value="small">Small (2 columns)</option>
+                    <option value="medium">Medium (3 columns)</option>
+                    <option value="large">Large (4 columns, 2 rows)</option>
+                    <option value="wide">Wide (6 columns)</option>
+                    <option value="extra-large">Extra Large (6 columns, 2 rows)</option>
+                    <option value="full-width">Full Width (12 columns)</option>
+                </select>
+            </div>
+            
+            <div id="widget-specific-config">
+                <!-- Widget-specific configuration will be loaded here -->
+            </div>
+            
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-md btn-primary">Save Configuration</button>
+                <button type="button" class="btn btn-md btn-secondary" id="cancel-config">Cancel</button>
+            </div>
+        </form>
     </div>
-    {% endif %}
 </div>
 
 <style>
-.stats-section {
-    margin-bottom: 2rem;
-}
+/* Dashboard-specific overrides */
 
-.stats-grid {
+.dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(12, 1fr);
     gap: 1rem;
-    margin: 1rem 0;
+    grid-auto-rows: 200px;
 }
 
-.stat-card {
+.dashboard-grid.customizing {
+    border: 2px dashed #007bff;
     background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    padding: 1.5rem;
-    text-align: center;
+    min-height: 400px;
 }
 
-.stat-card h3 {
-    font-size: 2rem;
-    margin: 0 0 0.5rem 0;
-    color: #007bff;
+/* Widget styles now inherited from common styles.css */
+
+.widget.dragging {
+    opacity: 0.8;
+    transform: rotate(3deg);
+    z-index: 1000;
 }
 
-.stat-card p {
-    margin: 0;
-    color: #6c757d;
-    font-weight: 500;
+.widget.small {
+    grid-column: span 2;
+    grid-row: span 1;
 }
 
-.team-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin: 1rem 0;
+.widget.medium {
+    grid-column: span 3;
+    grid-row: span 1;
 }
 
-.members-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
+.widget.large {
+    grid-column: span 4;
+    grid-row: span 2;
 }
 
-.member-card {
+.widget.wide {
+    grid-column: span 6;
+    grid-row: span 1;
+}
+
+.widget.extra-large {
+    grid-column: span 6;
+    grid-row: span 2;
+}
+
+.widget.full-width {
+    grid-column: span 12;
+    grid-row: span 1;
+}
+
+/* Widget header and title styles now inherited from common styles.css */
+
+.widget-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.widget:hover .widget-actions {
+    opacity: 1;
+}
+
+.widget-action {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.widget-action:hover {
     background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    padding: 1rem;
-}
-
-.member-card h4 {
-    margin: 0 0 0.5rem 0;
     color: #333;
 }
 
-.member-card p {
-    margin: 0.25rem 0;
+/* Widget content styling now inherited from common styles.css */
+.widget-content {
+    flex: 1;
+    overflow: hidden;
+}
+
+.widget[data-widget-type="break_reminder"] .widget-content {
+    overflow: visible;
+}
+
+.empty-dashboard {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #666;
+}
+
+.empty-dashboard-content {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.empty-dashboard-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.empty-dashboard h3 {
+    margin-bottom: 1rem;
+    color: #333;
+}
+
+.empty-dashboard p {
+    margin-bottom: 2rem;
+    color: #666;
+}
+
+.widget-gallery {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.widget-category {
+    margin-bottom: 2rem;
+}
+
+.widget-category h4 {
+    margin: 0 0 1rem 0;
+    color: #333;
+    font-size: 1.1rem;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 0.5rem;
+}
+
+.widget-options {
+    display: grid;
+    gap: 1rem;
+}
+
+.widget-option {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.widget-option:hover {
+    border-color: #007bff;
+    background: #f8f9fa;
+}
+
+.widget-option.selected {
+    border-color: #007bff;
+    background: #e7f3ff;
+}
+
+.widget-preview {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.widget-preview i {
+    font-size: 2rem;
+    color: #007bff;
+    width: 3rem;
+    text-align: center;
+}
+
+.widget-info h5 {
+    margin: 0 0 0.25rem 0;
+    color: #333;
+}
+
+.widget-info p {
+    margin: 0;
     color: #666;
     font-size: 0.9rem;
 }
 
-.status {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.8rem;
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background: white;
+    margin: 5% auto;
+    padding: 2rem;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover {
+    color: black;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
+/* Widget content styles */
+.projects-list, .tasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Weekly Chart Widget */
+.weekly-chart {
+    display: flex;
+    justify-content: space-around;
+    align-items: end;
+    height: 120px;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.chart-day {
+    text-align: center;
+    position: relative;
+    flex: 1;
+}
+
+.chart-bar {
+    background: linear-gradient(to top, #007bff, #0056b3);
+    margin: 0 auto 0.5rem;
+    width: 20px;
+    border-radius: 2px 2px 0 0;
+    transition: all 0.3s ease;
+}
+
+.chart-label {
+    font-size: 0.7rem;
+    color: #666;
     font-weight: 500;
+}
+
+.chart-value {
+    font-size: 0.6rem;
+    color: #333;
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 123, 255, 0.1);
+    padding: 0.1rem 0.3rem;
+    border-radius: 2px;
+    white-space: nowrap;
+}
+
+/* Task Priority Widget */
+.priority-task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.priority-task-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.task-priority {
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    min-width: 60px;
+    text-align: center;
+}
+
+.task-priority.high {
+    background: #dc3545;
+    color: white;
+}
+
+.task-priority.medium {
+    background: #fd7e14;
+    color: white;
+}
+
+.task-priority.low {
+    background: #28a745;
+    color: white;
+}
+
+.task-title {
+    flex: 1;
+    font-size: 0.9rem;
+    color: #333;
+}
+
+
+/* Project Progress Widget */
+.project-progress-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.progress-item {
+    background: #f8f9fa;
+    padding: 0.75rem;
+    border-radius: 4px;
+    border-left: 3px solid #007bff;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.progress-percent {
+    font-weight: 600;
+    color: #007bff;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    transition: width 0.5s ease;
+}
+
+.progress-stats {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+/* Productivity Metrics Widget */
+.productivity-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    padding: 0.5rem;
+}
+
+.metric-item {
+    text-align: center;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.metric-label {
+    font-size: 0.7rem;
+    color: #666;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+.metric-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.metric-value.positive {
+    color: #28a745;
+}
+
+.metric-value.negative {
+    color: #dc3545;
+}
+
+/* Break Reminder Widget */
+.break-reminder-widget {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    text-align: center;
+    height: 100%;
+    overflow: visible;
+}
+
+.break-status {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.break-icon {
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+}
+
+.break-text {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.next-break {
+    font-size: 0.85rem;
+    color: #333;
+    background: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 4px;
+    border-left: 3px solid #007bff;
+}
+
+.break-controls {
+    display: flex;
+    justify-content: center;
+}
+
+.project-item, .task-item {
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #007bff;
+}
+
+.project-header {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.project-code {
+    background: #007bff;
+    color: white;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.project-name, .task-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.project-desc {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.task-project {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.task-status {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-weight: 600;
     text-transform: uppercase;
 }
 
-.status.active {
-    background: #d4edda;
-    color: #155724;
-}
-
-.status.blocked {
-    background: #f8d7da;
-    color: #721c24;
-}
-
-.status.unverified {
+.task-status.pending {
     background: #fff3cd;
     color: #856404;
 }
 
-.status.completed {
+.task-status.in_progress {
+    background: #d4edda;
+    color: #155724;
+}
+
+.task-status.completed {
     background: #d1ecf1;
     color: #0c5460;
 }
 
-.no-team {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    border-radius: 0.5rem;
+.widget-loading {
+    text-align: center;
+    color: #666;
+    font-style: italic;
     padding: 1rem;
-    margin: 1rem 0;
 }
 
-.entries-table {
-    overflow-x: auto;
+/* Timer widget styles */
+.current-timer-widget {
+    text-align: center;
 }
 
-.recent-activity, .team-section, .quick-actions {
-    margin-top: 2rem;
+.current-time {
+    margin-bottom: 0.5rem;
+}
+
+.time-display {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    color: #333;
+}
+
+.timer-status {
+    margin-bottom: 1rem;
+}
+
+.status-text {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.status-text.active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.tracker-controls {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(8, 1fr);
+    }
+    
+    .widget.wide {
+        grid-column: span 4;
+    }
+    
+    .widget.extra-large {
+        grid-column: span 4;
+    }
+    
+    .widget.full-width {
+        grid-column: span 8;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+    }
+    
+    .widget.small {
+        grid-column: span 2;
+    }
+    
+    .widget.medium {
+        grid-column: span 2;
+    }
+    
+    .widget.large {
+        grid-column: span 4;
+        grid-row: span 2;
+    }
+    
+    .widget.wide {
+        grid-column: span 4;
+    }
+    
+    .widget.extra-large {
+        grid-column: span 4;
+        grid-row: span 2;
+    }
+    
+    .widget.full-width {
+        grid-column: span 4;
+    }
+    
+    .dashboard-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .dashboard-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .widget.small,
+    .widget.medium,
+    .widget.large,
+    .widget.wide,
+    .widget.extra-large,
+    .widget.full-width {
+        grid-column: span 2;
+    }
 }
 </style>
+
+<script>
+// Dashboard state
+let isCustomizing = false;
+let widgets = [];
+let selectedWidgetType = null;
+
+// Widget size mapping based on content type
+const widgetSizes = {
+    'current_timer': 'medium',
+    'daily_summary': 'medium',
+    'active_projects': 'medium',
+    'assigned_tasks': 'medium',
+    'weekly_chart': 'large',
+    'break_reminder': 'large',
+    'project_progress': 'wide',
+    'task_priority': 'medium',
+    'productivity_metrics': 'medium',
+    'time_distribution': 'wide',
+    'team_activity': 'wide',
+    'recent_activities': 'medium',
+    'work_patterns': 'large',
+    'goal_tracker': 'medium'
+};
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboard();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // Customize button
+    document.getElementById('customize-btn').addEventListener('click', toggleCustomizeMode);
+    
+    // Add widget buttons
+    document.getElementById('add-widget-btn').addEventListener('click', showAddWidgetModal);
+    document.getElementById('add-first-widget-btn').addEventListener('click', showAddWidgetModal);
+    
+    // Modal controls
+    document.querySelectorAll('.close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', closeModals);
+    });
+    
+    // Widget type selection
+    document.querySelectorAll('.widget-option').forEach(option => {
+        option.addEventListener('click', selectWidgetType);
+    });
+    
+    // Configuration form
+    document.getElementById('widget-config-form').addEventListener('submit', saveWidgetConfig);
+    document.getElementById('cancel-config').addEventListener('click', closeModals);
+    
+    // Click outside modal to close
+    window.addEventListener('click', function(event) {
+        if (event.target.classList.contains('modal')) {
+            closeModals();
+        }
+    });
+}
+
+function loadDashboard() {
+    console.log('Loading dashboard...');
+    fetch('/api/dashboard')
+        .then(response => {
+            console.log('Dashboard load response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Dashboard load response data:', data);
+            if (data.success) {
+                widgets = data.widgets;
+                console.log('Loaded widgets:', widgets);
+                renderDashboard();
+            } else {
+                console.error('Failed to load dashboard:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading dashboard:', error);
+        });
+}
+
+function renderDashboard() {
+    const grid = document.getElementById('dashboard-grid');
+    const emptyMessage = document.getElementById('empty-dashboard');
+    
+    if (widgets.length === 0) {
+        grid.style.display = 'none';
+        emptyMessage.style.display = 'block';
+        return;
+    }
+    
+    grid.style.display = 'grid';
+    emptyMessage.style.display = 'none';
+    
+    // Clear existing widgets
+    grid.innerHTML = '';
+    
+    // Sort widgets by grid position
+    widgets.sort((a, b) => {
+        if (a.grid_y !== b.grid_y) return a.grid_y - b.grid_y;
+        return a.grid_x - b.grid_x;
+    });
+    
+    // Render each widget
+    widgets.forEach(widget => {
+        const widgetElement = createWidgetElement(widget);
+        grid.appendChild(widgetElement);
+    });
+    
+    // Initialize drag and drop if in customize mode
+    if (isCustomizing) {
+        initializeDragAndDrop();
+    }
+}
+
+function createWidgetElement(widget) {
+    const div = document.createElement('div');
+    // Prioritize predefined size mapping over database value
+    const widgetSize = widgetSizes[widget.type] || 'medium';
+    div.className = `widget ${widgetSize}`;
+    div.dataset.widgetId = widget.id;
+    div.dataset.widgetType = widget.type;
+    
+    div.innerHTML = `
+        <div class="widget-header">
+            <h3 class="widget-title">${widget.title}</h3>
+            <div class="widget-actions">
+                <button class="widget-action" onclick="configureWidget(${widget.id})" title="Configure">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button class="widget-action" onclick="removeWidget(${widget.id})" title="Remove">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="widget-content">
+            ${renderWidgetContent(widget)}
+        </div>
+    `;
+    
+    return div;
+}
+
+function renderWidgetContent(widget) {
+    switch (widget.type) {
+        case 'current_timer':
+            return renderCurrentTimerWidget(widget);
+        case 'daily_summary':
+            return renderDailySummaryWidget(widget);
+        case 'weekly_chart':
+            return renderWeeklyChartWidget(widget);
+        case 'break_reminder':
+            return renderBreakReminderWidget(widget);
+        case 'active_projects':
+            return renderActiveProjectsWidget(widget);
+        case 'project_progress':
+            return renderProjectProgressWidget(widget);
+        case 'assigned_tasks':
+            return renderAssignedTasksWidget(widget);
+        case 'task_priority':
+            return renderTaskPriorityWidget(widget);
+        case 'productivity_metrics':
+            return renderProductivityMetricsWidget(widget);
+        case 'time_distribution':
+            return renderTimeDistributionWidget(widget);
+        default:
+            return '<p>Widget type not supported</p>';
+    }
+}
+
+function renderCurrentTimerWidget(widget) {
+    // Load current timer status
+    loadCurrentTimer(widget.id);
+    
+    return `
+        <div class="current-timer-widget" id="widget-content-${widget.id}">
+            <div class="current-time">
+                <span class="time-display" id="timer-display-${widget.id}">00:00:00</span>
+            </div>
+            <div class="timer-status" id="timer-status-${widget.id}">
+                <span class="status-text">No active timer</span>
+            </div>
+            <div class="tracker-controls">
+                <button class="btn btn-sm btn-success" onclick="startTimerFromWidget()">Start</button>
+                <button class="btn btn-sm btn-danger" onclick="stopTimerFromWidget()">Stop</button>
+            </div>
+        </div>
+    `;
+}
+
+function renderDailySummaryWidget(widget) {
+    // Load widget data
+    loadWidgetData(widget.id);
+    
+    return `
+        <div class="daily-summary-widget" id="widget-content-${widget.id}">
+            <div class="summary-item">
+                <span class="summary-label">Today:</span>
+                <span class="summary-value" id="today-${widget.id}">0h 0m</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">This Week:</span>
+                <span class="summary-value" id="week-${widget.id}">0h 0m</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">This Month:</span>
+                <span class="summary-value" id="month-${widget.id}">0h 0m</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderActiveProjectsWidget(widget) {
+    // Load widget data
+    loadWidgetData(widget.id);
+    
+    return `
+        <div class="active-projects-widget" id="widget-content-${widget.id}">
+            <div class="widget-loading">Loading projects...</div>
+        </div>
+    `;
+}
+
+function renderAssignedTasksWidget(widget) {
+    // Load widget data
+    loadWidgetData(widget.id);
+    
+    return `
+        <div class="assigned-tasks-widget" id="widget-content-${widget.id}">
+            <div class="widget-loading">Loading tasks...</div>
+        </div>
+    `;
+}
+
+function renderWeeklyChartWidget(widget) {
+    loadWidgetData(widget.id);
+    return `
+        <div class="weekly-chart-widget" id="widget-content-${widget.id}">
+            <div class="widget-loading">Loading weekly chart...</div>
+        </div>
+    `;
+}
+
+function renderBreakReminderWidget(widget) {
+    // Calculate next break time based on current timer after DOM is ready
+    setTimeout(() => updateBreakTimer(widget.id), 100);
+    
+    return `
+        <div class="break-reminder-widget" id="widget-content-${widget.id}">
+            <div class="break-status">
+                <div class="break-icon">☕</div>
+                <div class="break-text">Take a break every 2 hours</div>
+                <div class="next-break">Next break in: <span id="break-timer-${widget.id}">Loading...</span></div>
+            </div>
+            <div class="break-controls">
+                <button class="btn btn-sm btn-info" onclick="takeBreakNow()">Take Break Now</button>
+            </div>
+        </div>
+    `;
+}
+
+function renderProjectProgressWidget(widget) {
+    loadWidgetData(widget.id);
+    return `
+        <div class="project-progress-widget" id="widget-content-${widget.id}">
+            <div class="widget-loading">Loading project progress...</div>
+        </div>
+    `;
+}
+
+function renderTaskPriorityWidget(widget) {
+    loadWidgetData(widget.id);
+    return `
+        <div class="task-priority-widget" id="widget-content-${widget.id}">
+            <div class="widget-loading">Loading priority tasks...</div>
+        </div>
+    `;
+}
+
+
+function renderProductivityMetricsWidget(widget) {
+    loadWidgetData(widget.id);
+    return `
+        <div class="productivity-metrics-widget" id="widget-content-${widget.id}">
+            <div class="widget-loading">Loading analytics...</div>
+        </div>
+    `;
+}
+
+function renderTimeDistributionWidget(widget) {
+    loadWidgetData(widget.id);
+    return `
+        <div class="time-distribution-widget" id="widget-content-${widget.id}">
+            <div class="widget-loading">Loading time distribution...</div>
+        </div>
+    `;
+}
+
+function toggleCustomizeMode() {
+    isCustomizing = !isCustomizing;
+    const grid = document.getElementById('dashboard-grid');
+    const customizeBtn = document.getElementById('customize-btn');
+    
+    if (isCustomizing) {
+        grid.classList.add('customizing');
+        customizeBtn.textContent = 'Done';
+        customizeBtn.className = 'btn btn-md btn-warning';
+        initializeDragAndDrop();
+    } else {
+        grid.classList.remove('customizing');
+        customizeBtn.innerHTML = '<i class="fas fa-edit"></i> Customize';
+        customizeBtn.className = 'btn btn-md btn-primary';
+        destroyDragAndDrop();
+    }
+}
+
+function initializeDragAndDrop() {
+    // Initialize SortableJS for drag and drop
+    const grid = document.getElementById('dashboard-grid');
+    if (window.Sortable) {
+        new Sortable(grid, {
+            animation: 150,
+            ghostClass: 'dragging',
+            onEnd: function(evt) {
+                updateWidgetPositions();
+            }
+        });
+    }
+}
+
+function destroyDragAndDrop() {
+    // Remove sortable functionality
+    const grid = document.getElementById('dashboard-grid');
+    if (grid.sortable) {
+        grid.sortable.destroy();
+    }
+}
+
+function updateWidgetPositions() {
+    const widgetElements = document.querySelectorAll('.widget');
+    const positions = Array.from(widgetElements).map((element, index) => ({
+        id: parseInt(element.dataset.widgetId),
+        position: index,
+        grid_y: index  // Simple linear positioning for now
+    }));
+    
+    fetch('/api/dashboard/positions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({positions})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Failed to update positions:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error updating positions:', error);
+    });
+}
+
+function showAddWidgetModal() {
+    document.getElementById('add-widget-modal').style.display = 'block';
+}
+
+function selectWidgetType(event) {
+    console.log('Widget type selected:', event.currentTarget.dataset.type);
+    
+    // Remove previous selection
+    document.querySelectorAll('.widget-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // Select current option
+    event.currentTarget.classList.add('selected');
+    selectedWidgetType = event.currentTarget.dataset.type;
+    
+    console.log('Selected widget type:', selectedWidgetType);
+    
+    // Close add widget modal and show configuration modal
+    setTimeout(() => {
+        document.getElementById('add-widget-modal').style.display = 'none';
+        showConfigurationModal();
+    }, 200);
+}
+
+function showConfigurationModal() {
+    console.log('Showing configuration modal for:', selectedWidgetType);
+    
+    if (!selectedWidgetType) {
+        console.error('No widget type selected');
+        return;
+    }
+    
+    // Reset form
+    document.getElementById('widget-config-form').reset();
+    document.getElementById('widget-id').value = '';
+    
+    // Set default title based on widget type
+    const titles = {
+        'current_timer': 'Current Timer',
+        'daily_summary': 'Daily Summary',
+        'weekly_chart': 'Weekly Chart',
+        'break_reminder': 'Break Reminder',
+        'active_projects': 'Active Projects',
+        'project_progress': 'Project Progress',
+        'assigned_tasks': 'Assigned Tasks',
+        'task_priority': 'Task Priority',
+        'productivity_metrics': 'Productivity Metrics',
+        'time_distribution': 'Time Distribution'
+    };
+    
+    document.getElementById('widget-title').value = titles[selectedWidgetType] || 'New Widget';
+    
+    // Load widget-specific configuration
+    loadWidgetSpecificConfig(selectedWidgetType);
+    
+    document.getElementById('widget-config-modal').style.display = 'block';
+    console.log('Configuration modal displayed');
+}
+
+function loadWidgetSpecificConfig(widgetType) {
+    const configContainer = document.getElementById('widget-specific-config');
+    configContainer.innerHTML = '';
+    
+    // Add widget-specific configuration fields based on type
+    switch (widgetType) {
+        case 'TIME_SUMMARY':
+            configContainer.innerHTML = `
+                <div class="form-group">
+                    <label for="summary-period">Summary Period</label>
+                    <select id="summary-period" name="summary_period">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+            `;
+            break;
+        case 'PROJECT_LIST':
+            configContainer.innerHTML = `
+                <div class="form-group">
+                    <label for="project-filter">Project Filter</label>
+                    <select id="project-filter" name="project_filter">
+                        <option value="all">All Projects</option>
+                        <option value="active">Active Projects Only</option>
+                        <option value="recent">Recently Used</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="max-projects">Maximum Projects to Show</label>
+                    <input type="number" id="max-projects" name="max_projects" value="5" min="1" max="20">
+                </div>
+            `;
+            break;
+        case 'TASK_LIST':
+            configContainer.innerHTML = `
+                <div class="form-group">
+                    <label for="task-filter">Task Filter</label>
+                    <select id="task-filter" name="task_filter">
+                        <option value="assigned">Assigned to Me</option>
+                        <option value="created">Created by Me</option>
+                        <option value="all">All Tasks</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="task-status">Task Status</label>
+                    <select id="task-status" name="task_status">
+                        <option value="active">Active Tasks</option>
+                        <option value="pending">Pending Tasks</option>
+                        <option value="completed">Completed Tasks</option>
+                        <option value="all">All Statuses</option>
+                    </select>
+                </div>
+            `;
+            break;
+    }
+}
+
+function saveWidgetConfig(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const config = {};
+    
+    // Get all form data
+    for (let [key, value] of formData.entries()) {
+        config[key] = value;
+    }
+    
+    // Add widget type
+    config.type = selectedWidgetType;
+    
+    // If editing existing widget
+    const widgetId = document.getElementById('widget-id').value;
+    if (widgetId) {
+        config.widget_id = widgetId;
+    }
+    
+    console.log('Saving widget config:', config);
+    
+    // Save widget
+    fetch('/api/dashboard/widgets', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
+    })
+    .then(response => {
+        console.log('Widget save response status:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Widget save response data:', data);
+        if (data.success) {
+            closeModals();
+            loadDashboard();
+        } else {
+            alert('Failed to save widget: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error saving widget:', error);
+        alert('Error saving widget');
+    });
+}
+
+function configureWidget(widgetId) {
+    const widget = widgets.find(w => w.id === widgetId);
+    if (!widget) return;
+    
+    selectedWidgetType = widget.type;
+    
+    // Fill form with existing data
+    document.getElementById('widget-id').value = widget.id;
+    document.getElementById('widget-title').value = widget.title;
+    document.getElementById('widget-size').value = widget.size;
+    
+    // Load widget-specific configuration
+    loadWidgetSpecificConfig(widget.type);
+    
+    // Fill widget-specific fields
+    setTimeout(() => {
+        if (widget.config) {
+            Object.keys(widget.config).forEach(key => {
+                const field = document.querySelector(`[name="${key}"]`);
+                if (field) {
+                    field.value = widget.config[key];
+                }
+            });
+        }
+    }, 100);
+    
+    document.getElementById('widget-config-modal').style.display = 'block';
+}
+
+function removeWidget(widgetId) {
+    if (!confirm('Are you sure you want to remove this widget?')) return;
+    
+    fetch(`/api/dashboard/widgets/${widgetId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadDashboard();
+        } else {
+            alert('Failed to remove widget: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error removing widget:', error);
+        alert('Error removing widget');
+    });
+}
+
+function closeModals() {
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.style.display = 'none';
+    });
+    selectedWidgetType = null;
+}
+
+// Widget data loading
+function loadWidgetData(widgetId) {
+    fetch(`/api/dashboard/widgets/${widgetId}/data`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateWidgetContent(widgetId, data.data);
+            } else {
+                console.error('Failed to load widget data:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading widget data:', error);
+        });
+}
+
+function updateWidgetContent(widgetId, data) {
+    const contentElement = document.getElementById(`widget-content-${widgetId}`);
+    if (!contentElement) return;
+    
+    if (data.projects) {
+        // Update active projects widget
+        let projectsHtml = '<div class="projects-list">';
+        data.projects.forEach(project => {
+            projectsHtml += `
+                <div class="project-item">
+                    <div class="project-header">
+                        <span class="project-code">${project.code}</span>
+                        <span class="project-name">${project.name}</span>
+                    </div>
+                    ${project.description ? `<div class="project-desc">${project.description}</div>` : ''}
+                </div>
+            `;
+        });
+        projectsHtml += '</div>';
+        contentElement.innerHTML = projectsHtml;
+    } else if (data.tasks) {
+        // Update tasks widget
+        let tasksHtml = '<div class="tasks-list">';
+        data.tasks.forEach(task => {
+            tasksHtml += `
+                <div class="task-item">
+                    <div class="task-name">${task.name}</div>
+                    <div class="task-project">${task.project_name}</div>
+                    <div class="task-status ${task.status.toLowerCase()}">${task.status}</div>
+                </div>
+            `;
+        });
+        tasksHtml += '</div>';
+        contentElement.innerHTML = tasksHtml;
+    } else if (data.today !== undefined) {
+        // Update daily summary widget
+        const todayElement = document.getElementById(`today-${widgetId}`);
+        const weekElement = document.getElementById(`week-${widgetId}`);
+        const monthElement = document.getElementById(`month-${widgetId}`);
+        
+        if (todayElement) todayElement.textContent = data.today || '0h 0m';
+        if (weekElement) weekElement.textContent = data.week || '0h 0m';
+        if (monthElement) monthElement.textContent = data.month || '0h 0m';
+    } else if (data.weekly_data) {
+        // Update weekly chart widget
+        updateWeeklyChart(widgetId, data.weekly_data);
+    } else if (data.priority_tasks) {
+        // Update task priority widget
+        updateTaskPriorityWidget(widgetId, data.priority_tasks);
+    } else if (data.project_progress) {
+        // Update project progress widget
+        updateProjectProgressWidget(widgetId, data.project_progress);
+    } else if (data.this_week_hours !== undefined) {
+        // Update productivity metrics widget
+        updateProductivityMetricsWidget(widgetId, data);
+    }
+    
+    // Adjust widget size based on content after updating
+    setTimeout(() => adjustWidgetSize(widgetId), 100);
+}
+
+// Current timer functions
+let timerIntervals = {}; // Store timer intervals for each widget
+let globalTimerState = null; // Store global timer state to avoid repeated API calls
+
+function loadCurrentTimer(widgetId) {
+    // If we already have timer state, use it
+    if (globalTimerState !== null) {
+        updateTimerDisplay(widgetId, globalTimerState);
+        if (globalTimerState.isActive) {
+            startTimerInterval(widgetId, globalTimerState.startTime);
+        }
+        return;
+    }
+    
+    // Otherwise, fetch it once and cache it
+    fetch('/api/current-timer-status')
+        .then(response => response.json())
+        .then(data => {
+            globalTimerState = data; // Cache the state
+            if (data.success) {
+                updateTimerDisplay(widgetId, data);
+                if (data.isActive) {
+                    startTimerInterval(widgetId, data.startTime);
+                }
+            } else {
+                console.log('No active timer or error:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading timer status:', error);
+        });
+}
+
+function updateTimerDisplay(widgetId, timerData) {
+    const displayElement = document.getElementById(`timer-display-${widgetId}`);
+    const statusElement = document.getElementById(`timer-status-${widgetId}`);
+    
+    if (timerData.isActive) {
+        statusElement.innerHTML = `<span class="status-text active">Timer running</span>`;
+        if (timerData.currentDuration) {
+            displayElement.textContent = formatDuration(timerData.currentDuration);
+        }
+    } else {
+        statusElement.innerHTML = `<span class="status-text">No active timer</span>`;
+        displayElement.textContent = '00:00:00';
+    }
+}
+
+function startTimerInterval(widgetId, startTime) {
+    // Clear existing interval if any
+    if (timerIntervals[widgetId]) {
+        clearInterval(timerIntervals[widgetId]);
+    }
+    
+    const startTimeMs = new Date(startTime).getTime();
+    
+    timerIntervals[widgetId] = setInterval(() => {
+        const now = Date.now();
+        const elapsed = Math.floor((now - startTimeMs) / 1000);
+        const displayElement = document.getElementById(`timer-display-${widgetId}`);
+        if (displayElement) {
+            displayElement.textContent = formatDuration(elapsed);
+        }
+    }, 1000);
+}
+
+function formatDuration(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+function startTimerFromWidget() {
+    // Navigate to main timer page to start timer
+    window.location.href = '/';
+}
+
+function stopTimerFromWidget() {
+    // Navigate to main timer page to stop timer
+    window.location.href = '/';
+}
+
+// Function to refresh global timer state (call when timer changes)
+function refreshGlobalTimerState() {
+    globalTimerState = null; // Reset cache
+    // Reload all current timer widgets
+    document.querySelectorAll('[data-widget-type="current_timer"]').forEach(widget => {
+        const widgetId = widget.dataset.widgetId;
+        loadCurrentTimer(widgetId);
+    });
+    // Refresh all break timer widgets
+    document.querySelectorAll('[data-widget-type="break_reminder"]').forEach(widget => {
+        const widgetId = widget.dataset.widgetId;
+        updateBreakTimer(widgetId);
+    });
+}
+
+// Cleanup function for page unload
+window.addEventListener('beforeunload', function() {
+    // Clear all timer intervals
+    Object.values(timerIntervals).forEach(interval => clearInterval(interval));
+    Object.values(breakTimerIntervals).forEach(interval => clearInterval(interval));
+});
+
+// Widget-specific update functions
+function updateWeeklyChart(widgetId, weeklyData) {
+    const contentElement = document.getElementById(`widget-content-${widgetId}`);
+    if (!contentElement) return;
+    
+    let chartHtml = '<div class="weekly-chart">';
+    weeklyData.forEach(day => {
+        const barHeight = Math.min(day.hours * 10, 100); // Scale for display
+        chartHtml += `
+            <div class="chart-day">
+                <div class="chart-bar" style="height: ${barHeight}%"></div>
+                <div class="chart-hours">${day.hours}h</div>
+                <div class="chart-label">${day.day.substring(0, 3)}</div>
+            </div>
+        `;
+    });
+    chartHtml += '</div>';
+    contentElement.innerHTML = chartHtml;
+}
+
+function updateTaskPriorityWidget(widgetId, priorityTasks) {
+    const contentElement = document.getElementById(`widget-content-${widgetId}`);
+    if (!contentElement) return;
+    
+    let tasksHtml = '<div class="priority-tasks-list">';
+    priorityTasks.forEach(task => {
+        const priorityClass = task.priority.toLowerCase();
+        tasksHtml += `
+            <div class="priority-task-item">
+                <div class="task-priority ${priorityClass}">${task.priority}</div>
+                <div class="task-details">
+                    <div class="task-name">${task.name}</div>
+                    <div class="task-project">${task.project_name}</div>
+                </div>
+                <div class="task-status ${task.status.toLowerCase()}">${task.status}</div>
+            </div>
+        `;
+    });
+    tasksHtml += '</div>';
+    contentElement.innerHTML = tasksHtml;
+}
+
+
+function updateProjectProgressWidget(widgetId, projectProgress) {
+    const contentElement = document.getElementById(`widget-content-${widgetId}`);
+    if (!contentElement) return;
+    
+    let progressHtml = '<div class="project-progress-list">';
+    projectProgress.forEach(project => {
+        progressHtml += `
+            <div class="progress-item">
+                <div class="progress-header">
+                    <span class="project-code">${project.code}</span>
+                    <span class="project-name">${project.name}</span>
+                    <span class="progress-percent">${project.progress}%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${project.progress}%"></div>
+                </div>
+                <div class="progress-stats">${project.completed_tasks}/${project.total_tasks} tasks</div>
+            </div>
+        `;
+    });
+    progressHtml += '</div>';
+    contentElement.innerHTML = progressHtml;
+}
+
+function updateProductivityMetricsWidget(widgetId, data) {
+    const contentElement = document.getElementById(`widget-content-${widgetId}`);
+    if (!contentElement) return;
+    
+    const changeClass = data.productivity_change >= 0 ? 'positive' : 'negative';
+    const changeIcon = data.productivity_change >= 0 ? '↗' : '↘';
+    
+    const metricsHtml = `
+        <div class="productivity-metrics">
+            <div class="metric-item">
+                <div class="metric-label">This Week</div>
+                <div class="metric-value">${data.this_week_hours}h</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Last Week</div>
+                <div class="metric-value">${data.last_week_hours}h</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Change</div>
+                <div class="metric-value ${changeClass}">${changeIcon} ${Math.abs(data.productivity_change)}%</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Daily Avg</div>
+                <div class="metric-value">${data.avg_daily_hours}h</div>
+            </div>
+        </div>
+    `;
+    contentElement.innerHTML = metricsHtml;
+}
+
+// Break reminder functions
+function takeBreakNow() {
+    alert('Break time! Take a few minutes to rest.');
+}
+
+// Store break timer intervals
+let breakTimerIntervals = {};
+
+function updateBreakTimer(widgetId) {
+    // Clear any existing interval
+    if (breakTimerIntervals[widgetId]) {
+        clearInterval(breakTimerIntervals[widgetId]);
+    }
+    
+    // If we don't have global timer state, try to load it
+    if (globalTimerState === null) {
+        loadCurrentTimer(widgetId);
+        // Retry after a short delay
+        setTimeout(() => updateBreakTimer(widgetId), 100);
+        return;
+    }
+    
+    // Start local break timer calculation
+    function updateBreakDisplay() {
+        const timerElement = document.getElementById(`break-timer-${widgetId}`);
+        if (!timerElement) return;
+        
+        if (globalTimerState.success && globalTimerState.isActive) {
+            // Calculate time since start using local time
+            const startTime = new Date(globalTimerState.startTime);
+            const now = new Date();
+            const elapsedMinutes = Math.floor((now - startTime) / 60000);
+            
+            // Break every 2 hours (120 minutes)
+            const breakInterval = 120;
+            const minutesUntilBreak = breakInterval - (elapsedMinutes % breakInterval);
+            
+            if (minutesUntilBreak <= 0) {
+                timerElement.textContent = 'Break time!';
+                timerElement.style.color = '#dc3545';
+            } else {
+                const hours = Math.floor(minutesUntilBreak / 60);
+                const minutes = minutesUntilBreak % 60;
+                timerElement.textContent = `${hours}:${minutes.toString().padStart(2, '0')}`;
+                timerElement.style.color = '#333';
+            }
+        } else {
+            timerElement.textContent = 'Timer not active';
+            timerElement.style.color = '#666';
+        }
+    }
+    
+    // Initial update
+    updateBreakDisplay();
+    
+    // Update every second using setInterval
+    breakTimerIntervals[widgetId] = setInterval(updateBreakDisplay, 1000);
+}
+
+function adjustWidgetSize(widgetId) {
+    const widgetElement = document.querySelector(`[data-widget-id="${widgetId}"]`);
+    if (!widgetElement) return;
+    
+    const contentElement = widgetElement.querySelector('.widget-content');
+    if (!contentElement) return;
+    
+    // Get content height
+    const contentHeight = contentElement.scrollHeight;
+    const containerHeight = contentElement.clientHeight;
+    
+    // If content overflows, increase widget size
+    if (contentHeight > containerHeight + 20) {
+        const currentClasses = widgetElement.className.split(' ');
+        const sizeClass = currentClasses.find(c => ['small', 'medium', 'large', 'wide', 'extra-large', 'full-width'].includes(c));
+        
+        if (sizeClass) {
+            widgetElement.classList.remove(sizeClass);
+            // Upgrade to next size
+            if (sizeClass === 'small') widgetElement.classList.add('medium');
+            else if (sizeClass === 'medium') widgetElement.classList.add('large');
+            else if (sizeClass === 'large') widgetElement.classList.add('extra-large');
+            else if (sizeClass === 'wide') widgetElement.classList.add('full-width');
+        }
+    }
+    
+    // Check if content width overflows
+    const contentWidth = contentElement.scrollWidth;
+    const containerWidth = contentElement.clientWidth;
+    
+    if (contentWidth > containerWidth + 20) {
+        const currentClasses = widgetElement.className.split(' ');
+        const sizeClass = currentClasses.find(c => ['small', 'medium', 'large', 'wide', 'extra-large', 'full-width'].includes(c));
+        
+        if (sizeClass) {
+            widgetElement.classList.remove(sizeClass);
+            // Upgrade to wider size
+            if (sizeClass === 'small' || sizeClass === 'medium') widgetElement.classList.add('wide');
+            else if (sizeClass === 'large') widgetElement.classList.add('extra-large');
+            else if (sizeClass === 'wide') widgetElement.classList.add('full-width');
+        }
+    }
+}
+</script>
+
+<!-- Include SortableJS for drag and drop -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<!-- Include Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
 {% endblock %}

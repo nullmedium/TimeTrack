@@ -1,14 +1,147 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="hero">
-    <h1>Welcome to TimeTrack</h1>
-    <p>Track your work hours easily and efficiently</p>
-</div>
-
 {% if not g.user %}
 
-Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('register') }}">register</a> to access your dashboard.
+<!-- Decadent Splash Page -->
+<div class="splash-container">
+    <!-- Hero Section -->
+    <section class="splash-hero">
+        <div class="hero-content">
+            <h1 class="hero-title">Transform Your Productivity</h1>
+            <p class="hero-subtitle">Experience the future of time management with {{ g.branding.app_name if g.branding else 'TimeTrack' }}'s intelligent tracking system</p>
+            <div class="cta-buttons">
+                <a href="{{ url_for('register') }}" class="btn-primary">Get Started Free</a>
+                <a href="{{ url_for('login') }}" class="btn-secondary">Sign In</a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="floating-clock">
+                <div class="clock-face">
+                    <div class="hour-hand"></div>
+                    <div class="minute-hand"></div>
+                    <div class="second-hand"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Grid -->
+    <section class="features-grid">
+        <h2 class="section-title">Powerful Features for Modern Teams</h2>
+        <div class="feature-cards">
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Lightning Fast</h3>
+                <p>Start tracking in seconds with our intuitive one-click interface</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Advanced Analytics</h3>
+                <p>Gain insights with comprehensive reports and visual dashboards</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🏃‍♂️</div>
+                <h3>Sprint Management</h3>
+                <p>Organize work into sprints with agile project tracking</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">👥</div>
+                <h3>Team Collaboration</h3>
+                <p>Manage teams, projects, and resources all in one place</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Enterprise Security</h3>
+                <p>Bank-level encryption with role-based access control</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3>Multi-Company Support</h3>
+                <p>Perfect for agencies managing multiple client accounts</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Why Choose Section -->
+    <section class="statistics">
+        <h2 class="section-title">Why Choose {{ g.branding.app_name if g.branding else 'TimeTrack' }}?</h2>
+        <div class="stat-item">
+            <div class="stat-number">100%</div>
+            <div class="stat-label">Free & Open Source</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">∞</div>
+            <div class="stat-label">Unlimited Tracking</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">0</div>
+            <div class="stat-label">Hidden Fees</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">24/7</div>
+            <div class="stat-label">Always Available</div>
+        </div>
+    </section>
+
+    <!-- Getting Started Section -->
+    <section class="testimonials">
+        <h2 class="section-title">Get Started in Minutes</h2>
+        <div class="testimonial-grid">
+            <div class="testimonial-card">
+                <div class="feature-icon">1️⃣</div>
+                <h3>Sign Up</h3>
+                <p>Create your free account in seconds. No credit card required.</p>
+            </div>
+            <div class="testimonial-card">
+                <div class="feature-icon">2️⃣</div>
+                <h3>Set Up Your Workspace</h3>
+                <p>Add your company, teams, and projects to organize your time tracking.</p>
+            </div>
+            <div class="testimonial-card">
+                <div class="feature-icon">3️⃣</div>
+                <h3>Start Tracking</h3>
+                <p>Click "Arrive" to start tracking, "Leave" when done. It's that simple!</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Open Source Section -->
+    <section class="pricing">
+        <h2 class="section-title">Forever Free, Forever Open</h2>
+        <div class="pricing-cards">
+            <div class="pricing-card featured">
+                <div class="badge">100% Free</div>
+                <h3>{{ g.branding.app_name if g.branding else 'TimeTrack' }} Community</h3>
+                <div class="price">$0<span>/forever</span></div>
+                <ul class="pricing-features">
+                    <li>✓ Unlimited users</li>
+                    <li>✓ All features included</li>
+                    <li>✓ Time tracking & analytics</li>
+                    <li>✓ Sprint management</li>
+                    <li>✓ Team collaboration</li>
+                    <li>✓ Project management</li>
+                    <li>✓ Self-hosted option</li>
+                    <li>✓ No restrictions</li>
+                </ul>
+                <a href="{{ url_for('register') }}" class="btn-pricing">Get Started Free</a>
+            </div>
+        </div>
+        <p style="text-align: center; margin-top: 2rem; color: #666;">
+            The software {{ g.branding.app_name if g.branding else 'TimeTrack' }} runs is open source software.<br />
+            Host it yourself or use our free hosted version.<br />
+            The source is available on GitHub:
+            <a href="https://github.com/nullmedium/TimeTrack" target="_blank">https://github.com/nullmedium/TimeTrack</a>
+        </p>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="final-cta">
+        <h2>Ready to Take Control of Your Time?</h2>
+        <p>Start tracking your time effectively today - no strings attached</p>
+        <a href="{{ url_for('register') }}" class="btn-primary large">Create Free Account</a>
+    </section>
+</div>
 
 {% else %}
 
@@ -112,27 +245,6 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
         {% else %}
             <p>No time entries recorded yet.</p>
         {% endif %}
-    </div>
-</div>
-
-{% endif %}
-
-<div class="features">
-    <div class="feature">
-        <h3>Easy Time Tracking</h3>
-        <p>Simply click "Arrive" when you start working and "Leave" when you're done.</p>
-    </div>
-    <div class="feature">
-        <h3>Break Management</h3>
-        <p>Use the Pause button when taking breaks. Your break time is tracked separately.</p>
-    </div>
-    <div class="feature">
-        <h3>Detailed History</h3>
-        <p>View your complete work history with precise timestamps and durations.</p>
-    </div>
-    <div class="feature">
-        <h3>Simple Interface</h3>
-        <p>No complicated setup or configuration needed. Start tracking right away!</p>
     </div>
 </div>
 
@@ -577,5 +689,7 @@ Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('regist
     box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
 }
 </style>
+
+{% endif %}
 
 {% endblock %}

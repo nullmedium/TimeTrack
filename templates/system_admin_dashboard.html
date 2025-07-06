@@ -183,7 +183,10 @@
             <a href="{{ url_for('system_admin_settings') }}" class="btn btn-primary">
                 ⚙️ System Settings
             </a>
-            <a href="{{ url_for('system_admin_health') }}" class="btn btn-warning">
+            <a href="{{ url_for('system_admin_branding') }}" class="btn btn-primary">
+                🎨 Branding Settings
+            </a>
+            <a href="{{ url_for('system_admin_health') }}" class="btn btn-primary">
                 🏥 System Health
             </a>
         </div>
@@ -327,30 +330,7 @@
     flex-wrap: wrap;
 }
 
-.btn {
-    display: inline-block;
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 4px;
-    text-decoration: none;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.btn-primary {
-    background: #007bff;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #0056b3;
-}
-
-.btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-}
+/* Button styles now centralized in main style.css */
 
 .subtitle {
     color: #6c757d;

@@ -1,0 +1,434 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="management-container">
+    <div class="management-header">
+        <h1>🎨 Branding Settings</h1>
+        <div class="management-actions">
+            <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+        </div>
+    </div>
+    
+    <p class="subtitle">Customize the appearance and branding of {{ branding.app_name }}</p>
+
+    <!-- Current Branding Preview -->
+    <div class="management-section">
+        <h2>👁️ Current Branding Preview</h2>
+        <div class="management-card branding-preview-card">
+            <div class="card-header">
+                <h3>Live Preview</h3>
+            </div>
+            <div class="card-body">
+                <div class="preview-demo">
+                    <div class="demo-header">
+                        {% if branding.logo_filename %}
+                            <img src="{{ url_for('static', filename='uploads/branding/' + branding.logo_filename) }}" 
+                                 alt="{{ branding.logo_alt_text }}" 
+                                 class="demo-logo">
+                        {% else %}
+                            <span class="demo-text-logo">{{ branding.app_name }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="demo-content">
+                        <p>Welcome to {{ branding.app_name }}</p>
+                        <button class="btn btn-primary" style="background-color: {{ branding.primary_color }}; border-color: {{ branding.primary_color }};">
+                            Sample Button
+                        </button>
+                        <a href="#" style="color: {{ branding.primary_color }};">Sample Link</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Branding Settings Form -->
+    <div class="management-section">
+        <h2>🔧 Branding Configuration</h2>
+        <div class="management-card">
+            <form method="POST" enctype="multipart/form-data" class="settings-form">
+                <!-- Application Name -->
+                <div class="form-section">
+                    <h3>📝 Basic Information</h3>
+                    <div class="form-group">
+                        <label for="app_name">Application Name</label>
+                        <input type="text" id="app_name" name="app_name" 
+                               value="{{ branding.app_name }}" 
+                               class="form-control"
+                               placeholder="TimeTrack" 
+                               required>
+                        <small class="form-text text-muted">
+                            This name will appear in the title, navigation, and throughout the interface.
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="logo_alt_text">Logo Alternative Text</label>
+                        <input type="text" id="logo_alt_text" name="logo_alt_text" 
+                               value="{{ branding.logo_alt_text }}" 
+                               class="form-control"
+                               placeholder="Company Logo">
+                        <small class="form-text text-muted">
+                            Text displayed when the logo cannot be loaded (accessibility).
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Visual Assets -->
+                <div class="form-section">
+                    <h3>🖼️ Visual Assets</h3>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="logo_file">Logo Image</label>
+                            <input type="file" id="logo_file" name="logo_file" 
+                                   accept="image/*" 
+                                   class="form-control-file">
+                            {% if branding.logo_filename %}
+                                <div class="current-asset">
+                                    <img src="{{ url_for('static', filename='uploads/branding/' + branding.logo_filename) }}" 
+                                         alt="{{ branding.logo_alt_text }}" 
+                                         class="current-logo">
+                                    <span class="asset-label">Current logo</span>
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">
+                                PNG, JPG, GIF, SVG. Recommended: 200x50px
+                            </small>
+                        </div>
+
+                        <div class="form-group col-md-6">
+                            <label for="favicon_file">Favicon</label>
+                            <input type="file" id="favicon_file" name="favicon_file" 
+                                   accept="image/*" 
+                                   class="form-control-file">
+                            {% if branding.favicon_filename %}
+                                <div class="current-asset">
+                                    <img src="{{ url_for('static', filename='uploads/branding/' + branding.favicon_filename) }}" 
+                                         alt="Current favicon" 
+                                         class="current-favicon">
+                                    <span class="asset-label">Current favicon</span>
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">
+                                ICO, PNG. Recommended: 16x16px or 32x32px
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Theme Settings -->
+                <div class="form-section">
+                    <h3>🎨 Theme Settings</h3>
+                    <div class="form-group">
+                        <label for="primary_color">Primary Color</label>
+                        <div class="color-picker-wrapper">
+                            <input type="color" id="primary_color" name="primary_color" 
+                                   value="{{ branding.primary_color }}" 
+                                   class="form-control color-picker">
+                            <input type="text" value="{{ branding.primary_color }}" 
+                                   class="form-control color-value" 
+                                   id="primary_color_text"
+                                   pattern="^#[0-9A-Fa-f]{6}$"
+                                   placeholder="#007bff">
+                        </div>
+                        <small class="form-text text-muted">
+                            This color will be used for buttons, links, and other UI elements.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Imprint/Legal Page -->
+                <div class="form-section">
+                    <h3>⚖️ Imprint / Legal Page</h3>
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" name="imprint_enabled" id="imprint_enabled"
+                                   {% if branding.imprint_enabled %}checked{% endif %}>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-text">Enable Imprint Page</span>
+                        </label>
+                        <small class="form-text text-muted">
+                            When enabled, an "Imprint" link will appear in the footer linking to your custom legal page.
+                        </small>
+                    </div>
+                    
+                    <div class="imprint-settings" id="imprint-settings" style="{% if not branding.imprint_enabled %}display: none;{% endif %}">
+                        <div class="form-group">
+                            <label for="imprint_title">Page Title</label>
+                            <input type="text" id="imprint_title" name="imprint_title" 
+                                   value="{{ branding.imprint_title or 'Imprint' }}" 
+                                   class="form-control"
+                                   placeholder="Imprint">
+                            <small class="form-text text-muted">
+                                The title that will be displayed on the imprint page.
+                            </small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="imprint_content">Page Content (HTML supported)</label>
+                            <textarea id="imprint_content" name="imprint_content" 
+                                      class="form-control content-editor"
+                                      rows="15"
+                                      placeholder="Enter your imprint/legal information here...">{{ branding.imprint_content or '' }}</textarea>
+                            <small class="form-text text-muted">
+                                You can use HTML to format your content. Common tags: &lt;h2&gt;, &lt;h3&gt;, &lt;p&gt;, &lt;strong&gt;, &lt;br&gt;, &lt;a href=""&gt;
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Button -->
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">💾 Save Branding Settings</button>
+                    <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Branding-specific styles */
+.branding-preview-card {
+    margin-bottom: 2rem;
+}
+
+.preview-demo {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+}
+
+.demo-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.demo-logo {
+    max-height: 50px;
+    max-width: 200px;
+    object-fit: contain;
+}
+
+.demo-text-logo {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.demo-content {
+    margin-top: 1rem;
+}
+
+.demo-content p {
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+.demo-content .btn {
+    margin-right: 1rem;
+}
+
+/* Current assets display */
+.current-asset {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.current-logo {
+    max-height: 40px;
+    max-width: 120px;
+    object-fit: contain;
+}
+
+.current-favicon {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+}
+
+.asset-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+/* Color picker styling */
+.color-picker-wrapper {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    max-width: 300px;
+}
+
+.color-picker {
+    width: 60px;
+    height: 38px;
+    padding: 0.25rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.color-value {
+    flex: 1;
+    font-family: monospace;
+}
+
+/* Form sections */
+.form-section {
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.form-section h3 {
+    margin-bottom: 1rem;
+    color: #495057;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* File input styling */
+.form-control-file {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0;
+}
+
+/* Form row for two-column layout */
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-right: -0.5rem;
+    margin-left: -0.5rem;
+}
+
+.form-row > .col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .form-row > .col-md-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+
+/* Sync color inputs */
+
+/* Toggle label styling - ensuring proper alignment */
+.form-group .toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+    padding: 0;
+}
+
+.toggle-label input[type="checkbox"] {
+    display: none;
+}
+
+.toggle-slider {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    background: #ccc;
+    border-radius: 24px;
+    transition: background 0.3s;
+    flex-shrink: 0;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s;
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider {
+    background: var(--primary-color);
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider::before {
+    transform: translateX(26px);
+}
+
+.toggle-text {
+    font-weight: 500;
+    color: #495057;
+    line-height: 1;
+}
+
+/* Content editor styling */
+.content-editor {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    background: #f8f9fa;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 0.75rem;
+    resize: vertical;
+}
+
+.imprint-settings {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+</style>
+
+<script>
+// Sync color picker with text input
+document.addEventListener('DOMContentLoaded', function() {
+    const colorPicker = document.getElementById('primary_color');
+    const colorText = document.getElementById('primary_color_text');
+    
+    colorPicker.addEventListener('input', function() {
+        colorText.value = this.value;
+    });
+    
+    colorText.addEventListener('input', function() {
+        if (this.value.match(/^#[0-9A-Fa-f]{6}$/)) {
+            colorPicker.value = this.value;
+        }
+    });
+    
+    // Toggle imprint settings visibility
+    const imprintEnabled = document.getElementById('imprint_enabled');
+    const imprintSettings = document.getElementById('imprint-settings');
+    
+    imprintEnabled.addEventListener('change', function() {
+        if (this.checked) {
+            imprintSettings.style.display = 'block';
+        } else {
+            imprintSettings.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endblock %}

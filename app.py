@@ -1,8 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file, abort
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
-    format_table_data, format_graph_data, format_team_data
+    format_table_data, format_graph_data, format_team_data, format_burndown_data
 )
 from data_export import (
     export_to_csv, export_to_excel, export_team_hours_to_csv, export_team_hours_to_excel,
@@ -19,6 +19,7 @@ from sqlalchemy import func
 from functools import wraps
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
+from password_utils import PasswordValidator
 from werkzeug.security import check_password_hash
 
 # Load environment variables from .env file
@@ -40,7 +41,7 @@ app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT') or 587)
 app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'your-email@example.com')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'your-password')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'TimeTrack <noreply@timetrack.com>')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'TimeTrack <noreply@timetrack.com>')  # Will be overridden by branding in mail sending functions
 
 # Log mail configuration (without password)
 logger.info(f"Mail server: {app.config['MAIL_SERVER']}")
@@ -60,15 +61,24 @@ def run_migrations():
     # Check if we're using PostgreSQL or SQLite
     database_url = app.config['SQLALCHEMY_DATABASE_URI']
     print(f"DEBUG: Database URL: {database_url}")
-    
+
     is_postgresql = 'postgresql://' in database_url or 'postgres://' in database_url
     print(f"DEBUG: Is PostgreSQL: {is_postgresql}")
-    
+
     if is_postgresql:
         print("Using PostgreSQL - skipping SQLite migrations, ensuring tables exist...")
         with app.app_context():
             db.create_all()
             init_system_settings()
+            
+            # Run PostgreSQL-specific migrations
+            try:
+                from migrate_db import migrate_postgresql_schema
+                migrate_postgresql_schema()
+            except ImportError:
+                print("PostgreSQL migration function not available")
+            except Exception as e:
+                print(f"Warning: PostgreSQL migration failed: {e}")
         print("PostgreSQL setup completed successfully!")
     else:
         print("Using SQLite - running SQLite migrations...")
@@ -171,16 +181,16 @@ def inject_globals():
     active_announcements = []
     if g.user:
         active_announcements = Announcement.get_active_announcements_for_user(g.user)
-    
+
     # Get tracking script settings
     tracking_script_enabled = False
     tracking_script_code = ''
-    
+
     try:
         tracking_enabled_setting = SystemSettings.query.filter_by(key='tracking_script_enabled').first()
         if tracking_enabled_setting:
             tracking_script_enabled = tracking_enabled_setting.value == 'true'
-        
+
         tracking_code_setting = SystemSettings.query.filter_by(key='tracking_script_code').first()
         if tracking_code_setting:
             tracking_script_code = tracking_code_setting.value
@@ -387,15 +397,23 @@ def load_logged_in_user():
             else:
                 g.company = None
 
-            # Check if user is verified
-            if not g.user.is_verified and request.endpoint not in ['verify_email', 'static', 'logout', 'setup_company']:
-                # Allow unverified users to access only verification and static resources
-                if request.endpoint not in ['login', 'register']:
-                    flash('Please verify your email address before accessing this page.', 'warning')
-                    session.clear()
-                    return redirect(url_for('login'))
+            # Check if user has email but not verified
+            if g.user and not g.user.is_verified and g.user.email:
+                # Add a flag for templates to show email verification nag
+                g.show_email_verification_nag = True
+            else:
+                g.show_email_verification_nag = False
+                
+            # Check if user has no email at all
+            if g.user and not g.user.email:
+                g.show_email_nag = True
+            else:
+                g.show_email_nag = False
         else:
             g.company = None
+    
+    # Load branding settings
+    g.branding = BrandingSettings.get_current()
 
 @app.route('/')
 def home():
@@ -431,7 +449,7 @@ def home():
                              history=history,
                              available_projects=available_projects)
     else:
-        return render_template('about.html', title='Home')
+        return render_template('index.html', title='Home')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -505,7 +523,7 @@ def login():
             ip_address=request.remote_addr,
             user_agent=request.headers.get('User-Agent')
         )
-        
+
         flash('Invalid username or password', 'error')
 
     return render_template('login.html', title='Login')
@@ -526,7 +544,7 @@ def logout():
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get('User-Agent')
             )
-    
+
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
@@ -556,14 +574,19 @@ def register():
         error = None
         if not username:
             error = 'Username is required'
-        elif not email:
-            error = 'Email is required'
         elif not password:
             error = 'Password is required'
         elif password != confirm_password:
             error = 'Passwords do not match'
         elif not company_code:
             error = 'Company code is required'
+        
+        # Validate password strength
+        if not error:
+            validator = PasswordValidator()
+            is_valid, password_errors = validator.validate(password)
+            if not is_valid:
+                error = password_errors[0]  # Show first error
 
         # Find company by code
         company = None
@@ -576,7 +599,7 @@ def register():
         if company and not error:
             if User.query.filter_by(username=username, company_id=company.id).first():
                 error = 'Username already exists in this company'
-            elif User.query.filter_by(email=email, company_id=company.id).first():
+            elif email and User.query.filter_by(email=email, company_id=company.id).first():
                 error = 'Email already registered in this company'
 
         if error is None and company:
@@ -621,19 +644,19 @@ def register():
                 else:
                     # Send verification email for regular users when verification is required
                     verification_url = url_for('verify_email', token=token, _external=True)
-                    msg = Message('Verify your TimeTrack account', recipients=[email])
+                    msg = Message(f'Verify your {g.branding.app_name} account', recipients=[email])
                     msg.body = f'''Hello {username},
 
-Thank you for registering with TimeTrack. To complete your registration, please click on the link below:
+Thank you for registering with {g.branding.app_name}. To complete your registration, please click on the link below:
 
 {verification_url}
 
 This link will expire in 24 hours.
 
-If you did not register for TimeTrack, please ignore this email.
+If you did not register for {g.branding.app_name}, please ignore this email.
 
 Best regards,
-The TimeTrack Team
+The {g.branding.app_name} Team
 '''
                     mail.send(msg)
                     logger.info(f"Verification email sent to {email}")
@@ -670,18 +693,23 @@ def register_freelancer():
         error = None
         if not username:
             error = 'Username is required'
-        elif not email:
-            error = 'Email is required'
         elif not password:
             error = 'Password is required'
         elif password != confirm_password:
             error = 'Passwords do not match'
+        
+        # Validate password strength
+        if not error:
+            validator = PasswordValidator()
+            is_valid, password_errors = validator.validate(password)
+            if not is_valid:
+                error = password_errors[0]  # Show first error
 
         # Check for existing users globally (freelancers get unique usernames/emails)
         if not error:
             if User.query.filter_by(username=username).first():
                 error = 'Username already exists'
-            elif User.query.filter_by(email=email).first():
+            elif email and User.query.filter_by(email=email).first():
                 error = 'Email already registered'
 
         if error is None:
@@ -879,62 +907,11 @@ def verify_email(token):
     return redirect(url_for('login'))
 
 @app.route('/dashboard')
-@role_required(Role.TEAM_LEADER)
+@role_required(Role.TEAM_MEMBER)
+@company_required
 def dashboard():
-    # Get dashboard data based on user role
-    dashboard_data = {}
-
-    if g.user.role == Role.ADMIN and g.user.company_id:
-        # Admin sees everything within their company
-
-        dashboard_data.update({
-            'total_users': User.query.filter_by(company_id=g.user.company_id).count(),
-            'total_teams': Team.query.filter_by(company_id=g.user.company_id).count(),
-            'blocked_users': User.query.filter_by(company_id=g.user.company_id, is_blocked=True).count(),
-            'unverified_users': User.query.filter_by(company_id=g.user.company_id, is_verified=False).count(),
-            'recent_registrations': User.query.filter_by(company_id=g.user.company_id).order_by(User.id.desc()).limit(5).all()
-        })
-
-    if g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN]:
-
-        # Team leaders and supervisors see team-related data
-        if g.user.team_id or g.user.role == Role.ADMIN:
-            if g.user.role == Role.ADMIN and g.user.company_id:
-                # Admin can see all teams in their company
-                teams = Team.query.filter_by(company_id=g.user.company_id).all()
-                team_members = User.query.filter(
-                    User.team_id.isnot(None),
-                    User.company_id == g.user.company_id
-                ).all()
-            else:
-                # Team leaders/supervisors see their own team
-                teams = [Team.query.get(g.user.team_id)] if g.user.team_id else []
-
-                team_members = User.query.filter_by(
-                    team_id=g.user.team_id,
-                    company_id=g.user.company_id
-                ).all() if g.user.team_id else []
-
-            dashboard_data.update({
-                'teams': teams,
-                'team_members': team_members,
-                'team_member_count': len(team_members)
-            })
-
-    # Get recent time entries for the user's oversight
-    if g.user.role == Role.ADMIN:
-        # Admin sees all recent entries
-        recent_entries = TimeEntry.query.order_by(TimeEntry.arrival_time.desc()).limit(10).all()
-    elif g.user.team_id:
-        # Team leaders see their team's entries
-        team_user_ids = [user.id for user in User.query.filter_by(team_id=g.user.team_id).all()]
-        recent_entries = TimeEntry.query.filter(TimeEntry.user_id.in_(team_user_ids)).order_by(TimeEntry.arrival_time.desc()).limit(10).all()
-    else:
-        recent_entries = []
-
-    dashboard_data['recent_entries'] = recent_entries
-
-    return render_template('dashboard.html', title='Dashboard', **dashboard_data)
+    """User dashboard with configurable widgets."""
+    return render_template('dashboard.html', title='Dashboard')
 
 # Redirect old admin dashboard URL to new dashboard
 
@@ -994,17 +971,17 @@ def create_user():
                 # Generate verification token and send email
                 token = new_user.generate_verification_token()
                 verification_url = url_for('verify_email', token=token, _external=True)
-                msg = Message('Verify your TimeTrack account', recipients=[email])
+                msg = Message(f'Verify your {g.branding.app_name} account', recipients=[email])
                 msg.body = f'''Hello {username},
 
-An administrator has created an account for you on TimeTrack. To activate your account, please click on the link below:
+An administrator has created an account for you on {g.branding.app_name}. To activate your account, please click on the link below:
 
 {verification_url}
 
 This link will expire in 24 hours.
 
 Best regards,
-The TimeTrack Team
+The {g.branding.app_name} Team
 '''
                 mail.send(msg)
 
@@ -1090,11 +1067,217 @@ def delete_user(user_id):
         return redirect(url_for('admin_users'))
 
     username = user.username
-    db.session.delete(user)
-    db.session.commit()
-
-    flash(f'User {username} deleted successfully', 'success')
+    
+    try:
+        # Handle dependent records before deleting user
+        # Find an alternative admin/supervisor to transfer ownership to
+        alternative_admin = User.query.filter(
+            User.company_id == g.user.company_id,
+            User.role.in_([Role.ADMIN, Role.SUPERVISOR]),
+            User.id != user_id
+        ).first()
+        
+        if alternative_admin:
+            # Transfer ownership of projects to alternative admin
+            Project.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
+            
+            # Transfer ownership of tasks to alternative admin
+            Task.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
+            
+            # Transfer ownership of subtasks to alternative admin
+            SubTask.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
+            
+            # Transfer ownership of project categories to alternative admin
+            ProjectCategory.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
+        else:
+            # No alternative admin found - redirect to company deletion confirmation
+            flash('No other administrator or supervisor found. Company deletion required.', 'warning')
+            return redirect(url_for('confirm_company_deletion', user_id=user_id))
+        
+        # Delete user-specific records that can be safely removed
+        TimeEntry.query.filter_by(user_id=user_id).delete()
+        WorkConfig.query.filter_by(user_id=user_id).delete()
+        UserPreferences.query.filter_by(user_id=user_id).delete()
+        
+        # Delete user dashboards (cascades to widgets)
+        UserDashboard.query.filter_by(user_id=user_id).delete()
+        
+        # Clear task and subtask assignments
+        Task.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
+        SubTask.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
+        
+        # Now safe to delete the user
+        db.session.delete(user)
+        db.session.commit()
+        
+        flash(f'User {username} deleted successfully. Projects and tasks transferred to {alternative_admin.username}', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting user {user_id}: {str(e)}")
+        flash(f'Error deleting user: {str(e)}', 'error')
+    
     return redirect(url_for('admin_users'))
+
+@app.route('/confirm-company-deletion/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def confirm_company_deletion(user_id):
+    """Show confirmation page for company deletion when no alternative admin exists"""
+    
+    # Only allow admin or system admin access
+    if g.user.role not in [Role.ADMIN, Role.SYSTEM_ADMIN]:
+        flash('Access denied: Admin privileges required', 'error')
+        return redirect(url_for('index'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    # For admin users, ensure they're in the same company
+    if g.user.role == Role.ADMIN and user.company_id != g.user.company_id:
+        flash('Access denied: You can only delete users in your company', 'error')
+        return redirect(url_for('admin_users'))
+    
+    # Prevent deleting yourself
+    if user.id == g.user.id:
+        flash('You cannot delete your own account', 'error')
+        return redirect(url_for('admin_users') if g.user.role != Role.SYSTEM_ADMIN else url_for('system_admin_users'))
+    
+    company = user.company
+    
+    # Verify no alternative admin exists
+    alternative_admin = User.query.filter(
+        User.company_id == company.id,
+        User.role.in_([Role.ADMIN, Role.SUPERVISOR]),
+        User.id != user_id
+    ).first()
+    
+    if alternative_admin:
+        flash('Alternative admin found. Regular user deletion should be used instead.', 'error')
+        return redirect(url_for('admin_users') if g.user.role != Role.SYSTEM_ADMIN else url_for('system_admin_users'))
+    
+    if request.method == 'POST':
+        # Verify company name confirmation
+        company_name_confirm = request.form.get('company_name_confirm', '').strip()
+        understand_deletion = request.form.get('understand_deletion')
+        
+        if company_name_confirm != company.name:
+            flash('Company name confirmation does not match', 'error')
+            return redirect(url_for('confirm_company_deletion', user_id=user_id))
+        
+        if not understand_deletion:
+            flash('You must confirm that you understand the consequences', 'error')
+            return redirect(url_for('confirm_company_deletion', user_id=user_id))
+        
+        try:
+            # Perform cascade deletion
+            company_name = company.name
+            
+            # Delete all company-related data in the correct order
+            # First, clear foreign key references that could cause constraint violations
+            
+            # 1. Delete time entries (they reference tasks and users)
+            TimeEntry.query.filter(TimeEntry.user_id.in_(
+                db.session.query(User.id).filter(User.company_id == company.id)
+            )).delete(synchronize_session=False)
+            
+            # 2. Delete user preferences and dashboards
+            UserPreferences.query.filter(UserPreferences.user_id.in_(
+                db.session.query(User.id).filter(User.company_id == company.id)
+            )).delete(synchronize_session=False)
+            
+            UserDashboard.query.filter(UserDashboard.user_id.in_(
+                db.session.query(User.id).filter(User.company_id == company.id)
+            )).delete(synchronize_session=False)
+            
+            # 3. Delete work configs
+            WorkConfig.query.filter(WorkConfig.user_id.in_(
+                db.session.query(User.id).filter(User.company_id == company.id)
+            )).delete(synchronize_session=False)
+            
+            # 4. Delete subtasks (they depend on tasks)
+            SubTask.query.filter(SubTask.task_id.in_(
+                db.session.query(Task.id).filter(Task.project_id.in_(
+                    db.session.query(Project.id).filter(Project.company_id == company.id)
+                ))
+            )).delete(synchronize_session=False)
+            
+            # 5. Delete tasks (now safe since subtasks are deleted)
+            Task.query.filter(Task.project_id.in_(
+                db.session.query(Project.id).filter(Project.company_id == company.id)
+            )).delete(synchronize_session=False)
+            
+            # 6. Delete projects
+            Project.query.filter_by(company_id=company.id).delete()
+            
+            # 7. Delete project categories
+            ProjectCategory.query.filter_by(company_id=company.id).delete()
+            
+            # 8. Delete company work config
+            CompanyWorkConfig.query.filter_by(company_id=company.id).delete()
+            
+            # 9. Delete teams
+            Team.query.filter_by(company_id=company.id).delete()
+            
+            # 10. Delete users
+            User.query.filter_by(company_id=company.id).delete()
+            
+            # 11. Delete system events for this company
+            SystemEvent.query.filter_by(company_id=company.id).delete()
+            
+            # 12. Finally, delete the company itself
+            db.session.delete(company)
+            
+            db.session.commit()
+            
+            flash(f'Company "{company_name}" and all associated data has been permanently deleted', 'success')
+            
+            # Log the deletion
+            SystemEvent.log_event(
+                event_type='company_deleted',
+                description=f'Company "{company_name}" was deleted by {g.user.username} due to no alternative admin for user deletion',
+                event_category='admin_action',
+                severity='warning',
+                user_id=g.user.id
+            )
+            
+            return redirect(url_for('system_admin_companies') if g.user.role == Role.SYSTEM_ADMIN else url_for('index'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error deleting company {company.id}: {str(e)}")
+            flash(f'Error deleting company: {str(e)}', 'error')
+            return redirect(url_for('confirm_company_deletion', user_id=user_id))
+    
+    # GET request - show confirmation page
+    # Gather all data that will be deleted
+    users = User.query.filter_by(company_id=company.id).all()
+    teams = Team.query.filter_by(company_id=company.id).all()
+    projects = Project.query.filter_by(company_id=company.id).all()
+    categories = ProjectCategory.query.filter_by(company_id=company.id).all()
+    
+    # Get tasks for all projects in the company
+    project_ids = [p.id for p in projects]
+    tasks = Task.query.filter(Task.project_id.in_(project_ids)).all() if project_ids else []
+    
+    # Count time entries
+    user_ids = [u.id for u in users]
+    time_entries_count = TimeEntry.query.filter(TimeEntry.user_id.in_(user_ids)).count() if user_ids else 0
+    
+    # Calculate total hours
+    total_duration = db.session.query(func.sum(TimeEntry.duration)).filter(
+        TimeEntry.user_id.in_(user_ids)
+    ).scalar() or 0
+    total_hours_tracked = round(total_duration / 3600, 2) if total_duration else 0
+    
+    return render_template('confirm_company_deletion.html',
+                         user=user,
+                         company=company,
+                         users=users,
+                         teams=teams,
+                         projects=projects,
+                         categories=categories,
+                         tasks=tasks,
+                         time_entries_count=time_entries_count,
+                         total_hours_tracked=total_hours_tracked)
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
@@ -1122,6 +1305,12 @@ def profile():
                 error = 'Current password is incorrect'
             elif new_password != confirm_password:
                 error = 'New passwords do not match'
+            else:
+                # Validate password strength
+                validator = PasswordValidator()
+                is_valid, password_errors = validator.validate(new_password)
+                if not is_valid:
+                    error = password_errors[0]  # Show first error
 
         if error is None:
             user.email = email
@@ -1136,6 +1325,134 @@ def profile():
         flash(error, 'error')
 
     return render_template('profile.html', title='My Profile', user=user)
+
+@app.route('/update-avatar', methods=['POST'])
+@login_required
+def update_avatar():
+    """Update user avatar URL"""
+    user = User.query.get(session['user_id'])
+    avatar_url = request.form.get('avatar_url', '').strip()
+    
+    # Validate URL if provided
+    if avatar_url:
+        # Basic URL validation
+        import re
+        url_pattern = re.compile(
+            r'^https?://'  # http:// or https://
+            r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...
+            r'localhost|'  # localhost...
+            r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+            r'(?::\d+)?'  # optional port
+            r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+        
+        if not url_pattern.match(avatar_url):
+            flash('Please provide a valid URL for your avatar.', 'error')
+            return redirect(url_for('profile'))
+        
+        # Additional validation for image URLs
+        allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']
+        if not any(avatar_url.lower().endswith(ext) for ext in allowed_extensions):
+            # Check if it's a service that doesn't use extensions (like gravatar)
+            allowed_services = ['gravatar.com', 'dicebear.com', 'ui-avatars.com', 'avatars.githubusercontent.com']
+            if not any(service in avatar_url.lower() for service in allowed_services):
+                flash('Avatar URL should point to an image file (JPG, PNG, GIF, WebP, or SVG).', 'error')
+                return redirect(url_for('profile'))
+    
+    # Update avatar URL (empty string removes custom avatar)
+    user.avatar_url = avatar_url if avatar_url else None
+    db.session.commit()
+    
+    if avatar_url:
+        flash('Avatar updated successfully!', 'success')
+    else:
+        flash('Avatar reset to default.', 'success')
+    
+    # Log the avatar change
+    SystemEvent.log_event(
+        event_type='profile_avatar_updated',
+        event_category='user',
+        description=f'User {user.username} updated their avatar',
+        user_id=user.id,
+        company_id=user.company_id
+    )
+    
+    return redirect(url_for('profile'))
+
+@app.route('/upload-avatar', methods=['POST'])
+@login_required
+def upload_avatar():
+    """Handle avatar file upload"""
+    import os
+    from werkzeug.utils import secure_filename
+    import uuid
+    
+    user = User.query.get(session['user_id'])
+    
+    # Check if file was uploaded
+    if 'avatar_file' not in request.files:
+        flash('No file selected.', 'error')
+        return redirect(url_for('profile'))
+    
+    file = request.files['avatar_file']
+    
+    # Check if file is empty
+    if file.filename == '':
+        flash('No file selected.', 'error')
+        return redirect(url_for('profile'))
+    
+    # Validate file extension
+    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+    
+    if file_ext not in allowed_extensions:
+        flash('Invalid file type. Please upload a PNG, JPG, GIF, or WebP image.', 'error')
+        return redirect(url_for('profile'))
+    
+    # Validate file size (5MB max)
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)  # Reset file pointer
+    
+    if file_size > 5 * 1024 * 1024:  # 5MB
+        flash('File size must be less than 5MB.', 'error')
+        return redirect(url_for('profile'))
+    
+    # Generate unique filename
+    unique_filename = f"{user.id}_{uuid.uuid4().hex}.{file_ext}"
+    
+    # Create user avatar directory if it doesn't exist
+    avatar_dir = os.path.join(app.static_folder, 'uploads', 'avatars')
+    os.makedirs(avatar_dir, exist_ok=True)
+    
+    # Save the file
+    file_path = os.path.join(avatar_dir, unique_filename)
+    file.save(file_path)
+    
+    # Delete old avatar file if it exists and is a local upload
+    if user.avatar_url and user.avatar_url.startswith('/static/uploads/avatars/'):
+        old_file_path = os.path.join(app.root_path, user.avatar_url.lstrip('/'))
+        if os.path.exists(old_file_path):
+            try:
+                os.remove(old_file_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete old avatar: {e}")
+    
+    # Update user's avatar URL
+    user.avatar_url = f"/static/uploads/avatars/{unique_filename}"
+    db.session.commit()
+    
+    flash('Avatar uploaded successfully!', 'success')
+    
+    # Log the avatar upload
+    SystemEvent.log_event(
+        event_type='profile_avatar_uploaded',
+        event_category='user',
+        description=f'User {user.username} uploaded a new avatar',
+        user_id=user.id,
+        company_id=user.company_id
+    )
+    
+    return redirect(url_for('profile'))
 
 @app.route('/2fa/setup', methods=['GET', 'POST'])
 @login_required
@@ -1177,7 +1494,7 @@ def setup_2fa():
     import io
     import base64
 
-    qr_uri = g.user.get_2fa_uri()
+    qr_uri = g.user.get_2fa_uri(issuer_name=g.branding.app_name)
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
     qr.add_data(qr_uri)
     qr.make(fit=True)
@@ -1258,7 +1575,7 @@ def verify_2fa():
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get('User-Agent')
             )
-            
+
             flash('Invalid verification code. Please try again.', 'error')
 
     return render_template('verify_2fa.html', title='Two-Factor Authentication')
@@ -1266,6 +1583,22 @@ def verify_2fa():
 @app.route('/about')
 def about():
     return render_template('about.html', title='About')
+
+@app.route('/imprint')
+def imprint():
+    """Display the imprint/legal page if enabled"""
+    branding = BrandingSettings.get_current()
+    
+    # Check if imprint is enabled
+    if not branding or not branding.imprint_enabled:
+        abort(404)
+    
+    title = branding.imprint_title or 'Imprint'
+    content = branding.imprint_content or ''
+    
+    return render_template('imprint.html', 
+                         title=title,
+                         content=content)
 
 @app.route('/contact', methods=['GET', 'POST'])
 @login_required
@@ -1448,7 +1781,7 @@ def delete_entry(entry_id):
 def update_entry(entry_id):
     entry = TimeEntry.query.filter_by(id=entry_id, user_id=session['user_id']).first_or_404()
     data = request.json
-    
+
     if not data:
         return jsonify({'success': False, 'message': 'No JSON data provided'}), 400
 
@@ -1465,7 +1798,7 @@ def update_entry(entry_id):
             # Accept only ISO 8601 format
             departure_time_str = data['departure_time']
             entry.departure_time = datetime.fromisoformat(departure_time_str.replace('Z', '+00:00'))
-            
+
             # Recalculate duration if both times are present
             if entry.arrival_time and entry.departure_time:
                 # Calculate work duration considering breaks
@@ -1921,15 +2254,55 @@ def system_admin_delete_user(user_id):
     username = user.username
     company_name = user.company.name if user.company else 'Unknown'
 
-    # Delete related data first
-    TimeEntry.query.filter_by(user_id=user.id).delete()
-    WorkConfig.query.filter_by(user_id=user.id).delete()
-
-    # Delete the user
-    db.session.delete(user)
-    db.session.commit()
-
-    flash(f'User "{username}" from company "{company_name}" has been deleted.', 'success')
+    try:
+        # Handle dependent records before deleting user
+        # Find an alternative admin/supervisor in the same company to transfer ownership to
+        alternative_admin = User.query.filter(
+            User.company_id == user.company_id,
+            User.role.in_([Role.ADMIN, Role.SUPERVISOR]),
+            User.id != user_id
+        ).first()
+        
+        if alternative_admin:
+            # Transfer ownership of projects to alternative admin
+            Project.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
+            
+            # Transfer ownership of tasks to alternative admin
+            Task.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
+            
+            # Transfer ownership of subtasks to alternative admin
+            SubTask.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
+            
+            # Transfer ownership of project categories to alternative admin
+            ProjectCategory.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
+        else:
+            # No alternative admin found - redirect to company deletion confirmation
+            flash('No other administrator or supervisor found in the same company. Company deletion required.', 'warning')
+            return redirect(url_for('confirm_company_deletion', user_id=user_id))
+        
+        # Delete user-specific records that can be safely removed
+        TimeEntry.query.filter_by(user_id=user_id).delete()
+        WorkConfig.query.filter_by(user_id=user_id).delete()
+        UserPreferences.query.filter_by(user_id=user_id).delete()
+        
+        # Delete user dashboards (cascades to widgets)
+        UserDashboard.query.filter_by(user_id=user_id).delete()
+        
+        # Clear task and subtask assignments
+        Task.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
+        SubTask.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
+        
+        # Now safe to delete the user
+        db.session.delete(user)
+        db.session.commit()
+        
+        flash(f'User "{username}" from company "{company_name}" has been deleted. Projects and tasks transferred to {alternative_admin.username}', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting user {user_id}: {str(e)}")
+        flash(f'Error deleting user: {str(e)}', 'error')
+    
     return redirect(url_for('system_admin_users'))
 
 @app.route('/system-admin/companies')
@@ -2116,24 +2489,84 @@ def system_admin_settings():
                          total_users=total_users,
                          total_system_admins=total_system_admins)
 
+@app.route('/system-admin/branding', methods=['GET', 'POST'])
+@system_admin_required
+def system_admin_branding():
+    """System Admin: Branding settings"""
+    if request.method == 'POST':
+        branding = BrandingSettings.get_current()
+        
+        # Handle form data
+        branding.app_name = request.form.get('app_name', g.branding.app_name).strip()
+        branding.logo_alt_text = request.form.get('logo_alt_text', '').strip()
+        branding.primary_color = request.form.get('primary_color', '#007bff').strip()
+        
+        # Handle imprint settings
+        branding.imprint_enabled = 'imprint_enabled' in request.form
+        branding.imprint_title = request.form.get('imprint_title', 'Imprint').strip()
+        branding.imprint_content = request.form.get('imprint_content', '').strip()
+        
+        branding.updated_by_id = g.user.id
+        
+        # Handle logo upload
+        if 'logo_file' in request.files:
+            logo_file = request.files['logo_file']
+            if logo_file and logo_file.filename:
+                # Create uploads directory if it doesn't exist
+                upload_dir = os.path.join(app.static_folder, 'uploads', 'branding')
+                os.makedirs(upload_dir, exist_ok=True)
+                
+                # Save the file with a timestamp to avoid conflicts
+                import time
+                filename = f"logo_{int(time.time())}_{logo_file.filename}"
+                logo_path = os.path.join(upload_dir, filename)
+                logo_file.save(logo_path)
+                branding.logo_filename = filename
+        
+        # Handle favicon upload
+        if 'favicon_file' in request.files:
+            favicon_file = request.files['favicon_file']
+            if favicon_file and favicon_file.filename:
+                # Create uploads directory if it doesn't exist
+                upload_dir = os.path.join(app.static_folder, 'uploads', 'branding')
+                os.makedirs(upload_dir, exist_ok=True)
+                
+                # Save the file with a timestamp to avoid conflicts
+                import time
+                filename = f"favicon_{int(time.time())}_{favicon_file.filename}"
+                favicon_path = os.path.join(upload_dir, filename)
+                favicon_file.save(favicon_path)
+                branding.favicon_filename = filename
+        
+        db.session.commit()
+        flash('Branding settings updated successfully.', 'success')
+        return redirect(url_for('system_admin_branding'))
+    
+    # Get current branding settings
+    branding = BrandingSettings.get_current()
+    
+    return render_template('system_admin_branding.html',
+                         title='System Administrator - Branding Settings',
+                         branding=branding)
+
 @app.route('/system-admin/health')
-@system_admin_required  
+@system_admin_required
 def system_admin_health():
     """System Admin: System health check and event log"""
     # Get system health summary
     health_summary = SystemEvent.get_system_health_summary()
-    
+
     # Get recent events (last 7 days)
     recent_events = SystemEvent.get_recent_events(days=7, limit=100)
-    
+
     # Get events by severity for quick stats
     errors = SystemEvent.get_events_by_severity('error', days=7, limit=20)
     warnings = SystemEvent.get_events_by_severity('warning', days=7, limit=20)
-    
+
     # System metrics
     from datetime import datetime, timedelta
     now = datetime.now()
-    
+
     # Database connection test
     db_healthy = True
     db_error = None
@@ -2148,18 +2581,18 @@ def system_admin_health():
             'system',
             'error'
         )
-    
+
     # Application uptime (approximate based on first event)
     first_event = SystemEvent.query.order_by(SystemEvent.timestamp.asc()).first()
     uptime_start = first_event.timestamp if first_event else now
     uptime_duration = now - uptime_start
-    
+
     # Recent activity stats
     today = now.date()
     today_events = SystemEvent.query.filter(
         func.date(SystemEvent.timestamp) == today
     ).count()
-    
+
     # Log the health check
     SystemEvent.log_event(
         'system_health_check',
@@ -2170,7 +2603,7 @@ def system_admin_health():
         ip_address=request.remote_addr,
         user_agent=request.headers.get('User-Agent')
     )
-    
+
     return render_template('system_admin_health.html',
                          title='System Health Check',
                          health_summary=health_summary,
@@ -2188,10 +2621,10 @@ def system_admin_announcements():
     """System Admin: Manage announcements"""
     page = request.args.get('page', 1, type=int)
     per_page = 20
-    
+
     announcements = Announcement.query.order_by(Announcement.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False)
-    
+
     return render_template('system_admin_announcements.html',
                          title='System Admin - Announcements',
                          announcements=announcements)
@@ -2206,43 +2639,43 @@ def system_admin_announcement_new():
         announcement_type = request.form.get('announcement_type', 'info')
         is_urgent = request.form.get('is_urgent') == 'on'
         is_active = request.form.get('is_active') == 'on'
-        
+
         # Handle date fields
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
-        
+
         start_datetime = None
         end_datetime = None
-        
+
         if start_date:
             try:
                 start_datetime = datetime.strptime(start_date, '%Y-%m-%dT%H:%M')
             except ValueError:
                 pass
-        
+
         if end_date:
             try:
                 end_datetime = datetime.strptime(end_date, '%Y-%m-%dT%H:%M')
             except ValueError:
                 pass
-        
+
         # Handle targeting
         target_all_users = request.form.get('target_all_users') == 'on'
         target_roles = None
         target_companies = None
-        
+
         if not target_all_users:
             selected_roles = request.form.getlist('target_roles')
             selected_companies = request.form.getlist('target_companies')
-            
+
             if selected_roles:
                 import json
                 target_roles = json.dumps(selected_roles)
-            
+
             if selected_companies:
                 import json
                 target_companies = json.dumps([int(c) for c in selected_companies])
-        
+
         announcement = Announcement(
             title=title,
             content=content,
@@ -2256,17 +2689,17 @@ def system_admin_announcement_new():
             target_companies=target_companies,
             created_by_id=g.user.id
         )
-        
+
         db.session.add(announcement)
         db.session.commit()
-        
+
         flash('Announcement created successfully.', 'success')
         return redirect(url_for('system_admin_announcements'))
-    
+
     # Get roles and companies for targeting options
     roles = [role.value for role in Role]
     companies = Company.query.order_by(Company.name).all()
-    
+
     return render_template('system_admin_announcement_form.html',
                          title='Create Announcement',
                          announcement=None,
@@ -2278,18 +2711,18 @@ def system_admin_announcement_new():
 def system_admin_announcement_edit(id):
     """System Admin: Edit announcement"""
     announcement = Announcement.query.get_or_404(id)
-    
+
     if request.method == 'POST':
         announcement.title = request.form.get('title')
         announcement.content = request.form.get('content')
         announcement.announcement_type = request.form.get('announcement_type', 'info')
         announcement.is_urgent = request.form.get('is_urgent') == 'on'
         announcement.is_active = request.form.get('is_active') == 'on'
-        
+
         # Handle date fields
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
-        
+
         if start_date:
             try:
                 announcement.start_date = datetime.strptime(start_date, '%Y-%m-%dT%H:%M')
@@ -2297,7 +2730,7 @@ def system_admin_announcement_edit(id):
                 announcement.start_date = None
         else:
             announcement.start_date = None
-        
+
         if end_date:
             try:
                 announcement.end_date = datetime.strptime(end_date, '%Y-%m-%dT%H:%M')
@@ -2305,20 +2738,20 @@ def system_admin_announcement_edit(id):
                 announcement.end_date = None
         else:
             announcement.end_date = None
-        
+
         # Handle targeting
         announcement.target_all_users = request.form.get('target_all_users') == 'on'
-        
+
         if not announcement.target_all_users:
             selected_roles = request.form.getlist('target_roles')
             selected_companies = request.form.getlist('target_companies')
-            
+
             if selected_roles:
                 import json
                 announcement.target_roles = json.dumps(selected_roles)
             else:
                 announcement.target_roles = None
-            
+
             if selected_companies:
                 import json
                 announcement.target_companies = json.dumps([int(c) for c in selected_companies])
@@ -2327,18 +2760,18 @@ def system_admin_announcement_edit(id):
         else:
             announcement.target_roles = None
             announcement.target_companies = None
-        
+
         announcement.updated_at = datetime.now()
-        
+
         db.session.commit()
-        
+
         flash('Announcement updated successfully.', 'success')
         return redirect(url_for('system_admin_announcements'))
-    
+
     # Get roles and companies for targeting options
     roles = [role.value for role in Role]
     companies = Company.query.order_by(Company.name).all()
-    
+
     return render_template('system_admin_announcement_form.html',
                          title='Edit Announcement',
                          announcement=announcement,
@@ -2350,10 +2783,10 @@ def system_admin_announcement_edit(id):
 def system_admin_announcement_delete(id):
     """System Admin: Delete announcement"""
     announcement = Announcement.query.get_or_404(id)
-    
+
     db.session.delete(announcement)
     db.session.commit()
-    
+
     flash('Announcement deleted successfully.', 'success')
     return redirect(url_for('system_admin_announcements'))
 
@@ -3098,6 +3531,13 @@ def analytics_data():
         # Format data based on view type
         if view_type == 'graph':
             formatted_data = format_graph_data(data, granularity)
+            # For burndown chart, we need task data instead of time entries
+            chart_type = request.args.get('chart_type', 'timeSeries')
+            if chart_type == 'burndown':
+                # Get tasks for burndown chart
+                tasks = get_filtered_tasks_for_burndown(g.user, mode, start_date, end_date, project_filter)
+                burndown_data = format_burndown_data(tasks, start_date, end_date)
+                formatted_data.update(burndown_data)
         elif view_type == 'team':
             formatted_data = format_team_data(data, granularity)
         else:
@@ -3139,6 +3579,48 @@ def get_filtered_analytics_data(user, mode, start_date=None, end_date=None, proj
                 pass
 
     return query.order_by(TimeEntry.arrival_time.desc()).all()
+
+
+def get_filtered_tasks_for_burndown(user, mode, start_date=None, end_date=None, project_filter=None):
+    """Get filtered tasks for burndown chart"""
+    # Base query - get tasks from user's company
+    query = Task.query.join(Project).filter(Project.company_id == user.company_id)
+    
+    # Apply user/team filter
+    if mode == 'personal':
+        # For personal mode, get tasks assigned to the user or created by them
+        query = query.filter(
+            (Task.assigned_to_id == user.id) | 
+            (Task.created_by_id == user.id)
+        )
+    elif mode == 'team' and user.team_id:
+        # For team mode, get tasks from projects assigned to the team
+        query = query.filter(Project.team_id == user.team_id)
+    
+    # Apply project filter
+    if project_filter:
+        if project_filter == 'none':
+            # No project filter for tasks - they must belong to a project
+            return []
+        else:
+            try:
+                project_id = int(project_filter)
+                query = query.filter(Task.project_id == project_id)
+            except ValueError:
+                pass
+    
+    # Apply date filters - use task creation date and completion date
+    if start_date:
+        query = query.filter(
+            (Task.created_at >= datetime.combine(start_date, time.min)) |
+            (Task.completed_date >= start_date)
+        )
+    if end_date:
+        query = query.filter(
+            Task.created_at <= datetime.combine(end_date, time.max)
+        )
+    
+    return query.order_by(Task.created_at.desc()).all()
 
 
 @app.route('/api/companies/<int:company_id>/teams')
@@ -3392,6 +3874,115 @@ def manage_project_tasks(project_id):
                          tasks=tasks,
                          team_members=team_members)
 
+
+
+# Unified Task Management Route
+@app.route('/tasks')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def unified_task_management():
+    """Unified task management interface"""
+    
+    # Get all projects the user has access to (for filtering and task creation)
+    if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
+        # Admins and Supervisors can see all company projects
+        available_projects = Project.query.filter_by(
+            company_id=g.user.company_id, 
+            is_active=True
+        ).order_by(Project.name).all()
+    elif g.user.team_id:
+        # Team members see team projects + unassigned projects
+        available_projects = Project.query.filter(
+            Project.company_id == g.user.company_id,
+            Project.is_active == True,
+            db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+        ).order_by(Project.name).all()
+        # Filter by actual access permissions
+        available_projects = [p for p in available_projects if p.is_user_allowed(g.user)]
+    else:
+        # Unassigned users see only unassigned projects
+        available_projects = Project.query.filter_by(
+            company_id=g.user.company_id,
+            team_id=None,
+            is_active=True
+        ).order_by(Project.name).all()
+        available_projects = [p for p in available_projects if p.is_user_allowed(g.user)]
+    
+    # Get team members for task assignment (company-scoped)
+    if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
+        # Admins can assign to anyone in the company
+        team_members = User.query.filter_by(
+            company_id=g.user.company_id,
+            is_blocked=False
+        ).order_by(User.username).all()
+    elif g.user.team_id:
+        # Team members can assign to team members + supervisors/admins
+        team_members = User.query.filter(
+            User.company_id == g.user.company_id,
+            User.is_blocked == False,
+            db.or_(
+                User.team_id == g.user.team_id,
+                User.role.in_([Role.ADMIN, Role.SUPERVISOR])
+            )
+        ).order_by(User.username).all()
+    else:
+        # Unassigned users can assign to supervisors/admins only
+        team_members = User.query.filter(
+            User.company_id == g.user.company_id,
+            User.is_blocked == False,
+            User.role.in_([Role.ADMIN, Role.SUPERVISOR])
+        ).order_by(User.username).all()
+    
+    # Convert team members to JSON-serializable format
+    team_members_data = [{
+        'id': member.id,
+        'username': member.username,
+        'email': member.email,
+        'role': member.role.value if member.role else 'Team Member',
+        'avatar_url': member.get_avatar_url(32)
+    } for member in team_members]
+    
+    return render_template('unified_task_management.html',
+                         title='Task Management',
+                         available_projects=available_projects,
+                         team_members=team_members_data)
+
+# Sprint Management Route
+@app.route('/sprints')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def sprint_management():
+    """Sprint management interface"""
+    
+    # Get all projects the user has access to (for sprint assignment)
+    if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
+        # Admins and Supervisors can see all company projects
+        available_projects = Project.query.filter_by(
+            company_id=g.user.company_id, 
+            is_active=True
+        ).order_by(Project.name).all()
+    elif g.user.team_id:
+        # Team members see team projects + unassigned projects
+        available_projects = Project.query.filter(
+            Project.company_id == g.user.company_id,
+            Project.is_active == True,
+            db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+        ).order_by(Project.name).all()
+        # Filter by actual access permissions
+        available_projects = [p for p in available_projects if p.is_user_allowed(g.user)]
+    else:
+        # Unassigned users see only unassigned projects
+        available_projects = Project.query.filter_by(
+            company_id=g.user.company_id,
+            team_id=None,
+            is_active=True
+        ).order_by(Project.name).all()
+        available_projects = [p for p in available_projects if p.is_user_allowed(g.user)]
+    
+    return render_template('sprint_management.html',
+                         title='Sprint Management',
+                         available_projects=available_projects)
+
 # Task API Routes
 @app.route('/api/tasks', methods=['POST'])
 @role_required(Role.TEAM_MEMBER)
@@ -3419,15 +4010,20 @@ def create_task():
         if data.get('due_date'):
             due_date = datetime.strptime(data.get('due_date'), '%Y-%m-%d').date()
 
+        # Generate task number
+        task_number = Task.generate_task_number(g.user.company_id)
+        
         # Create task
         task = Task(
+            task_number=task_number,
             name=name,
             description=data.get('description', ''),
-            status=TaskStatus(data.get('status', 'Not Started')),
-            priority=TaskPriority(data.get('priority', 'Medium')),
+            status=TaskStatus[data.get('status', 'NOT_STARTED')],
+            priority=TaskPriority[data.get('priority', 'MEDIUM')],
             estimated_hours=float(data.get('estimated_hours')) if data.get('estimated_hours') else None,
             project_id=project_id,
             assigned_to_id=int(data.get('assigned_to_id')) if data.get('assigned_to_id') else None,
+            sprint_id=int(data.get('sprint_id')) if data.get('sprint_id') else None,
             start_date=start_date,
             due_date=due_date,
             created_by_id=g.user.id
@@ -3436,7 +4032,14 @@ def create_task():
         db.session.add(task)
         db.session.commit()
 
-        return jsonify({'success': True, 'message': 'Task created successfully'})
+        return jsonify({
+            'success': True, 
+            'message': 'Task created successfully',
+            'task': {
+                'id': task.id,
+                'task_number': task.task_number
+            }
+        })
 
     except Exception as e:
         db.session.rollback()
@@ -3457,17 +4060,33 @@ def get_task(task_id):
 
         task_data = {
             'id': task.id,
+            'task_number': getattr(task, 'task_number', f'TSK-{task.id:03d}'),
             'name': task.name,
             'description': task.description,
-            'status': task.status.value,
-            'priority': task.priority.value,
+            'status': task.status.name,
+            'priority': task.priority.name,
             'estimated_hours': task.estimated_hours,
             'assigned_to_id': task.assigned_to_id,
+            'assigned_to_name': task.assigned_to.username if task.assigned_to else None,
+            'project_id': task.project_id,
+            'project_name': task.project.name if task.project else None,
+            'project_code': task.project.code if task.project else None,
             'start_date': task.start_date.isoformat() if task.start_date else None,
-            'due_date': task.due_date.isoformat() if task.due_date else None
+            'due_date': task.due_date.isoformat() if task.due_date else None,
+            'completed_date': task.completed_date.isoformat() if task.completed_date else None,
+            'archived_date': task.archived_date.isoformat() if task.archived_date else None,
+            'sprint_id': task.sprint_id,
+            'subtasks': [{
+                'id': subtask.id,
+                'name': subtask.name,
+                'status': subtask.status.name,
+                'priority': subtask.priority.name,
+                'assigned_to_id': subtask.assigned_to_id,
+                'assigned_to_name': subtask.assigned_to.username if subtask.assigned_to else None
+            } for subtask in task.subtasks] if task.subtasks else []
         }
 
-        return jsonify({'success': True, 'task': task_data})
+        return jsonify(task_data)
 
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
@@ -3493,17 +4112,19 @@ def update_task(task_id):
         if 'description' in data:
             task.description = data['description']
         if 'status' in data:
-            task.status = TaskStatus(data['status'])
-            if data['status'] == 'Completed':
+            task.status = TaskStatus[data['status']]
+            if data['status'] == 'COMPLETED':
                 task.completed_date = datetime.now().date()
             else:
                 task.completed_date = None
         if 'priority' in data:
-            task.priority = TaskPriority(data['priority'])
+            task.priority = TaskPriority[data['priority']]
         if 'estimated_hours' in data:
             task.estimated_hours = float(data['estimated_hours']) if data['estimated_hours'] else None
         if 'assigned_to_id' in data:
             task.assigned_to_id = int(data['assigned_to_id']) if data['assigned_to_id'] else None
+        if 'sprint_id' in data:
+            task.sprint_id = int(data['sprint_id']) if data['sprint_id'] else None
         if 'start_date' in data:
             task.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date() if data['start_date'] else None
         if 'due_date' in data:
@@ -3537,6 +4158,609 @@ def delete_task(task_id):
 
     except Exception as e:
         db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+# Unified Task Management APIs
+@app.route('/api/tasks/unified')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_unified_tasks():
+    """Get all tasks for unified task view"""
+    try:
+        # Base query for tasks in user's company
+        query = Task.query.join(Project).filter(Project.company_id == g.user.company_id)
+        
+        # Apply access restrictions based on user role and team
+        if g.user.role not in [Role.ADMIN, Role.SUPERVISOR]:
+            # Regular users can only see tasks from projects they have access to
+            accessible_project_ids = []
+            projects = Project.query.filter_by(company_id=g.user.company_id).all()
+            for project in projects:
+                if project.is_user_allowed(g.user):
+                    accessible_project_ids.append(project.id)
+            
+            if accessible_project_ids:
+                query = query.filter(Task.project_id.in_(accessible_project_ids))
+            else:
+                # No accessible projects, return empty list
+                return jsonify({'success': True, 'tasks': []})
+        
+        tasks = query.order_by(Task.created_at.desc()).all()
+        
+        task_list = []
+        for task in tasks:
+            # Determine if this is a team task
+            is_team_task = (
+                g.user.team_id and 
+                task.project and 
+                task.project.team_id == g.user.team_id
+            )
+            
+            task_data = {
+                'id': task.id,
+                'task_number': getattr(task, 'task_number', f'TSK-{task.id:03d}'),  # Fallback for existing tasks
+                'name': task.name,
+                'description': task.description,
+                'status': task.status.name,
+                'priority': task.priority.name,
+                'estimated_hours': task.estimated_hours,
+                'project_id': task.project_id,
+                'project_name': task.project.name if task.project else None,
+                'project_code': task.project.code if task.project else None,
+                'assigned_to_id': task.assigned_to_id,
+                'assigned_to_name': task.assigned_to.username if task.assigned_to else None,
+                'created_by_id': task.created_by_id,
+                'created_by_name': task.created_by.username if task.created_by else None,
+                'start_date': task.start_date.isoformat() if task.start_date else None,
+                'due_date': task.due_date.isoformat() if task.due_date else None,
+                'completed_date': task.completed_date.isoformat() if task.completed_date else None,
+                'created_at': task.created_at.isoformat(),
+                'is_team_task': is_team_task,
+                'subtask_count': len(task.subtasks) if task.subtasks else 0,
+                'subtasks': [{
+                    'id': subtask.id,
+                    'name': subtask.name,
+                    'status': subtask.status.name,
+                    'priority': subtask.priority.name,
+                    'assigned_to_id': subtask.assigned_to_id,
+                    'assigned_to_name': subtask.assigned_to.username if subtask.assigned_to else None
+                } for subtask in task.subtasks] if task.subtasks else [],
+                'sprint_id': task.sprint_id,
+                'sprint_name': task.sprint.name if task.sprint else None,
+                'is_current_sprint': task.sprint.is_current if task.sprint else False
+            }
+            task_list.append(task_data)
+        
+        return jsonify({'success': True, 'tasks': task_list})
+        
+    except Exception as e:
+        logger.error(f"Error in get_unified_tasks: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/tasks/<int:task_id>/status', methods=['PUT'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def update_task_status(task_id):
+    """Update task status"""
+    try:
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+
+        if not task or not task.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Task not found or access denied'})
+
+        data = request.get_json()
+        new_status = data.get('status')
+        
+        if not new_status:
+            return jsonify({'success': False, 'message': 'Status is required'})
+        
+        # Validate status value - convert from enum name to enum object
+        try:
+            task_status = TaskStatus[new_status]
+        except KeyError:
+            return jsonify({'success': False, 'message': 'Invalid status value'})
+        
+        # Update task status
+        old_status = task.status
+        task.status = task_status
+        
+        # Set completion date if status is COMPLETED
+        if task_status == TaskStatus.COMPLETED:
+            task.completed_date = datetime.now().date()
+        elif old_status == TaskStatus.COMPLETED:
+            # Clear completion date if moving away from completed
+            task.completed_date = None
+        
+        # Set archived date if status is ARCHIVED
+        if task_status == TaskStatus.ARCHIVED:
+            task.archived_date = datetime.now().date()
+        elif old_status == TaskStatus.ARCHIVED:
+            # Clear archived date if moving away from archived
+            task.archived_date = None
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Task status updated successfully',
+            'old_status': old_status.name,
+            'new_status': task_status.name
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating task status: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+# Task Dependencies APIs
+@app.route('/api/tasks/<int:task_id>/dependencies')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_task_dependencies(task_id):
+    """Get dependencies for a specific task"""
+    try:
+        # Get the task and verify ownership
+        task = Task.query.filter_by(id=task_id, company_id=g.user.company_id).first()
+        if not task:
+            return jsonify({'success': False, 'message': 'Task not found'})
+        
+        # Get blocked by dependencies (tasks that block this one)
+        blocked_by_query = db.session.query(Task).join(
+            TaskDependency, Task.id == TaskDependency.blocking_task_id
+        ).filter(TaskDependency.blocked_task_id == task_id)
+        
+        # Get blocks dependencies (tasks that this one blocks)
+        blocks_query = db.session.query(Task).join(
+            TaskDependency, Task.id == TaskDependency.blocked_task_id
+        ).filter(TaskDependency.blocking_task_id == task_id)
+        
+        blocked_by_tasks = blocked_by_query.all()
+        blocks_tasks = blocks_query.all()
+        
+        def task_to_dict(t):
+            return {
+                'id': t.id,
+                'name': t.name,
+                'task_number': t.task_number
+            }
+        
+        return jsonify({
+            'success': True,
+            'dependencies': {
+                'blocked_by': [task_to_dict(t) for t in blocked_by_tasks],
+                'blocks': [task_to_dict(t) for t in blocks_tasks]
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting task dependencies: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/api/tasks/<int:task_id>/dependencies', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def add_task_dependency(task_id):
+    """Add a dependency for a task"""
+    try:
+        data = request.get_json()
+        task_number = data.get('task_number')
+        dependency_type = data.get('type')  # 'blocked_by' or 'blocks'
+        
+        if not task_number or not dependency_type:
+            return jsonify({'success': False, 'message': 'Task number and type are required'})
+        
+        # Get the main task
+        task = Task.query.filter_by(id=task_id, company_id=g.user.company_id).first()
+        if not task:
+            return jsonify({'success': False, 'message': 'Task not found'})
+        
+        # Find the dependency task by task number
+        dependency_task = Task.query.filter_by(
+            task_number=task_number, 
+            company_id=g.user.company_id
+        ).first()
+        
+        if not dependency_task:
+            return jsonify({'success': False, 'message': f'Task {task_number} not found'})
+        
+        # Prevent self-dependency
+        if dependency_task.id == task_id:
+            return jsonify({'success': False, 'message': 'A task cannot depend on itself'})
+        
+        # Create the dependency based on type
+        if dependency_type == 'blocked_by':
+            # Current task is blocked by the dependency task
+            blocked_task_id = task_id
+            blocking_task_id = dependency_task.id
+        elif dependency_type == 'blocks':
+            # Current task blocks the dependency task
+            blocked_task_id = dependency_task.id
+            blocking_task_id = task_id
+        else:
+            return jsonify({'success': False, 'message': 'Invalid dependency type'})
+        
+        # Check if dependency already exists
+        existing_dep = TaskDependency.query.filter_by(
+            blocked_task_id=blocked_task_id,
+            blocking_task_id=blocking_task_id
+        ).first()
+        
+        if existing_dep:
+            return jsonify({'success': False, 'message': 'This dependency already exists'})
+        
+        # Check for circular dependencies
+        def would_create_cycle(blocked_id, blocking_id):
+            # Use a simple DFS to check if adding this dependency would create a cycle
+            visited = set()
+            
+            def dfs(current_blocked_id):
+                if current_blocked_id in visited:
+                    return False
+                visited.add(current_blocked_id)
+                
+                # If we reach the original blocking task, we have a cycle
+                if current_blocked_id == blocking_id:
+                    return True
+                
+                # Check all tasks that block the current task
+                dependencies = TaskDependency.query.filter_by(blocked_task_id=current_blocked_id).all()
+                for dep in dependencies:
+                    if dfs(dep.blocking_task_id):
+                        return True
+                
+                return False
+            
+            return dfs(blocked_id)
+        
+        if would_create_cycle(blocked_task_id, blocking_task_id):
+            return jsonify({'success': False, 'message': 'This dependency would create a circular dependency'})
+        
+        # Create the new dependency
+        new_dependency = TaskDependency(
+            blocked_task_id=blocked_task_id,
+            blocking_task_id=blocking_task_id
+        )
+        
+        db.session.add(new_dependency)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Dependency added successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error adding task dependency: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/api/tasks/<int:task_id>/dependencies/<int:dependency_task_id>', methods=['DELETE'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def remove_task_dependency(task_id, dependency_task_id):
+    """Remove a dependency for a task"""
+    try:
+        data = request.get_json()
+        dependency_type = data.get('type')  # 'blocked_by' or 'blocks'
+        
+        if not dependency_type:
+            return jsonify({'success': False, 'message': 'Dependency type is required'})
+        
+        # Get the main task
+        task = Task.query.filter_by(id=task_id, company_id=g.user.company_id).first()
+        if not task:
+            return jsonify({'success': False, 'message': 'Task not found'})
+        
+        # Determine which dependency to remove based on type
+        if dependency_type == 'blocked_by':
+            # Remove dependency where current task is blocked by dependency_task_id
+            dependency = TaskDependency.query.filter_by(
+                blocked_task_id=task_id,
+                blocking_task_id=dependency_task_id
+            ).first()
+        elif dependency_type == 'blocks':
+            # Remove dependency where current task blocks dependency_task_id
+            dependency = TaskDependency.query.filter_by(
+                blocked_task_id=dependency_task_id,
+                blocking_task_id=task_id
+            ).first()
+        else:
+            return jsonify({'success': False, 'message': 'Invalid dependency type'})
+        
+        if not dependency:
+            return jsonify({'success': False, 'message': 'Dependency not found'})
+        
+        db.session.delete(dependency)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Dependency removed successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error removing task dependency: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+# Task Archive/Restore APIs
+@app.route('/api/tasks/<int:task_id>/archive', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def archive_task(task_id):
+    """Archive a completed task"""
+    try:
+        # Get the task and verify ownership through project
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        if not task:
+            return jsonify({'success': False, 'message': 'Task not found'})
+        
+        # Only allow archiving completed tasks
+        if task.status != TaskStatus.COMPLETED:
+            return jsonify({'success': False, 'message': 'Only completed tasks can be archived'})
+        
+        # Archive the task
+        task.status = TaskStatus.ARCHIVED
+        task.archived_date = datetime.now().date()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Task archived successfully',
+            'archived_date': task.archived_date.isoformat()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error archiving task: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/api/tasks/<int:task_id>/restore', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def restore_task(task_id):
+    """Restore an archived task to completed status"""
+    try:
+        # Get the task and verify ownership through project
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        if not task:
+            return jsonify({'success': False, 'message': 'Task not found'})
+        
+        # Only allow restoring archived tasks
+        if task.status != TaskStatus.ARCHIVED:
+            return jsonify({'success': False, 'message': 'Only archived tasks can be restored'})
+        
+        # Restore the task to completed status
+        task.status = TaskStatus.COMPLETED
+        task.archived_date = None
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Task restored successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error restoring task: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+# Sprint Management APIs
+@app.route('/api/sprints')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_sprints():
+    """Get all sprints for the user's company"""
+    try:
+        # Base query for sprints in user's company
+        query = Sprint.query.filter(Sprint.company_id == g.user.company_id)
+        
+        # Apply access restrictions based on user role and team
+        if g.user.role not in [Role.ADMIN, Role.SUPERVISOR]:
+            # Regular users can only see sprints they have access to
+            accessible_sprint_ids = []
+            sprints = query.all()
+            for sprint in sprints:
+                if sprint.can_user_access(g.user):
+                    accessible_sprint_ids.append(sprint.id)
+            
+            if accessible_sprint_ids:
+                query = query.filter(Sprint.id.in_(accessible_sprint_ids))
+            else:
+                # No accessible sprints, return empty list
+                return jsonify({'success': True, 'sprints': []})
+        
+        sprints = query.order_by(Sprint.created_at.desc()).all()
+        
+        sprint_list = []
+        for sprint in sprints:
+            task_summary = sprint.get_task_summary()
+            
+            sprint_data = {
+                'id': sprint.id,
+                'name': sprint.name,
+                'description': sprint.description,
+                'status': sprint.status.name,
+                'company_id': sprint.company_id,
+                'project_id': sprint.project_id,
+                'project_name': sprint.project.name if sprint.project else None,
+                'project_code': sprint.project.code if sprint.project else None,
+                'start_date': sprint.start_date.isoformat(),
+                'end_date': sprint.end_date.isoformat(),
+                'goal': sprint.goal,
+                'capacity_hours': sprint.capacity_hours,
+                'created_by_id': sprint.created_by_id,
+                'created_by_name': sprint.created_by.username if sprint.created_by else None,
+                'created_at': sprint.created_at.isoformat(),
+                'is_current': sprint.is_current,
+                'duration_days': sprint.duration_days,
+                'days_remaining': sprint.days_remaining,
+                'progress_percentage': sprint.progress_percentage,
+                'task_summary': task_summary
+            }
+            sprint_list.append(sprint_data)
+        
+        return jsonify({'success': True, 'sprints': sprint_list})
+        
+    except Exception as e:
+        logger.error(f"Error in get_sprints: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/sprints', methods=['POST'])
+@role_required(Role.TEAM_LEADER)  # Team leaders and above can create sprints
+@company_required
+def create_sprint():
+    """Create a new sprint"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        name = data.get('name')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        
+        if not name:
+            return jsonify({'success': False, 'message': 'Sprint name is required'})
+        if not start_date:
+            return jsonify({'success': False, 'message': 'Start date is required'})
+        if not end_date:
+            return jsonify({'success': False, 'message': 'End date is required'})
+        
+        # Parse dates
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Invalid date format'})
+        
+        if start_date >= end_date:
+            return jsonify({'success': False, 'message': 'End date must be after start date'})
+        
+        # Verify project access if project is specified
+        project_id = data.get('project_id')
+        if project_id:
+            project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
+            if not project or not project.is_user_allowed(g.user):
+                return jsonify({'success': False, 'message': 'Project not found or access denied'})
+        
+        # Create sprint
+        sprint = Sprint(
+            name=name,
+            description=data.get('description', ''),
+            status=SprintStatus[data.get('status', 'PLANNING')],
+            company_id=g.user.company_id,
+            project_id=int(project_id) if project_id else None,
+            start_date=start_date,
+            end_date=end_date,
+            goal=data.get('goal'),
+            capacity_hours=int(data.get('capacity_hours')) if data.get('capacity_hours') else None,
+            created_by_id=g.user.id
+        )
+        
+        db.session.add(sprint)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Sprint created successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error creating sprint: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/sprints/<int:sprint_id>', methods=['PUT'])
+@role_required(Role.TEAM_LEADER)
+@company_required
+def update_sprint(sprint_id):
+    """Update an existing sprint"""
+    try:
+        sprint = Sprint.query.filter_by(id=sprint_id, company_id=g.user.company_id).first()
+        
+        if not sprint or not sprint.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Sprint not found or access denied'})
+        
+        data = request.get_json()
+        
+        # Update sprint fields
+        if 'name' in data:
+            sprint.name = data['name']
+        if 'description' in data:
+            sprint.description = data['description']
+        if 'status' in data:
+            sprint.status = SprintStatus[data['status']]
+        if 'goal' in data:
+            sprint.goal = data['goal']
+        if 'capacity_hours' in data:
+            sprint.capacity_hours = int(data['capacity_hours']) if data['capacity_hours'] else None
+        if 'project_id' in data:
+            project_id = data['project_id']
+            if project_id:
+                project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
+                if not project or not project.is_user_allowed(g.user):
+                    return jsonify({'success': False, 'message': 'Project not found or access denied'})
+                sprint.project_id = int(project_id)
+            else:
+                sprint.project_id = None
+        
+        # Update dates if provided
+        if 'start_date' in data:
+            try:
+                sprint.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'success': False, 'message': 'Invalid start date format'})
+        
+        if 'end_date' in data:
+            try:
+                sprint.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'success': False, 'message': 'Invalid end date format'})
+        
+        # Validate date order
+        if sprint.start_date >= sprint.end_date:
+            return jsonify({'success': False, 'message': 'End date must be after start date'})
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Sprint updated successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating sprint: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/sprints/<int:sprint_id>', methods=['DELETE'])
+@role_required(Role.TEAM_LEADER)
+@company_required
+def delete_sprint(sprint_id):
+    """Delete a sprint and remove it from all associated tasks"""
+    try:
+        sprint = Sprint.query.filter_by(id=sprint_id, company_id=g.user.company_id).first()
+        
+        if not sprint or not sprint.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Sprint not found or access denied'})
+        
+        # Remove sprint assignment from all tasks
+        Task.query.filter_by(sprint_id=sprint_id).update({'sprint_id': None})
+        
+        # Delete the sprint
+        db.session.delete(sprint)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Sprint deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting sprint: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
 # Subtask API Routes
@@ -3574,8 +4798,8 @@ def create_subtask():
         subtask = SubTask(
             name=name,
             description=data.get('description', ''),
-            status=TaskStatus(data.get('status', 'Not Started')),
-            priority=TaskPriority(data.get('priority', 'Medium')),
+            status=TaskStatus[data.get('status', 'NOT_STARTED')],
+            priority=TaskPriority[data.get('priority', 'MEDIUM')],
             estimated_hours=float(data.get('estimated_hours')) if data.get('estimated_hours') else None,
             task_id=task_id,
             assigned_to_id=int(data.get('assigned_to_id')) if data.get('assigned_to_id') else None,
@@ -3610,8 +4834,8 @@ def get_subtask(subtask_id):
             'id': subtask.id,
             'name': subtask.name,
             'description': subtask.description,
-            'status': subtask.status.value,
-            'priority': subtask.priority.value,
+            'status': subtask.status.name,
+            'priority': subtask.priority.name,
             'estimated_hours': subtask.estimated_hours,
             'assigned_to_id': subtask.assigned_to_id,
             'start_date': subtask.start_date.isoformat() if subtask.start_date else None,
@@ -3644,13 +4868,13 @@ def update_subtask(subtask_id):
         if 'description' in data:
             subtask.description = data['description']
         if 'status' in data:
-            subtask.status = TaskStatus(data['status'])
-            if data['status'] == 'Completed':
+            subtask.status = TaskStatus[data['status']]
+            if data['status'] == 'COMPLETED':
                 subtask.completed_date = datetime.now().date()
             else:
                 subtask.completed_date = None
         if 'priority' in data:
-            subtask.priority = TaskPriority(data['priority'])
+            subtask.priority = TaskPriority[data['priority']]
         if 'estimated_hours' in data:
             subtask.estimated_hours = float(data['estimated_hours']) if data['estimated_hours'] else None
         if 'assigned_to_id' in data:
@@ -3686,6 +4910,239 @@ def delete_subtask(subtask_id):
 
         return jsonify({'success': True, 'message': 'Subtask deleted successfully'})
 
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+# Comment API Routes
+@app.route('/api/tasks/<int:task_id>/comments')
+@login_required
+@company_required
+def get_task_comments(task_id):
+    """Get all comments for a task that the user can view"""
+    try:
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        
+        if not task or not task.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Task not found or access denied'})
+        
+        # Get all comments for the task
+        comments = []
+        for comment in task.comments.order_by(Comment.created_at.desc()):
+            if comment.can_user_view(g.user):
+                comment_data = {
+                    'id': comment.id,
+                    'content': comment.content,
+                    'visibility': comment.visibility.value,
+                    'is_edited': comment.is_edited,
+                    'edited_at': comment.edited_at.isoformat() if comment.edited_at else None,
+                    'created_at': comment.created_at.isoformat(),
+                    'author': {
+                        'id': comment.created_by.id,
+                        'username': comment.created_by.username,
+                        'avatar_url': comment.created_by.get_avatar_url(40)
+                    },
+                    'can_edit': comment.can_user_edit(g.user),
+                    'can_delete': comment.can_user_delete(g.user),
+                    'replies': []
+                }
+                
+                # Add replies if any
+                for reply in comment.replies:
+                    if reply.can_user_view(g.user):
+                        reply_data = {
+                            'id': reply.id,
+                            'content': reply.content,
+                            'is_edited': reply.is_edited,
+                            'edited_at': reply.edited_at.isoformat() if reply.edited_at else None,
+                            'created_at': reply.created_at.isoformat(),
+                            'author': {
+                                'id': reply.created_by.id,
+                                'username': reply.created_by.username,
+                                'avatar_url': reply.created_by.get_avatar_url(40)
+                            },
+                            'can_edit': reply.can_user_edit(g.user),
+                            'can_delete': reply.can_user_delete(g.user)
+                        }
+                        comment_data['replies'].append(reply_data)
+                
+                comments.append(comment_data)
+        
+        # Check if user can use team visibility
+        company_settings = CompanySettings.query.filter_by(company_id=g.user.company_id).first()
+        allow_team_visibility = company_settings.allow_team_visibility_comments if company_settings else True
+        
+        return jsonify({
+            'success': True,
+            'comments': comments,
+            'allow_team_visibility': allow_team_visibility
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/tasks/<int:task_id>/comments', methods=['POST'])
+@login_required
+@company_required
+def create_task_comment(task_id):
+    """Create a new comment on a task"""
+    try:
+        task = Task.query.join(Project).filter(
+            Task.id == task_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        
+        if not task or not task.can_user_access(g.user):
+            return jsonify({'success': False, 'message': 'Task not found or access denied'})
+        
+        data = request.get_json()
+        content = data.get('content', '').strip()
+        visibility = data.get('visibility', 'COMPANY')
+        parent_comment_id = data.get('parent_comment_id')
+        
+        if not content:
+            return jsonify({'success': False, 'message': 'Comment content is required'})
+        
+        # Check visibility settings
+        company_settings = CompanySettings.query.filter_by(company_id=g.user.company_id).first()
+        if visibility == 'TEAM' and company_settings and not company_settings.allow_team_visibility_comments:
+            visibility = 'COMPANY'
+        
+        # Validate parent comment if provided
+        if parent_comment_id:
+            parent_comment = Comment.query.filter_by(
+                id=parent_comment_id,
+                task_id=task_id
+            ).first()
+            
+            if not parent_comment or not parent_comment.can_user_view(g.user):
+                return jsonify({'success': False, 'message': 'Parent comment not found or access denied'})
+        
+        # Create comment
+        comment = Comment(
+            content=content,
+            task_id=task_id,
+            parent_comment_id=parent_comment_id,
+            visibility=CommentVisibility[visibility],
+            created_by_id=g.user.id
+        )
+        
+        db.session.add(comment)
+        db.session.commit()
+        
+        # Log system event
+        SystemEvent.log_event(
+            event_type='comment_created',
+            event_category='task',
+            description=f'Comment added to task {task.task_number}',
+            user_id=g.user.id,
+            company_id=g.user.company_id,
+            event_metadata={'task_id': task_id, 'comment_id': comment.id}
+        )
+        
+        # Return the created comment
+        comment_data = {
+            'id': comment.id,
+            'content': comment.content,
+            'visibility': comment.visibility.value,
+            'is_edited': comment.is_edited,
+            'created_at': comment.created_at.isoformat(),
+            'author': {
+                'id': comment.created_by.id,
+                'username': comment.created_by.username,
+                'avatar_url': comment.created_by.get_avatar_url(40)
+            },
+            'can_edit': True,
+            'can_delete': True
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'Comment posted successfully',
+            'comment': comment_data
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/comments/<int:comment_id>', methods=['PUT'])
+@login_required
+@company_required
+def update_comment(comment_id):
+    """Update an existing comment"""
+    try:
+        comment = Comment.query.join(Task).join(Project).filter(
+            Comment.id == comment_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        
+        if not comment:
+            return jsonify({'success': False, 'message': 'Comment not found'})
+        
+        if not comment.can_user_edit(g.user):
+            return jsonify({'success': False, 'message': 'You cannot edit this comment'})
+        
+        data = request.get_json()
+        content = data.get('content', '').strip()
+        
+        if not content:
+            return jsonify({'success': False, 'message': 'Comment content is required'})
+        
+        comment.content = content
+        comment.is_edited = True
+        comment.edited_at = datetime.now()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Comment updated successfully',
+            'edited_at': comment.edited_at.isoformat()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/comments/<int:comment_id>', methods=['DELETE'])
+@login_required
+@company_required
+def delete_comment(comment_id):
+    """Delete a comment"""
+    try:
+        comment = Comment.query.join(Task).join(Project).filter(
+            Comment.id == comment_id,
+            Project.company_id == g.user.company_id
+        ).first()
+        
+        if not comment:
+            return jsonify({'success': False, 'message': 'Comment not found'})
+        
+        if not comment.can_user_delete(g.user):
+            return jsonify({'success': False, 'message': 'You cannot delete this comment'})
+        
+        # Log system event before deletion
+        SystemEvent.log_event(
+            event_type='comment_deleted',
+            event_category='task',
+            description=f'Comment deleted from task {comment.task.task_number}',
+            user_id=g.user.id,
+            company_id=g.user.company_id,
+            event_metadata={'task_id': comment.task_id, 'comment_id': comment.id}
+        )
+        
+        db.session.delete(comment)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Comment deleted successfully'
+        })
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)})
@@ -3801,6 +5258,689 @@ def delete_category(category_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)})
 
+# Dashboard API Endpoints
+@app.route('/api/dashboard')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_dashboard():
+    """Get user's dashboard configuration and widgets."""
+    try:
+        # Get or create user dashboard
+        dashboard = UserDashboard.query.filter_by(user_id=g.user.id).first()
+        if not dashboard:
+            dashboard = UserDashboard(user_id=g.user.id)
+            db.session.add(dashboard)
+            db.session.commit()
+            logger.info(f"Created new dashboard {dashboard.id} for user {g.user.id}")
+        else:
+            logger.info(f"Using existing dashboard {dashboard.id} for user {g.user.id}")
+
+        # Get user's widgets
+        widgets = DashboardWidget.query.filter_by(dashboard_id=dashboard.id).order_by(DashboardWidget.grid_y, DashboardWidget.grid_x).all()
+
+        logger.info(f"Found {len(widgets)} widgets for dashboard {dashboard.id}")
+
+        # Convert to JSON format
+        widget_data = []
+        for widget in widgets:
+            # Convert grid size to simple size names
+            if widget.grid_width == 1 and widget.grid_height == 1:
+                size = 'small'
+            elif widget.grid_width == 2 and widget.grid_height == 1:
+                size = 'medium'
+            elif widget.grid_width == 2 and widget.grid_height == 2:
+                size = 'large'
+            elif widget.grid_width == 3 and widget.grid_height == 1:
+                size = 'wide'
+            else:
+                size = 'small'
+
+            # Parse config JSON
+            try:
+                import json
+                config = json.loads(widget.config) if widget.config else {}
+            except (json.JSONDecodeError, TypeError):
+                config = {}
+
+            widget_data.append({
+                'id': widget.id,
+                'type': widget.widget_type.value,
+                'title': widget.title,
+                'size': size,
+                'grid_x': widget.grid_x,
+                'grid_y': widget.grid_y,
+                'grid_width': widget.grid_width,
+                'grid_height': widget.grid_height,
+                'config': config
+            })
+
+        return jsonify({
+            'success': True,
+            'dashboard': {
+                'id': dashboard.id,
+                'layout_config': dashboard.layout_config,
+                'grid_columns': dashboard.grid_columns,
+                'theme': dashboard.theme
+            },
+            'widgets': widget_data
+        })
+
+    except Exception as e:
+        logger.error(f"Error loading dashboard: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/dashboard/widgets', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def create_or_update_widget():
+    """Create or update a dashboard widget."""
+    try:
+        data = request.get_json()
+
+        # Get or create user dashboard
+        dashboard = UserDashboard.query.filter_by(user_id=g.user.id).first()
+        if not dashboard:
+            dashboard = UserDashboard(user_id=g.user.id)
+            db.session.add(dashboard)
+            db.session.flush()  # Get the ID
+            logger.info(f"Created new dashboard {dashboard.id} for user {g.user.id} in widget creation")
+        else:
+            logger.info(f"Using existing dashboard {dashboard.id} for user {g.user.id} in widget creation")
+
+        # Check if updating existing widget
+        widget_id = data.get('widget_id')
+        if widget_id:
+            widget = DashboardWidget.query.filter_by(
+                id=widget_id,
+                dashboard_id=dashboard.id
+            ).first()
+            if not widget:
+                return jsonify({'success': False, 'error': 'Widget not found'})
+        else:
+            # Create new widget
+            widget = DashboardWidget(dashboard_id=dashboard.id)
+            # Find next available position
+            max_y = db.session.query(func.max(DashboardWidget.grid_y)).filter_by(
+                dashboard_id=dashboard.id
+            ).scalar() or 0
+            widget.grid_y = max_y + 1
+            widget.grid_x = 0
+
+        # Update widget properties
+        widget.widget_type = WidgetType(data['type'])
+        widget.title = data['title']
+
+        # Convert size to grid dimensions
+        size = data.get('size', 'small')
+        if size == 'small':
+            widget.grid_width = 1
+            widget.grid_height = 1
+        elif size == 'medium':
+            widget.grid_width = 2
+            widget.grid_height = 1
+        elif size == 'large':
+            widget.grid_width = 2
+            widget.grid_height = 2
+        elif size == 'wide':
+            widget.grid_width = 3
+            widget.grid_height = 1
+
+        # Build config from form data
+        config = {}
+        for key, value in data.items():
+            if key not in ['type', 'title', 'size', 'widget_id']:
+                config[key] = value
+
+        # Store config as JSON string
+        if config:
+            import json
+            widget.config = json.dumps(config)
+        else:
+            widget.config = None
+
+        if not widget_id:
+            db.session.add(widget)
+            logger.info(f"Creating new widget: {widget.widget_type.value} for dashboard {dashboard.id}")
+        else:
+            logger.info(f"Updating existing widget {widget_id}")
+
+        db.session.commit()
+        logger.info(f"Widget saved successfully with ID: {widget.id}")
+
+        # Verify the widget was actually saved
+        saved_widget = DashboardWidget.query.filter_by(id=widget.id).first()
+        if saved_widget:
+            logger.info(f"Verification: Widget {widget.id} exists in database with dashboard_id: {saved_widget.dashboard_id}")
+        else:
+            logger.error(f"Verification failed: Widget {widget.id} not found in database")
+
+        # Convert grid size back to simple size name for response
+        if widget.grid_width == 1 and widget.grid_height == 1:
+            size_name = 'small'
+        elif widget.grid_width == 2 and widget.grid_height == 1:
+            size_name = 'medium'
+        elif widget.grid_width == 2 and widget.grid_height == 2:
+            size_name = 'large'
+        elif widget.grid_width == 3 and widget.grid_height == 1:
+            size_name = 'wide'
+        else:
+            size_name = 'small'
+
+        # Parse config for response
+        try:
+            import json
+            config_dict = json.loads(widget.config) if widget.config else {}
+        except (json.JSONDecodeError, TypeError):
+            config_dict = {}
+
+        return jsonify({
+            'success': True,
+            'message': 'Widget saved successfully',
+            'widget': {
+                'id': widget.id,
+                'type': widget.widget_type.value,
+                'title': widget.title,
+                'size': size_name,
+                'grid_x': widget.grid_x,
+                'grid_y': widget.grid_y,
+                'grid_width': widget.grid_width,
+                'grid_height': widget.grid_height,
+                'config': config_dict
+            }
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error saving widget: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/dashboard/widgets/<int:widget_id>', methods=['DELETE'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def delete_widget(widget_id):
+    """Delete a dashboard widget."""
+    try:
+        # Get user dashboard
+        dashboard = UserDashboard.query.filter_by(user_id=g.user.id).first()
+        if not dashboard:
+            return jsonify({'success': False, 'error': 'Dashboard not found'})
+
+        # Find and delete widget
+        widget = DashboardWidget.query.filter_by(
+            id=widget_id,
+            dashboard_id=dashboard.id
+        ).first()
+
+        if not widget:
+            return jsonify({'success': False, 'error': 'Widget not found'})
+
+        # No need to update positions for grid-based layout
+
+        db.session.delete(widget)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Widget deleted successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting widget: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/dashboard/positions', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def update_widget_positions():
+    """Update widget grid positions after drag and drop."""
+    try:
+        data = request.get_json()
+        positions = data.get('positions', [])
+
+        # Get user dashboard
+        dashboard = UserDashboard.query.filter_by(user_id=g.user.id).first()
+        if not dashboard:
+            return jsonify({'success': False, 'error': 'Dashboard not found'})
+
+        # Update grid positions
+        for pos_data in positions:
+            widget = DashboardWidget.query.filter_by(
+                id=pos_data['id'],
+                dashboard_id=dashboard.id
+            ).first()
+            if widget:
+                # For now, just assign sequential grid positions
+                # In a more advanced implementation, we'd calculate actual grid coordinates
+                widget.grid_x = pos_data.get('grid_x', 0)
+                widget.grid_y = pos_data.get('grid_y', pos_data.get('position', 0))
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Positions updated successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating positions: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+# Widget data endpoints
+@app.route('/api/dashboard/widgets/<int:widget_id>/data')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_widget_data(widget_id):
+    """Get data for a specific widget."""
+    try:
+        # Get user dashboard
+        dashboard = UserDashboard.query.filter_by(user_id=g.user.id).first()
+        if not dashboard:
+            return jsonify({'success': False, 'error': 'Dashboard not found'})
+
+        # Find widget
+        widget = DashboardWidget.query.filter_by(
+            id=widget_id,
+            dashboard_id=dashboard.id
+        ).first()
+
+        if not widget:
+            return jsonify({'success': False, 'error': 'Widget not found'})
+
+        # Get widget-specific data based on type
+        widget_data = {}
+
+        if widget.widget_type == WidgetType.DAILY_SUMMARY:
+            from datetime import datetime, timedelta
+
+            config = widget.config or {}
+            period = config.get('summary_period', 'daily')
+
+            # Calculate time summaries
+            now = datetime.now()
+
+            # Today's summary
+            start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_entries = TimeEntry.query.filter(
+                TimeEntry.user_id == g.user.id,
+                TimeEntry.arrival_time >= start_of_today,
+                TimeEntry.departure_time.isnot(None)
+            ).all()
+            today_seconds = sum(entry.duration or 0 for entry in today_entries)
+
+            # This week's summary
+            start_of_week = start_of_today - timedelta(days=start_of_today.weekday())
+            week_entries = TimeEntry.query.filter(
+                TimeEntry.user_id == g.user.id,
+                TimeEntry.arrival_time >= start_of_week,
+                TimeEntry.departure_time.isnot(None)
+            ).all()
+            week_seconds = sum(entry.duration or 0 for entry in week_entries)
+
+            # This month's summary
+            start_of_month = start_of_today.replace(day=1)
+            month_entries = TimeEntry.query.filter(
+                TimeEntry.user_id == g.user.id,
+                TimeEntry.arrival_time >= start_of_month,
+                TimeEntry.departure_time.isnot(None)
+            ).all()
+            month_seconds = sum(entry.duration or 0 for entry in month_entries)
+
+            widget_data.update({
+                'today': f"{today_seconds // 3600}h {(today_seconds % 3600) // 60}m",
+                'week': f"{week_seconds // 3600}h {(week_seconds % 3600) // 60}m",
+                'month': f"{month_seconds // 3600}h {(month_seconds % 3600) // 60}m",
+                'entries_today': len(today_entries),
+                'entries_week': len(week_entries),
+                'entries_month': len(month_entries)
+            })
+
+        elif widget.widget_type == WidgetType.ACTIVE_PROJECTS:
+            config = widget.config or {}
+            project_filter = config.get('project_filter', 'all')
+            max_projects = int(config.get('max_projects', 5))
+
+            # Get user's projects
+            if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
+                projects = Project.query.filter_by(
+                    company_id=g.user.company_id,
+                    is_active=True
+                ).limit(max_projects).all()
+            elif g.user.team_id:
+                projects = Project.query.filter(
+                    Project.company_id == g.user.company_id,
+                    Project.is_active == True,
+                    db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+                ).limit(max_projects).all()
+            else:
+                projects = []
+
+            widget_data['projects'] = [{
+                'id': p.id,
+                'name': p.name,
+                'code': p.code,
+                'description': p.description
+            } for p in projects]
+
+        elif widget.widget_type == WidgetType.ASSIGNED_TASKS:
+            config = widget.config or {}
+            task_filter = config.get('task_filter', 'assigned')
+            task_status = config.get('task_status', 'active')
+
+            # Get user's tasks based on filter
+            if task_filter == 'assigned':
+                tasks = Task.query.filter_by(assigned_to_id=g.user.id)
+            elif task_filter == 'created':
+                tasks = Task.query.filter_by(created_by_id=g.user.id)
+            else:
+                # Get tasks from user's projects
+                if g.user.team_id:
+                    project_ids = [p.id for p in Project.query.filter(
+                        Project.company_id == g.user.company_id,
+                        db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+                    ).all()]
+                    tasks = Task.query.filter(Task.project_id.in_(project_ids))
+                else:
+                    tasks = Task.query.join(Project).filter(Project.company_id == g.user.company_id)
+
+            # Filter by status if specified
+            if task_status != 'all':
+                if task_status == 'active':
+                    tasks = tasks.filter(Task.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]))
+                elif task_status == 'pending':
+                    tasks = tasks.filter_by(status=TaskStatus.PENDING)
+                elif task_status == 'completed':
+                    tasks = tasks.filter_by(status=TaskStatus.COMPLETED)
+
+            tasks = tasks.limit(10).all()
+
+            widget_data['tasks'] = [{
+                'id': t.id,
+                'name': t.name,
+                'description': t.description,
+                'status': t.status.value if t.status else 'Pending',
+                'priority': t.priority.value if t.priority else 'Medium',
+                'project_name': t.project.name if t.project else 'No Project'
+            } for t in tasks]
+
+        elif widget.widget_type == WidgetType.WEEKLY_CHART:
+            from datetime import datetime, timedelta
+
+            # Get weekly data for chart
+            now = datetime.now()
+            start_of_week = now - timedelta(days=now.weekday())
+
+            weekly_data = []
+            for i in range(7):
+                day = start_of_week + timedelta(days=i)
+                day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+                day_end = day_start + timedelta(days=1)
+
+                day_entries = TimeEntry.query.filter(
+                    TimeEntry.user_id == g.user.id,
+                    TimeEntry.arrival_time >= day_start,
+                    TimeEntry.arrival_time < day_end,
+                    TimeEntry.departure_time.isnot(None)
+                ).all()
+
+                total_seconds = sum(entry.duration or 0 for entry in day_entries)
+                weekly_data.append({
+                    'day': day.strftime('%A'),
+                    'date': day.strftime('%Y-%m-%d'),
+                    'hours': round(total_seconds / 3600, 2),
+                    'entries': len(day_entries)
+                })
+
+            widget_data['weekly_data'] = weekly_data
+
+        elif widget.widget_type == WidgetType.TASK_PRIORITY:
+            # Get tasks by priority
+            if g.user.team_id:
+                project_ids = [p.id for p in Project.query.filter(
+                    Project.company_id == g.user.company_id,
+                    db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+                ).all()]
+                tasks = Task.query.filter(
+                    Task.project_id.in_(project_ids),
+                    Task.assigned_to_id == g.user.id
+                ).order_by(Task.priority.desc(), Task.created_at.desc()).limit(10).all()
+            else:
+                tasks = Task.query.filter_by(assigned_to_id=g.user.id).order_by(
+                    Task.priority.desc(), Task.created_at.desc()
+                ).limit(10).all()
+
+            widget_data['priority_tasks'] = [{
+                'id': t.id,
+                'name': t.name,
+                'description': t.description,
+                'priority': t.priority.value if t.priority else 'Medium',
+                'status': t.status.value if t.status else 'Pending',
+                'project_name': t.project.name if t.project else 'No Project'
+            } for t in tasks]
+
+        elif widget.widget_type == WidgetType.PROJECT_PROGRESS:
+            # Get project progress data
+            if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
+                projects = Project.query.filter_by(
+                    company_id=g.user.company_id,
+                    is_active=True
+                ).limit(5).all()
+            elif g.user.team_id:
+                projects = Project.query.filter(
+                    Project.company_id == g.user.company_id,
+                    Project.is_active == True,
+                    db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
+                ).limit(5).all()
+            else:
+                projects = []
+
+            project_progress = []
+            for project in projects:
+                total_tasks = Task.query.filter_by(project_id=project.id).count()
+                completed_tasks = Task.query.filter_by(
+                    project_id=project.id,
+                    status=TaskStatus.COMPLETED
+                ).count()
+
+                progress = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+
+                project_progress.append({
+                    'id': project.id,
+                    'name': project.name,
+                    'code': project.code,
+                    'progress': round(progress, 1),
+                    'completed_tasks': completed_tasks,
+                    'total_tasks': total_tasks
+                })
+
+            widget_data['project_progress'] = project_progress
+
+        elif widget.widget_type == WidgetType.PRODUCTIVITY_METRICS:
+            from datetime import datetime, timedelta
+
+            # Calculate productivity metrics
+            now = datetime.now()
+            today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            week_ago = today - timedelta(days=7)
+
+            # This week vs last week comparison
+            this_week_entries = TimeEntry.query.filter(
+                TimeEntry.user_id == g.user.id,
+                TimeEntry.arrival_time >= week_ago,
+                TimeEntry.departure_time.isnot(None)
+            ).all()
+
+            last_week_entries = TimeEntry.query.filter(
+                TimeEntry.user_id == g.user.id,
+                TimeEntry.arrival_time >= week_ago - timedelta(days=7),
+                TimeEntry.arrival_time < week_ago,
+                TimeEntry.departure_time.isnot(None)
+            ).all()
+
+            this_week_hours = sum(entry.duration or 0 for entry in this_week_entries) / 3600
+            last_week_hours = sum(entry.duration or 0 for entry in last_week_entries) / 3600
+
+            productivity_change = ((this_week_hours - last_week_hours) / last_week_hours * 100) if last_week_hours > 0 else 0
+
+            widget_data.update({
+                'this_week_hours': round(this_week_hours, 1),
+                'last_week_hours': round(last_week_hours, 1),
+                'productivity_change': round(productivity_change, 1),
+                'avg_daily_hours': round(this_week_hours / 7, 1),
+                'total_entries': len(this_week_entries)
+            })
+
+        return jsonify({
+            'success': True,
+            'data': widget_data
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting widget data: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/current-timer-status')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_current_timer_status():
+    """Get current timer status for dashboard widgets."""
+    try:
+        # Get the user's current active time entry
+        active_entry = TimeEntry.query.filter_by(
+            user_id=g.user.id,
+            departure_time=None
+        ).first()
+
+        if active_entry:
+            # Calculate current duration
+            now = datetime.now()
+            elapsed_seconds = int((now - active_entry.arrival_time).total_seconds())
+
+            return jsonify({
+                'success': True,
+                'isActive': True,
+                'startTime': active_entry.arrival_time.isoformat(),
+                'currentDuration': elapsed_seconds,
+                'entryId': active_entry.id
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'isActive': False,
+                'message': 'No active timer'
+            })
+
+    except Exception as e:
+        logger.error(f"Error getting timer status: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+# Smart Search API Endpoints
+@app.route('/api/search/users')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def search_users():
+    """Search for users for smart search auto-completion"""
+    try:
+        query = request.args.get('q', '').strip()
+        
+        if not query:
+            return jsonify({'success': True, 'users': []})
+        
+        # Search users in the same company
+        users = User.query.filter(
+            User.company_id == g.user.company_id,
+            User.username.ilike(f'%{query}%')
+        ).limit(10).all()
+        
+        user_list = [
+            {
+                'id': user.id,
+                'username': user.username,
+                'full_name': f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else user.username
+            }
+            for user in users
+        ]
+        
+        return jsonify({'success': True, 'users': user_list})
+        
+    except Exception as e:
+        logger.error(f"Error in search_users: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/search/projects')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def search_projects():
+    """Search for projects for smart search auto-completion"""
+    try:
+        query = request.args.get('q', '').strip()
+        
+        if not query:
+            return jsonify({'success': True, 'projects': []})
+        
+        # Search projects the user has access to
+        projects = Project.query.filter(
+            Project.company_id == g.user.company_id,
+            db.or_(
+                Project.code.ilike(f'%{query}%'),
+                Project.name.ilike(f'%{query}%')
+            )
+        ).limit(10).all()
+        
+        # Filter projects user has access to
+        accessible_projects = [
+            project for project in projects 
+            if project.is_user_allowed(g.user)
+        ]
+        
+        project_list = [
+            {
+                'id': project.id,
+                'code': project.code,
+                'name': project.name
+            }
+            for project in accessible_projects
+        ]
+        
+        return jsonify({'success': True, 'projects': project_list})
+        
+    except Exception as e:
+        logger.error(f"Error in search_projects: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/search/sprints')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def search_sprints():
+    """Search for sprints for smart search auto-completion"""
+    try:
+        query = request.args.get('q', '').strip()
+        
+        if not query:
+            return jsonify({'success': True, 'sprints': []})
+        
+        # Search sprints in the same company
+        sprints = Sprint.query.filter(
+            Sprint.company_id == g.user.company_id,
+            Sprint.name.ilike(f'%{query}%')
+        ).limit(10).all()
+        
+        # Filter sprints user has access to
+        accessible_sprints = [
+            sprint for sprint in sprints 
+            if sprint.can_user_access(g.user)
+        ]
+        
+        sprint_list = [
+            {
+                'id': sprint.id,
+                'name': sprint.name,
+                'status': sprint.status.value
+            }
+            for sprint in accessible_sprints
+        ]
+        
+        return jsonify({'success': True, 'sprints': sprint_list})
+        
+    except Exception as e:
+        logger.error(f"Error in search_sprints: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=port)

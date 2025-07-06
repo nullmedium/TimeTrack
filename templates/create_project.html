@@ -40,6 +40,19 @@
                     {% endfor %}
                 </select>
             </div>
+            
+            <div class="form-group">
+                <label for="category_id">Project Category</label>
+                <select id="category_id" name="category_id">
+                    <option value="">No Category</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" 
+                            {% if request.form.category_id and request.form.category_id|int == category.id %}selected{% endif %}>
+                        {{ category.icon or '📁' }} {{ category.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
         
         <div class="form-row">
@@ -112,15 +125,7 @@
     margin-top: 2rem;
 }
 
-.btn-secondary {
-    background-color: #6c757d;
-    border-color: #6c757d;
-}
-
-.btn-secondary:hover {
-    background-color: #5a6268;
-    border-color: #545b62;
-}
+/* Button styles now centralized in main style.css */
 
 #code {
     text-transform: uppercase;

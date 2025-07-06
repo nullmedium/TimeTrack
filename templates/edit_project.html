@@ -42,6 +42,21 @@
             </div>
             
             <div class="form-group">
+                <label for="category_id">Project Category</label>
+                <select id="category_id" name="category_id">
+                    <option value="">No Category</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" 
+                            {% if (request.form.category_id and request.form.category_id|int == category.id) or (not request.form.category_id and project.category_id == category.id) %}selected{% endif %}>
+                        {{ category.icon or '📁' }} {{ category.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
                 <label class="checkbox-label">
                     <input type="checkbox" name="is_active" 
                            {% if (request.form.is_active and request.form.is_active == 'on') or (not request.form and project.is_active) %}checked{% endif %}>
@@ -174,15 +189,7 @@
     margin-top: 2rem;
 }
 
-.btn-secondary {
-    background-color: #6c757d;
-    border-color: #6c757d;
-}
-
-.btn-secondary:hover {
-    background-color: #5a6268;
-    border-color: #545b62;
-}
+/* Button styles now centralized in main style.css */
 
 #code {
     text-transform: uppercase;

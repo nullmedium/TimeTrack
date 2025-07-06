@@ -3,17 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - TimeTrack{% if g.company %} - {{ g.company.name }}{% endif %}</title>
+    <title>{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% if g.company %} - {{ g.company.name }}{% endif %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% if not g.user %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/splash.css') }}">
+    {% endif %}
+    {% if g.branding and g.branding.favicon_filename %}
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/branding/' + g.branding.favicon_filename) }}">
+    {% endif %}
+    <style>
+        :root {
+            --primary-color: {{ g.branding.primary_color if g.branding else '#007bff' }};
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .btn-primary:hover {
+            background-color: {{ (g.branding.primary_color if g.branding else '#007bff') + 'dd' }};
+            border-color: {{ (g.branding.primary_color if g.branding else '#007bff') + 'dd' }};
+        }
+        .nav-icon {
+            color: var(--primary-color);
+        }
+        a:hover {
+            color: var(--primary-color);
+        }
+        .mobile-logo {
+            max-height: 30px;
+            max-width: 150px;
+            object-fit: contain;
+        }
+        .sidebar-logo {
+            max-height: 32px;
+            max-width: 160px;
+            object-fit: contain;
+        }
+        .mobile-nav-brand a {
+            display: flex;
+            align-items: center;
+        }
+        .sidebar-header h2 a {
+            display: flex;
+            align-items: center;
+            color: inherit;
+            text-decoration: none;
+        }
+    </style>
 </head>
-<body>
+<body{% if g.user %} class="has-user"{% endif %}>
     <!-- Mobile header -->
+    {% if g.user %}
     <header class="mobile-header">
         <div class="mobile-nav-brand">
-            <a href="{{ url_for('home') }}">TimeTrack</a>
-            {% if g.company %}
-                <small class="company-name">{{ g.company.name }}</small>
-            {% endif %}
+            <a href="{{ url_for('home') }}">
+                {% if g.branding and g.branding.logo_filename %}
+                    <img src="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename) }}" 
+                         alt="{{ g.branding.logo_alt_text }}" 
+                         class="mobile-logo">
+                {% else %}
+                    {{ g.branding.app_name if g.branding else 'TimeTrack' }}
+                {% endif %}
+            </a>
         </div>
         <button class="mobile-nav-toggle" id="mobile-nav-toggle">
             <span></span>
@@ -21,33 +73,70 @@
             <span></span>
         </button>
     </header>
+    {% endif %}
 
     <!-- Sidebar navigation -->
+    {% if g.user %}
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h2><a href="{{ url_for('home') }}">TimeTrack</a></h2>
-            {% if g.company %}
-                <div class="company-info">
-                    <small class="text-muted">{{ g.company.name }}</small>
-                </div>
-            {% endif %}
+            <!-- <h2>
+                <a href="{{ url_for('home') }}">
+                    {% if g.branding and g.branding.logo_filename %}
+                        <img src="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename) }}" 
+                             alt="{{ g.branding.logo_alt_text }}" 
+                             class="sidebar-logo">
+                    {% else %}
+                        {{ g.branding.app_name if g.branding else 'TimeTrack' }}
+                    {% endif %}
+                </a>
+            -->
+            </h2>
             <button class="sidebar-toggle" id="sidebar-toggle">
                 <span></span>
                 <span></span>
                 <span></span>
             </button>
+            {% if g.user %}
+            <!-- User Account Menu -->
+            <a href="#" class="user-dropdown-toggle" id="user-dropdown-toggle" data-tooltip="{{ g.user.username }}">
+            <img src="{{ g.user.get_avatar_url(32) }}" alt="{{ g.user.username }}" class="user-avatar">
+            <span class="nav-text">{{ g.user.username }}<span class="dropdown-arrow">▼</span></span>
+            </a>
+            
+            <!-- User Dropdown Context Menu -->
+            <div class="user-dropdown-modal" id="user-dropdown-modal">
+                <div class="user-dropdown-header">
+                    <img src="{{ g.user.get_avatar_url(64) }}" alt="{{ g.user.username }}" class="user-avatar-large">
+                    <h3>{{ g.user.username }}</h3>
+                    <div class="user-info">
+                        {% if g.user.email %}
+                            {{ g.user.email }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="user-dropdown-menu">
+                    <ul>
+                        <li><a href="{{ url_for('profile') }}"><i class="nav-icon">👤</i>Profile</a></li>
+                        <li><a href="{{ url_for('config') }}"><i class="nav-icon">⚙️</i>Settings</a></li>
+                        <li class="user-dropdown-divider"></li>
+                        <li><a href="{{ url_for('logout') }}"><i class="nav-icon">🚪</i>Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
         </div>
         <nav class="sidebar-nav">
             <ul>
                 {% if g.user %}
                     <li><a href="{{ url_for('home') }}" data-tooltip="Home"><i class="nav-icon">🏠</i><span class="nav-text">Home</span></a></li>
+                    <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📊</i><span class="nav-text">Dashboard</span></a></li>
+                    <li><a href="{{ url_for('unified_task_management') }}" data-tooltip="Task Management"><i class="nav-icon">📋</i><span class="nav-text">Task Management</span></a></li>
+                    <li><a href="{{ url_for('sprint_management') }}" data-tooltip="Sprint Management"><i class="nav-icon">🏃‍♂️</i><span class="nav-text">Sprints</span></a></li>
                     <li><a href="{{ url_for('analytics') }}" data-tooltip="Time Analytics"><i class="nav-icon">📊</i><span class="nav-text">Analytics</span></a></li>
                     
                     <!-- Role-based menu items -->
                     {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">Admin</li>
-                    <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
-                    <li><a href="{{ url_for('config') }}" data-tooltip="Config"><i class="nav-icon">⚙️</i><span class="nav-text">Config</span></a></li>
                     <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📈</i><span class="nav-text">Dashboard</span></a></li>
                     <li><a href="{{ url_for('admin_company') }}" data-tooltip="Company"><i class="nav-icon">🏢</i><span class="nav-text">Company</span></a></li>
                     <li><a href="{{ url_for('admin_users') }}" data-tooltip="Manage Users"><i class="nav-icon">👥</i><span class="nav-text">Manage Users</span></a></li>
@@ -61,21 +150,12 @@
                     <li><a href="{{ url_for('system_admin_announcements') }}" data-tooltip="Announcements"><i class="nav-icon">📢</i><span class="nav-text">Announcements</span></a></li>
                     {% endif %}
                     {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
-                    <li class="nav-divider">{{ g.user.username }}</li>
-                    <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
-                    <li><a href="{{ url_for('config') }}" data-tooltip="Config"><i class="nav-icon">⚙️</i><span class="nav-text">Config</span></a></li>
+                    <li class="nav-divider">Team</li>
                     <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📈</i><span class="nav-text">Dashboard</span></a></li>
                     {% if g.user.role == Role.SUPERVISOR %}
                     <li><a href="{{ url_for('admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
                     {% endif %}
-                    {% else %}
-                    <li class="nav-divider">{{ g.user.username }}</li>
-                    <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
-                    <li><a href="{{ url_for('config') }}" data-tooltip="Config"><i class="nav-icon">⚙️</i><span class="nav-text">Config</span></a></li>
                     {% endif %}
-                    
-                    <li class="nav-divider"></li>
-                    <li><a href="{{ url_for('logout') }}" data-tooltip="Logout"><i class="nav-icon">🚪</i><span class="nav-text">Logout</span></a></li>
                 {% else %}
                     <li><a href="{{ url_for('about') }}" data-tooltip="About"><i class="nav-icon">ℹ️</i><span class="nav-text">About</span></a></li>
                     <li><a href="{{ url_for('login') }}" data-tooltip="Login"><i class="nav-icon">🔑</i><span class="nav-text">Login</span></a></li>
@@ -84,9 +164,12 @@
             </ul>
         </nav>
     </aside>
+    {% endif %}
 
     <!-- Mobile overlay -->
+    {% if g.user %}
     <div class="mobile-overlay" id="mobile-overlay"></div>
+    {% endif %}
 
     <main class="main-content">
         <!-- System Announcements -->
@@ -123,15 +206,79 @@
             {% endif %}
         {% endwith %}
         
+        <!-- Email Nag Screens -->
+        {% if g.show_email_nag %}
+            <div class="email-nag-banner">
+                <div class="email-nag-content">
+                    <span class="email-nag-icon">📧</span>
+                    <span class="email-nag-text">
+                        <strong>Add your email address</strong> to enable account recovery and receive important notifications.
+                    </span>
+                    <a href="{{ url_for('profile') }}" class="btn btn-sm btn-primary">Add Email</a>
+                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session">×</button>
+                </div>
+            </div>
+        {% elif g.show_email_verification_nag %}
+            <div class="email-nag-banner email-verify">
+                <div class="email-nag-content">
+                    <span class="email-nag-icon">✉️</span>
+                    <span class="email-nag-text">
+                        <strong>Please verify your email address</strong> to ensure you can recover your account if needed.
+                    </span>
+                    <a href="{{ url_for('profile') }}" class="btn btn-sm btn-warning">Verify Email</a>
+                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session">×</button>
+                </div>
+            </div>
+        {% endif %}
+        
         {% block content %}{% endblock %}
     </main>
 
-    <footer>
-        <p>&copy; {{ current_year }} TimeTrack. All rights reserved.</p>
+    <footer class="site-footer">
+        <div class="footer-content">
+            <div class="footer-info">
+                <p>&copy; {{ current_year }} {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% if g.company %} - {{ g.company.name }}{% endif %}. All rights reserved.</p>
+            </div>
+            <div class="footer-links">
+                <a href="{{ url_for('about') }}">About</a>
+                {% if g.branding and g.branding.imprint_enabled %}
+                    <span class="footer-separator">•</span>
+                    <a href="{{ url_for('imprint') }}">{{ g.branding.imprint_title or 'Imprint' }}</a>
+                {% endif %}
+            </div>
+        </div>
     </footer>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/password-strength.js') }}"></script>
+    {% if g.user %}
+    <script src="{{ url_for('static', filename='js/user-dropdown.js') }}"></script>
+    <script>
+        function dismissEmailNag() {
+            // Hide the banner with animation
+            const banner = document.querySelector('.email-nag-banner');
+            if (banner) {
+                banner.style.animation = 'slideUp 0.3s ease-out';
+                setTimeout(() => {
+                    banner.style.display = 'none';
+                }, 300);
+            }
+            // Store in session storage to not show again this session
+            sessionStorage.setItem('emailNagDismissed', 'true');
+        }
+        
+        // Check if already dismissed this session
+        if (sessionStorage.getItem('emailNagDismissed') === 'true') {
+            const banner = document.querySelector('.email-nag-banner');
+            if (banner) {
+                banner.style.display = 'none';
+            }
+        }
+    </script>
+    {% else %}
+    <script src="{{ url_for('static', filename='js/splash.js') }}"></script>
+    {% endif %}
     
     <!-- Custom Tracking Script -->
     {% if tracking_script_enabled and tracking_script_code %}
