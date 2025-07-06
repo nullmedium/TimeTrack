@@ -1,9 +1,18 @@
-{% extends "layout.html" %}
-
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freelancer Registration - TimeTrack</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body class="auth-page">
 <div class="auth-container">
-    <h1>Register as Freelancer</h1>
-    <p class="text-muted">Create your independent freelancer account</p>
+    <div class="auth-brand">
+        <h1>Start Freelancing</h1>
+        <p>Create your independent workspace</p>
+    </div>
     
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -13,36 +22,63 @@
         {% endif %}
     {% endwith %}
     
+    <div class="registration-progress">
+        <div class="progress-step active">
+            <div class="progress-step-number">1</div>
+            <div class="progress-step-label">Account Info</div>
+        </div>
+        <div class="progress-step">
+            <div class="progress-step-number">2</div>
+            <div class="progress-step-label">Verify Email</div>
+        </div>
+        <div class="progress-step">
+            <div class="progress-step-number">3</div>
+            <div class="progress-step-label">Start Tracking</div>
+        </div>
+    </div>
+
     <form method="POST" action="{{ url_for('register_freelancer') }}" class="auth-form">
-        <div class="form-group">
+        <div class="form-group input-icon">
+            <i>👤</i>
+            <input type="text" id="username" name="username" class="form-control" placeholder="Choose your username" required autofocus>
             <label for="username">Username</label>
-            <input type="text" id="username" name="username" class="form-control" required autofocus>
         </div>
         
-        <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" class="form-control" required>
+        <div class="form-group input-icon">
+            <i>📧</i>
+            <input type="email" id="email" name="email" class="form-control" placeholder="your@email.com" required>
+            <label for="email">Email Address</label>
         </div>
         
-        <div class="form-group">
-            <label for="business_name">Business Name (Optional)</label>
+        <div class="form-group input-icon">
+            <i>🏢</i>
             <input type="text" id="business_name" name="business_name" class="form-control" 
-                   placeholder="Your business or freelance name">
-            <small class="form-text text-muted">Leave blank to use your username as your workspace name.</small>
+                   placeholder="Your Business Name (optional)">
+            <label for="business_name">Business Name</label>
+            <small class="form-text text-muted">Leave blank to use your username as workspace name</small>
         </div>
         
-        <div class="form-group">
+        <div class="form-group input-icon">
+            <i>🔒</i>
+            <input type="password" id="password" name="password" class="form-control" placeholder="Create a strong password" required>
             <label for="password">Password</label>
-            <input type="password" id="password" name="password" class="form-control" required>
         </div>
         
-        <div class="form-group">
+        <div class="form-group input-icon">
+            <i>🔒</i>
+            <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="Confirm your password" required>
             <label for="confirm_password">Confirm Password</label>
-            <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
+        </div>
+        
+        <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="terms" required>
+            <label class="form-check-label" for="terms">
+                I agree to the Terms of Service and Privacy Policy
+            </label>
         </div>
         
         <div class="form-group">
-            <button type="submit" class="btn btn-primary">Create Freelancer Account</button>
+            <button type="submit" class="btn btn-primary">Create My Workspace</button>
         </div>
         
         <div class="auth-links">
@@ -60,6 +96,20 @@
                 <li>No company code required</li>
             </ul>
         </div>
+        
+        <div class="social-divider">
+            <span>Why choose TimeTrack?</span>
+        </div>
+        
+        <div class="freelancer-benefits" style="text-align: center; margin-top: 1.5rem;">
+            <p style="color: #666; font-size: 0.9rem;">
+                ✓ Free forever &nbsp;&nbsp; ✓ No credit card required &nbsp;&nbsp; ✓ Unlimited projects
+            </p>
+        </div>
     </form>
 </div>
-{% endblock %}
+
+<script src="{{ url_for('static', filename='js/password-strength.js') }}"></script>
+<script src="{{ url_for('static', filename='js/auth-animations.js') }}"></script>
+</body>
+</html>

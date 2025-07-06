@@ -19,6 +19,7 @@ from sqlalchemy import func
 from functools import wraps
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
+from password_utils import PasswordValidator
 from werkzeug.security import check_password_hash
 
 # Load environment variables from .env file
@@ -440,7 +441,7 @@ def home():
                              history=history,
                              available_projects=available_projects)
     else:
-        return render_template('about.html', title='Home')
+        return render_template('index.html', title='Home')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -573,6 +574,13 @@ def register():
             error = 'Passwords do not match'
         elif not company_code:
             error = 'Company code is required'
+        
+        # Validate password strength
+        if not error:
+            validator = PasswordValidator()
+            is_valid, password_errors = validator.validate(password)
+            if not is_valid:
+                error = password_errors[0]  # Show first error
 
         # Find company by code
         company = None
@@ -685,6 +693,13 @@ def register_freelancer():
             error = 'Password is required'
         elif password != confirm_password:
             error = 'Passwords do not match'
+        
+        # Validate password strength
+        if not error:
+            validator = PasswordValidator()
+            is_valid, password_errors = validator.validate(password)
+            if not is_valid:
+                error = password_errors[0]  # Show first error
 
         # Check for existing users globally (freelancers get unique usernames/emails)
         if not error:
@@ -1286,6 +1301,12 @@ def profile():
                 error = 'Current password is incorrect'
             elif new_password != confirm_password:
                 error = 'New passwords do not match'
+            else:
+                # Validate password strength
+                validator = PasswordValidator()
+                is_valid, password_errors = validator.validate(new_password)
+                if not is_valid:
+                    error = password_errors[0]  # Show first error
 
         if error is None:
             user.email = email

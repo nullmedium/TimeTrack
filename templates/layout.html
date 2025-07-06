@@ -5,9 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - TimeTrack{% if g.company %} - {{ g.company.name }}{% endif %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% if not g.user %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/splash.css') }}">
+    {% endif %}
 </head>
-<body>
+<body{% if g.user %} class="has-user"{% endif %}>
     <!-- Mobile header -->
+    {% if g.user %}
     <header class="mobile-header">
         <div class="mobile-nav-brand">
             <a href="{{ url_for('home') }}">TimeTrack</a>
@@ -21,21 +25,44 @@
             <span></span>
         </button>
     </header>
+    {% endif %}
 
     <!-- Sidebar navigation -->
+    {% if g.user %}
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h2><a href="{{ url_for('home') }}">TimeTrack</a></h2>
-            {% if g.company %}
-                <div class="company-info">
-                    <small class="text-muted">{{ g.company.name }}</small>
-                </div>
-            {% endif %}
             <button class="sidebar-toggle" id="sidebar-toggle">
                 <span></span>
                 <span></span>
                 <span></span>
             </button>
+            {% if g.user %}
+            <!-- User Account Menu -->
+            <a href="#" class="user-dropdown-toggle" id="user-dropdown-toggle" data-tooltip="{{ g.user.username }}">
+            <i class="nav-icon">👤</i>
+            <span class="nav-text">{{ g.user.username }}<span class="dropdown-arrow">▼</span></span>
+            </a>
+            
+            <!-- User Dropdown Context Menu -->
+            <div class="user-dropdown-modal" id="user-dropdown-modal">
+                <div class="user-dropdown-header">
+                    <h3>{{ g.user.username }}</h3>
+                    <div class="user-info">
+                        {% if g.user.email %}
+                            {{ g.user.email }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="user-dropdown-menu">
+                    <ul>
+                        <li><a href="{{ url_for('profile') }}"><i class="nav-icon">👤</i>Profile</a></li>
+                        <li><a href="{{ url_for('config') }}"><i class="nav-icon">⚙️</i>Settings</a></li>
+                        <li class="user-dropdown-divider"></li>
+                        <li><a href="{{ url_for('logout') }}"><i class="nav-icon">🚪</i>Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
         </div>
         <nav class="sidebar-nav">
             <ul>
@@ -49,8 +76,6 @@
                     <!-- Role-based menu items -->
                     {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">Admin</li>
-                    <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
-                    <li><a href="{{ url_for('config') }}" data-tooltip="Config"><i class="nav-icon">⚙️</i><span class="nav-text">Config</span></a></li>
                     <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📈</i><span class="nav-text">Dashboard</span></a></li>
                     <li><a href="{{ url_for('admin_company') }}" data-tooltip="Company"><i class="nav-icon">🏢</i><span class="nav-text">Company</span></a></li>
                     <li><a href="{{ url_for('admin_users') }}" data-tooltip="Manage Users"><i class="nav-icon">👥</i><span class="nav-text">Manage Users</span></a></li>
@@ -64,21 +89,12 @@
                     <li><a href="{{ url_for('system_admin_announcements') }}" data-tooltip="Announcements"><i class="nav-icon">📢</i><span class="nav-text">Announcements</span></a></li>
                     {% endif %}
                     {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
-                    <li class="nav-divider">{{ g.user.username }}</li>
-                    <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
-                    <li><a href="{{ url_for('config') }}" data-tooltip="Config"><i class="nav-icon">⚙️</i><span class="nav-text">Config</span></a></li>
+                    <li class="nav-divider">Team</li>
                     <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📈</i><span class="nav-text">Dashboard</span></a></li>
                     {% if g.user.role == Role.SUPERVISOR %}
                     <li><a href="{{ url_for('admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
                     {% endif %}
-                    {% else %}
-                    <li class="nav-divider">{{ g.user.username }}</li>
-                    <li><a href="{{ url_for('profile') }}" data-tooltip="Profile"><i class="nav-icon">👤</i><span class="nav-text">Profile</span></a></li>
-                    <li><a href="{{ url_for('config') }}" data-tooltip="Config"><i class="nav-icon">⚙️</i><span class="nav-text">Config</span></a></li>
                     {% endif %}
-                    
-                    <li class="nav-divider"></li>
-                    <li><a href="{{ url_for('logout') }}" data-tooltip="Logout"><i class="nav-icon">🚪</i><span class="nav-text">Logout</span></a></li>
                 {% else %}
                     <li><a href="{{ url_for('about') }}" data-tooltip="About"><i class="nav-icon">ℹ️</i><span class="nav-text">About</span></a></li>
                     <li><a href="{{ url_for('login') }}" data-tooltip="Login"><i class="nav-icon">🔑</i><span class="nav-text">Login</span></a></li>
@@ -87,9 +103,12 @@
             </ul>
         </nav>
     </aside>
+    {% endif %}
 
     <!-- Mobile overlay -->
+    {% if g.user %}
     <div class="mobile-overlay" id="mobile-overlay"></div>
+    {% endif %}
 
     <main class="main-content">
         <!-- System Announcements -->
@@ -135,6 +154,12 @@
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/password-strength.js') }}"></script>
+    {% if g.user %}
+    <script src="{{ url_for('static', filename='js/user-dropdown.js') }}"></script>
+    {% else %}
+    <script src="{{ url_for('static', filename='js/splash.js') }}"></script>
+    {% endif %}
     
     <!-- Custom Tracking Script -->
     {% if tracking_script_enabled and tracking_script_code %}
