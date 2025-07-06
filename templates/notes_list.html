@@ -8,19 +8,23 @@
             <button type="button" class="btn btn-sm btn-secondary" id="toggle-sidebar">
                 <span>📁</span> Toggle Folders
             </button>
-            <button type="button" class="btn btn-sm btn-secondary" id="toggle-view">
-                <span class="view-icon">☰</span> List View
-            </button>
             <a href="{{ url_for('notes_folders') }}" class="btn btn-sm btn-info">
                 <span>⚙️</span> Manage Folders
             </a>
-            <a href="{{ url_for('create_note') }}" class="btn btn-md btn-success">Create New Note</a>
         </div>
     </div>
     
     <div class="notes-layout">
         <!-- Folder Tree Sidebar -->
         <div class="folder-sidebar" id="folder-sidebar">
+            <div class="create-note-section">
+                <a href="{{ url_for('create_note') }}" class="btn btn-create-note">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                    </svg>
+                    Create New Note
+                </a>
+            </div>
             <div class="sidebar-header">
                 <h3>Folders</h3>
                 <button type="button" class="btn-icon" onclick="showCreateFolderModal()" title="Create Folder">
@@ -157,6 +161,24 @@
     </div>
 
     {% if notes %}
+    <!-- Notes Toolbar -->
+    <div class="notes-toolbar">
+        <div class="toolbar-left">
+            <span class="notes-count">{{ notes|length }} notes</span>
+        </div>
+        <div class="toolbar-right">
+            <button type="button" class="btn-view-toggle" id="toggle-view" title="Toggle view">
+                <svg class="icon-grid" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="display: none;">
+                    <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zM2.5 2a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z"/>
+                </svg>
+                <svg class="icon-list" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+                </svg>
+                <span class="view-label">Table View</span>
+            </button>
+        </div>
+    </div>
+    
     <!-- Table View (Default) -->
     <div id="table-view" class="notes-view">
         <table class="notes-table">
@@ -221,12 +243,25 @@
                     </td>
                     <td class="column-actions">
                         <div class="note-actions">
-                            <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn btn-xs btn-primary">View</a>
+                            <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn-action" title="View">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                                </svg>
+                            </a>
                             {% if note.can_user_edit(g.user) %}
-                            <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn btn-xs btn-info">Edit</a>
+                            <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn-action" title="Edit">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                                </svg>
+                            </a>
                             <form method="POST" action="{{ url_for('delete_note', slug=note.slug) }}" style="display: inline;"
                                   onsubmit="return confirm('Are you sure you want to delete this note?')">
-                                <button type="submit" class="btn btn-xs btn-danger">Delete</button>
+                                <button type="submit" class="btn-action btn-action-danger" title="Delete">
+                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                        <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                    </svg>
+                                </button>
                             </form>
                             {% endif %}
                         </div>
@@ -288,12 +323,25 @@
                 </div>
                 
                 <div class="note-actions">
-                    <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn btn-sm btn-primary">View</a>
+                    <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn-action" title="View">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                        </svg>
+                    </a>
                     {% if note.can_user_edit(g.user) %}
-                    <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn btn-sm btn-info">Edit</a>
+                    <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn-action" title="Edit">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                        </svg>
+                    </a>
                     <form method="POST" action="{{ url_for('delete_note', slug=note.slug) }}" style="display: inline;"
                           onsubmit="return confirm('Are you sure you want to delete this note?')">
-                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                        <button type="submit" class="btn-action btn-action-danger" title="Delete">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                            </svg>
+                        </button>
                     </form>
                     {% endif %}
                 </div>
@@ -335,6 +383,35 @@
     padding: 1rem;
     max-height: calc(100vh - 200px);
     overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.create-note-section {
+    margin-bottom: 1.5rem;
+}
+
+.btn-create-note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--primary-color, #007bff);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.btn-create-note:hover {
+    background: var(--primary-dark, #0056b3);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-create-note svg {
     flex-shrink: 0;
 }
 
@@ -719,6 +796,62 @@
     font-size: 0.75rem;
 }
 
+/* Notes toolbar */
+.notes-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #dee2e6;
+    margin-bottom: 1rem;
+}
+
+.toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.notes-count {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.btn-view-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    color: #333;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-view-toggle:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.btn-view-toggle svg {
+    width: 16px;
+    height: 16px;
+}
+
+.view-label {
+    font-weight: 500;
+}
+
 /* Drag and drop styles */
 .note-row.dragging,
 .note-card.dragging {
@@ -749,15 +882,6 @@
     align-items: center;
 }
 
-#toggle-view {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.view-icon {
-    font-size: 1.2rem;
-}
 
 .notes-filter-section {
     background: #f8f9fa;
@@ -882,7 +1006,41 @@
 }
 
 .column-actions {
-    width: 180px;
+    width: 120px;
+}
+
+.note-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.btn-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    color: #495057;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.btn-action:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+    color: var(--primary-color, #007bff);
+    text-decoration: none;
+}
+
+.btn-action-danger:hover {
+    background: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
 }
 
 .note-associations {
@@ -961,16 +1119,16 @@
 /* Grid View Styles */
 .notes-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
     margin-bottom: 2rem;
 }
 
 .note-card {
     background: white;
     border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 1.5rem;
+    border-radius: 6px;
+    padding: 1rem;
     transition: box-shadow 0.2s ease;
     display: flex;
     flex-direction: column;
@@ -981,15 +1139,15 @@
 }
 
 .note-header {
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
 }
 
 .note-title {
-    margin: 0 0 0.5rem 0;
-    font-size: 1.25rem;
+    margin: 0 0 0.4rem 0;
+    font-size: 1.1rem;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
 }
 
 .note-title a {
@@ -1003,21 +1161,22 @@
 
 .note-meta {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.5rem;
     align-items: center;
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     color: #666;
     flex-wrap: wrap;
 }
 
 .note-preview {
     flex: 1;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     color: #555;
-    line-height: 1.6;
+    line-height: 1.4;
+    font-size: 0.85rem;
     overflow: hidden;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
 }
 
@@ -1025,15 +1184,55 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.4rem;
 }
 
 .note-tags {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.3rem;
     flex-wrap: wrap;
+}
+
+/* Grid View specific adjustments */
+.note-card .visibility-badge {
+    padding: 0.15rem 0.4rem;
+    font-size: 0.7rem;
+}
+
+.note-card .folder-badge {
+    padding: 0.15rem 0.4rem;
+    font-size: 0.7rem;
+}
+
+.note-card .tag-badge {
+    padding: 0.15rem 0.4rem;
+    font-size: 0.7rem;
+    margin-right: 0.2rem;
+}
+
+.note-card .association-badge {
+    padding: 0.15rem 0.4rem;
+    font-size: 0.7rem;
+}
+
+.note-card .note-date {
+    font-size: 0.75rem;
+}
+
+.note-card .pin-icon {
+    font-size: 0.85rem;
+}
+
+.note-card .btn-action {
+    width: 28px;
+    height: 28px;
+}
+
+.note-card .btn-action svg {
+    width: 14px;
+    height: 14px;
 }
 
 /* Responsive design */
@@ -1177,15 +1376,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const toggleBtn = document.getElementById('toggle-view');
     const tableView = document.getElementById('table-view');
     const gridView = document.getElementById('grid-view');
-    const viewIcon = toggleBtn.querySelector('.view-icon');
+    const iconGrid = toggleBtn.querySelector('.icon-grid');
+    const iconList = toggleBtn.querySelector('.icon-list');
+    const viewLabel = toggleBtn.querySelector('.view-label');
     
     // Load saved view preference
     const savedView = localStorage.getItem('notes-view') || 'table';
     if (savedView === 'grid') {
         tableView.style.display = 'none';
         gridView.style.display = 'block';
-        viewIcon.textContent = '⊞';
-        toggleBtn.innerHTML = '<span class="view-icon">⊞</span> Grid View';
+        iconGrid.style.display = 'none';
+        iconList.style.display = 'block';
+        viewLabel.textContent = 'Grid View';
+    } else {
+        iconGrid.style.display = 'block';
+        iconList.style.display = 'none';
+        viewLabel.textContent = 'Table View';
     }
     
     toggleBtn.addEventListener('click', function() {
@@ -1193,15 +1399,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // Switch to table view
             tableView.style.display = 'block';
             gridView.style.display = 'none';
-            viewIcon.textContent = '☰';
-            toggleBtn.innerHTML = '<span class="view-icon">☰</span> List View';
+            iconGrid.style.display = 'block';
+            iconList.style.display = 'none';
+            viewLabel.textContent = 'Table View';
             localStorage.setItem('notes-view', 'table');
         } else {
             // Switch to grid view
             tableView.style.display = 'none';
             gridView.style.display = 'block';
-            viewIcon.textContent = '⊞';
-            toggleBtn.innerHTML = '<span class="view-icon">⊞</span> Grid View';
+            iconGrid.style.display = 'none';
+            iconList.style.display = 'block';
+            viewLabel.textContent = 'Grid View';
             localStorage.setItem('notes-view', 'grid');
         }
     });
