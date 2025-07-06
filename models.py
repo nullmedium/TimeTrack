@@ -433,6 +433,7 @@ class TaskPriority(enum.Enum):
 # Task model for project breakdown
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    task_number = db.Column(db.String(20), nullable=False, unique=True)  # e.g., "TSK-001", "TSK-002"
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
 
@@ -487,6 +488,68 @@ class Task(db.Model):
     def can_user_access(self, user):
         """Check if a user can access this task"""
         return self.project.is_user_allowed(user)
+
+    @classmethod
+    def generate_task_number(cls, company_id):
+        """Generate next task number for the company"""
+        # Get the highest task number for this company
+        last_task = cls.query.join(Project).filter(
+            Project.company_id == company_id,
+            cls.task_number.like('TSK-%')
+        ).order_by(cls.task_number.desc()).first()
+        
+        if last_task and last_task.task_number:
+            try:
+                # Extract number from TSK-XXX format
+                last_num = int(last_task.task_number.split('-')[1])
+                return f"TSK-{last_num + 1:03d}"
+            except (IndexError, ValueError):
+                pass
+        
+        return "TSK-001"
+
+    @property
+    def blocked_by_tasks(self):
+        """Get tasks that are blocking this task"""
+        return [dep.blocking_task for dep in self.blocked_by_dependencies]
+    
+    @property
+    def blocking_tasks(self):
+        """Get tasks that this task is blocking"""
+        return [dep.blocked_task for dep in self.blocking_dependencies]
+
+# Task Dependencies model for tracking blocking relationships
+class TaskDependency(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # The task that is blocked (cannot start until blocking task is done)
+    blocked_task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
+    
+    # The task that is blocking (must be completed before blocked task can start)
+    blocking_task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
+    
+    # Dependency type (for future extension)
+    dependency_type = db.Column(db.String(50), default='blocks', nullable=False)  # 'blocks', 'subtask', etc.
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Relationships
+    blocked_task = db.relationship('Task', foreign_keys=[blocked_task_id], 
+                                 backref=db.backref('blocked_by_dependencies', cascade='all, delete-orphan'))
+    blocking_task = db.relationship('Task', foreign_keys=[blocking_task_id], 
+                                  backref=db.backref('blocking_dependencies', cascade='all, delete-orphan'))
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    
+    # Ensure a task doesn't block itself and prevent duplicate dependencies
+    __table_args__ = (
+        db.CheckConstraint('blocked_task_id != blocking_task_id', name='no_self_blocking'),
+        db.UniqueConstraint('blocked_task_id', 'blocking_task_id', name='unique_dependency'),
+    )
+    
+    def __repr__(self):
+        return f'<TaskDependency {self.blocking_task_id} blocks {self.blocked_task_id}>'
 
 # SubTask model for task breakdown
 class SubTask(db.Model):

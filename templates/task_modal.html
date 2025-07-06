@@ -1,0 +1,467 @@
+<!-- Task Detail Modal -->
+<div id="task-modal" class="modal task-modal" style="display: none;">
+    <div class="modal-content task-modal-content">
+        <div class="modal-header">
+            <h2 id="modal-title">Task Details</h2>
+            <span class="close" onclick="closeTaskModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="task-form">
+                <input type="hidden" id="task-id">
+                
+                <!-- Basic Information -->
+                <div class="form-section">
+                    <h3>📝 Basic Information</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="task-name">Task Name *</label>
+                            <input type="text" id="task-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="task-priority">Priority</label>
+                            <select id="task-priority">
+                                <option value="LOW">Low</option>
+                                <option value="MEDIUM">Medium</option>
+                                <option value="HIGH">High</option>
+                                <option value="URGENT">Urgent</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-description">Description</label>
+                        <textarea id="task-description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-status">Status</label>
+                        <select id="task-status">
+                            <option value="NOT_STARTED">Not Started</option>
+                            <option value="IN_PROGRESS">In Progress</option>
+                            <option value="ON_HOLD">On Hold</option>
+                            <option value="COMPLETED">Completed</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Assignment & Planning -->
+                <div class="form-section">
+                    <h3>👥 Assignment & Planning</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="task-project">Project</label>
+                            <select id="task-project">
+                                <option value="">Select Project</option>
+                                {% for project in available_projects %}
+                                <option value="{{ project.id }}">{{ project.code }} - {{ project.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="task-assignee">Assigned To</label>
+                            <select id="task-assignee">
+                                <option value="">Unassigned</option>
+                                {% for user in team_members %}
+                                <option value="{{ user.id }}">{{ user.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="task-sprint">Sprint</label>
+                            <select id="task-sprint">
+                                <option value="">No Sprint</option>
+                                <!-- Sprint options will be populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="task-estimated-hours">Estimated Hours</label>
+                            <input type="number" id="task-estimated-hours" min="0" step="0.5">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-due-date">Due Date</label>
+                        <div class="hybrid-date-input">
+                            <input type="date" id="task-due-date-native" class="date-input-native">
+                            <input type="text" id="task-due-date" class="date-input-formatted" placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
+                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('task-due-date')" title="Open calendar">📅</button>
+                        </div>
+                        <div class="date-error" id="task-due-date-error" style="display: none; color: #dc3545; font-size: 0.8rem; margin-top: 0.25rem;"></div>
+                    </div>
+                </div>
+                
+                <!-- Dependencies -->
+                <div class="form-section">
+                    <h3>🔗 Dependencies</h3>
+                    <div class="dependencies-grid">
+                        <!-- Blocked By -->
+                        <div class="dependency-column">
+                            <h4>🚫 Blocked By</h4>
+                            <p class="dependency-help">Tasks that must be completed before this task can start</p>
+                            <div id="blocked-by-container" class="dependency-list">
+                                <!-- Blocked by tasks will be populated here -->
+                            </div>
+                            <div class="add-dependency-form">
+                                <input type="text" id="blocked-by-input" placeholder="TSK-001" class="dependency-input">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="addBlockedBy()">Add</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Blocks -->
+                        <div class="dependency-column">
+                            <h4>🔒 Blocks</h4>
+                            <p class="dependency-help">Tasks that cannot start until this task is completed</p>
+                            <div id="blocks-container" class="dependency-list">
+                                <!-- Blocks tasks will be populated here -->
+                            </div>
+                            <div class="add-dependency-form">
+                                <input type="text" id="blocks-input" placeholder="TSK-002" class="dependency-input">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="addBlocks()">Add</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Subtasks -->
+                <div class="form-section">
+                    <h3>📋 Subtasks</h3>
+                    <div id="subtasks-container">
+                        <!-- Subtasks will be populated here -->
+                    </div>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addSubtask()">+ Add Subtask</button>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeTaskModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveTask()">Save Task</button>
+            <button type="button" class="btn btn-danger" onclick="deleteTask()" id="delete-task-btn" style="display: none;">Delete Task</button>
+        </div>
+    </div>
+</div>
+
+<!-- Task Modal JavaScript Functions -->
+<script>
+// Hybrid Date Input Functions for task modal
+function setupHybridDateInput(inputId) {
+    const formattedInput = document.getElementById(inputId);
+    const nativeInput = document.getElementById(inputId + '-native');
+    
+    if (!formattedInput || !nativeInput) return;
+    
+    // Sync from native input to formatted input
+    nativeInput.addEventListener('change', function() {
+        if (this.value) {
+            formattedInput.value = formatDateForInput(this.value);
+            // Trigger change event on formatted input
+            formattedInput.dispatchEvent(new Event('change'));
+        }
+    });
+    
+    // Sync from formatted input to native input
+    formattedInput.addEventListener('change', function() {
+        const isoDate = parseUserDate(this.value);
+        if (isoDate) {
+            nativeInput.value = isoDate;
+        } else {
+            nativeInput.value = '';
+        }
+    });
+    
+    // Clear both inputs when formatted input is cleared
+    formattedInput.addEventListener('input', function() {
+        if (this.value === '') {
+            nativeInput.value = '';
+        }
+    });
+}
+
+function openCalendarPicker(inputId) {
+    const nativeInput = document.getElementById(inputId + '-native');
+    if (nativeInput) {
+        // Try multiple methods to open the date picker
+        nativeInput.focus();
+        
+        // For modern browsers
+        if (nativeInput.showPicker) {
+            try {
+                nativeInput.showPicker();
+            } catch (e) {
+                // Fallback to click if showPicker fails
+                nativeInput.click();
+            }
+        } else {
+            // Fallback for older browsers
+            nativeInput.click();
+        }
+    }
+}
+
+// Initialize hybrid date inputs when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Setup hybrid date inputs for task modal
+    setupHybridDateInput('task-due-date');
+});
+</script>
+
+<!-- Task Modal Styles -->
+<style>
+/* Task Modal Specific Styles */
+.task-modal .modal-content {
+    width: 95%;
+    max-width: 1000px;
+    max-height: 95vh;
+    overflow-y: auto;
+}
+
+.task-modal-content .modal-body {
+    padding: 1.5rem;
+}
+
+.form-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.form-section h3 {
+    margin: 0 0 1rem 0;
+    color: #495057;
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #f8f9fa;
+}
+
+/* Dependencies Grid */
+.dependencies-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.dependency-column {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.dependency-column h4 {
+    margin: 0 0 0.5rem 0;
+    color: #495057;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.dependency-help {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin: 0 0 1rem 0;
+    line-height: 1.4;
+}
+
+.dependency-list {
+    min-height: 60px;
+    margin-bottom: 1rem;
+}
+
+.dependency-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.dependency-task-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.dependency-task-number {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #007bff;
+    background: #e3f2fd;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.dependency-task-title {
+    color: #333;
+    font-weight: 500;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dependency-remove-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: background-color 0.2s;
+    flex-shrink: 0;
+}
+
+.dependency-remove-btn:hover {
+    background: #c82333;
+}
+
+.add-dependency-form {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.dependency-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-family: 'Courier New', monospace;
+    background: white;
+}
+
+.dependency-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.dependency-input::placeholder {
+    color: #adb5bd;
+    font-style: italic;
+}
+
+/* Subtasks Section */
+.subtask-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.subtask-item input[type="text"] {
+    flex: 1;
+    margin: 0;
+}
+
+.subtask-item button {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+/* Hybrid Date Input Styles */
+.hybrid-date-input {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.date-input-native {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: calc(100% - 35px);
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+    pointer-events: auto;
+}
+
+.date-input-formatted {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+    position: relative;
+    z-index: 1;
+}
+
+.calendar-picker-btn {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.5rem;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+    z-index: 3;
+    position: relative;
+}
+
+.calendar-picker-btn:hover {
+    background: #e9ecef;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .task-modal .modal-content {
+        width: 98%;
+        margin: 1% auto;
+        max-height: 98vh;
+    }
+    
+    .dependencies-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .form-row {
+        flex-direction: column;
+    }
+    
+    .dependency-task-title {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .task-modal-content .modal-body {
+        padding: 1rem;
+    }
+    
+    .form-section {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+    }
+    
+    .dependency-item {
+        padding: 0.5rem;
+    }
+    
+    .dependency-task-number {
+        font-size: 0.7rem;
+        padding: 0.15rem 0.3rem;
+    }
+}
+</style>

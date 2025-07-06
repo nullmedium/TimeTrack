@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data, format_burndown_data
@@ -3763,8 +3763,12 @@ def create_task():
         if data.get('due_date'):
             due_date = datetime.strptime(data.get('due_date'), '%Y-%m-%d').date()
 
+        # Generate task number
+        task_number = Task.generate_task_number(g.user.company_id)
+        
         # Create task
         task = Task(
+            task_number=task_number,
             name=name,
             description=data.get('description', ''),
             status=TaskStatus[data.get('status', 'NOT_STARTED')],
@@ -3924,6 +3928,7 @@ def get_unified_tasks():
             
             task_data = {
                 'id': task.id,
+                'task_number': getattr(task, 'task_number', f'TSK-{task.id:03d}'),  # Fallback for existing tasks
                 'name': task.name,
                 'description': task.description,
                 'status': task.status.name,
@@ -4003,6 +4008,194 @@ def update_task_status(task_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error updating task status: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+# Task Dependencies APIs
+@app.route('/api/tasks/<int:task_id>/dependencies')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def get_task_dependencies(task_id):
+    """Get dependencies for a specific task"""
+    try:
+        # Get the task and verify ownership
+        task = Task.query.filter_by(id=task_id, company_id=g.user.company_id).first()
+        if not task:
+            return jsonify({'success': False, 'message': 'Task not found'})
+        
+        # Get blocked by dependencies (tasks that block this one)
+        blocked_by_query = db.session.query(Task).join(
+            TaskDependency, Task.id == TaskDependency.blocking_task_id
+        ).filter(TaskDependency.blocked_task_id == task_id)
+        
+        # Get blocks dependencies (tasks that this one blocks)
+        blocks_query = db.session.query(Task).join(
+            TaskDependency, Task.id == TaskDependency.blocked_task_id
+        ).filter(TaskDependency.blocking_task_id == task_id)
+        
+        blocked_by_tasks = blocked_by_query.all()
+        blocks_tasks = blocks_query.all()
+        
+        def task_to_dict(t):
+            return {
+                'id': t.id,
+                'name': t.name,
+                'task_number': t.task_number
+            }
+        
+        return jsonify({
+            'success': True,
+            'dependencies': {
+                'blocked_by': [task_to_dict(t) for t in blocked_by_tasks],
+                'blocks': [task_to_dict(t) for t in blocks_tasks]
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting task dependencies: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/api/tasks/<int:task_id>/dependencies', methods=['POST'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def add_task_dependency(task_id):
+    """Add a dependency for a task"""
+    try:
+        data = request.get_json()
+        task_number = data.get('task_number')
+        dependency_type = data.get('type')  # 'blocked_by' or 'blocks'
+        
+        if not task_number or not dependency_type:
+            return jsonify({'success': False, 'message': 'Task number and type are required'})
+        
+        # Get the main task
+        task = Task.query.filter_by(id=task_id, company_id=g.user.company_id).first()
+        if not task:
+            return jsonify({'success': False, 'message': 'Task not found'})
+        
+        # Find the dependency task by task number
+        dependency_task = Task.query.filter_by(
+            task_number=task_number, 
+            company_id=g.user.company_id
+        ).first()
+        
+        if not dependency_task:
+            return jsonify({'success': False, 'message': f'Task {task_number} not found'})
+        
+        # Prevent self-dependency
+        if dependency_task.id == task_id:
+            return jsonify({'success': False, 'message': 'A task cannot depend on itself'})
+        
+        # Create the dependency based on type
+        if dependency_type == 'blocked_by':
+            # Current task is blocked by the dependency task
+            blocked_task_id = task_id
+            blocking_task_id = dependency_task.id
+        elif dependency_type == 'blocks':
+            # Current task blocks the dependency task
+            blocked_task_id = dependency_task.id
+            blocking_task_id = task_id
+        else:
+            return jsonify({'success': False, 'message': 'Invalid dependency type'})
+        
+        # Check if dependency already exists
+        existing_dep = TaskDependency.query.filter_by(
+            blocked_task_id=blocked_task_id,
+            blocking_task_id=blocking_task_id
+        ).first()
+        
+        if existing_dep:
+            return jsonify({'success': False, 'message': 'This dependency already exists'})
+        
+        # Check for circular dependencies
+        def would_create_cycle(blocked_id, blocking_id):
+            # Use a simple DFS to check if adding this dependency would create a cycle
+            visited = set()
+            
+            def dfs(current_blocked_id):
+                if current_blocked_id in visited:
+                    return False
+                visited.add(current_blocked_id)
+                
+                # If we reach the original blocking task, we have a cycle
+                if current_blocked_id == blocking_id:
+                    return True
+                
+                # Check all tasks that block the current task
+                dependencies = TaskDependency.query.filter_by(blocked_task_id=current_blocked_id).all()
+                for dep in dependencies:
+                    if dfs(dep.blocking_task_id):
+                        return True
+                
+                return False
+            
+            return dfs(blocked_id)
+        
+        if would_create_cycle(blocked_task_id, blocking_task_id):
+            return jsonify({'success': False, 'message': 'This dependency would create a circular dependency'})
+        
+        # Create the new dependency
+        new_dependency = TaskDependency(
+            blocked_task_id=blocked_task_id,
+            blocking_task_id=blocking_task_id
+        )
+        
+        db.session.add(new_dependency)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Dependency added successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error adding task dependency: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/api/tasks/<int:task_id>/dependencies/<int:dependency_task_id>', methods=['DELETE'])
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def remove_task_dependency(task_id, dependency_task_id):
+    """Remove a dependency for a task"""
+    try:
+        data = request.get_json()
+        dependency_type = data.get('type')  # 'blocked_by' or 'blocks'
+        
+        if not dependency_type:
+            return jsonify({'success': False, 'message': 'Dependency type is required'})
+        
+        # Get the main task
+        task = Task.query.filter_by(id=task_id, company_id=g.user.company_id).first()
+        if not task:
+            return jsonify({'success': False, 'message': 'Task not found'})
+        
+        # Determine which dependency to remove based on type
+        if dependency_type == 'blocked_by':
+            # Remove dependency where current task is blocked by dependency_task_id
+            dependency = TaskDependency.query.filter_by(
+                blocked_task_id=task_id,
+                blocking_task_id=dependency_task_id
+            ).first()
+        elif dependency_type == 'blocks':
+            # Remove dependency where current task blocks dependency_task_id
+            dependency = TaskDependency.query.filter_by(
+                blocked_task_id=dependency_task_id,
+                blocking_task_id=task_id
+            ).first()
+        else:
+            return jsonify({'success': False, 'message': 'Invalid dependency type'})
+        
+        if not dependency:
+            return jsonify({'success': False, 'message': 'Dependency not found'})
+        
+        db.session.delete(dependency)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Dependency removed successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error removing task dependency: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
 
@@ -5045,6 +5238,118 @@ def get_current_timer_status():
     except Exception as e:
         logger.error(f"Error getting timer status: {e}")
         return jsonify({'success': False, 'error': str(e)})
+
+# Smart Search API Endpoints
+@app.route('/api/search/users')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def search_users():
+    """Search for users for smart search auto-completion"""
+    try:
+        query = request.args.get('q', '').strip()
+        
+        if not query:
+            return jsonify({'success': True, 'users': []})
+        
+        # Search users in the same company
+        users = User.query.filter(
+            User.company_id == g.user.company_id,
+            User.username.ilike(f'%{query}%')
+        ).limit(10).all()
+        
+        user_list = [
+            {
+                'id': user.id,
+                'username': user.username,
+                'full_name': f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else user.username
+            }
+            for user in users
+        ]
+        
+        return jsonify({'success': True, 'users': user_list})
+        
+    except Exception as e:
+        logger.error(f"Error in search_users: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/search/projects')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def search_projects():
+    """Search for projects for smart search auto-completion"""
+    try:
+        query = request.args.get('q', '').strip()
+        
+        if not query:
+            return jsonify({'success': True, 'projects': []})
+        
+        # Search projects the user has access to
+        projects = Project.query.filter(
+            Project.company_id == g.user.company_id,
+            db.or_(
+                Project.code.ilike(f'%{query}%'),
+                Project.name.ilike(f'%{query}%')
+            )
+        ).limit(10).all()
+        
+        # Filter projects user has access to
+        accessible_projects = [
+            project for project in projects 
+            if project.is_user_allowed(g.user)
+        ]
+        
+        project_list = [
+            {
+                'id': project.id,
+                'code': project.code,
+                'name': project.name
+            }
+            for project in accessible_projects
+        ]
+        
+        return jsonify({'success': True, 'projects': project_list})
+        
+    except Exception as e:
+        logger.error(f"Error in search_projects: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/search/sprints')
+@role_required(Role.TEAM_MEMBER)
+@company_required
+def search_sprints():
+    """Search for sprints for smart search auto-completion"""
+    try:
+        query = request.args.get('q', '').strip()
+        
+        if not query:
+            return jsonify({'success': True, 'sprints': []})
+        
+        # Search sprints in the same company
+        sprints = Sprint.query.filter(
+            Sprint.company_id == g.user.company_id,
+            Sprint.name.ilike(f'%{query}%')
+        ).limit(10).all()
+        
+        # Filter sprints user has access to
+        accessible_sprints = [
+            sprint for sprint in sprints 
+            if sprint.can_user_access(g.user)
+        ]
+        
+        sprint_list = [
+            {
+                'id': sprint.id,
+                'name': sprint.name,
+                'status': sprint.status.value
+            }
+            for sprint in accessible_sprints
+        ]
+        
+        return jsonify({'success': True, 'sprints': sprint_list})
+        
+    except Exception as e:
+        logger.error(f"Error in search_sprints: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

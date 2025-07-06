@@ -6,71 +6,16 @@
     <div class="management-header task-header">
         <h1>📋 Task Management</h1>
         <div class="management-controls task-controls">
-            <!-- View Switcher -->
-            <div class="view-switcher">
-                <button class="view-btn active" data-view="all">All Tasks</button>
-                <button class="view-btn" data-view="project">By Project</button>
-                <button class="view-btn" data-view="personal">My Tasks</button>
-                {% if g.user.team_id %}
-                <button class="view-btn" data-view="team">Team Tasks</button>
-                {% endif %}
-            </div>
             
-            <!-- Filters -->
-            <div class="task-filters">
-                <select id="project-filter" class="filter-select">
-                    <option value="">All Projects</option>
-                    {% for project in available_projects %}
-                    <option value="{{ project.id }}">{{ project.code }} - {{ project.name }}</option>
-                    {% endfor %}
-                </select>
-                
-                <select id="assignee-filter" class="filter-select">
-                    <option value="">All Assignees</option>
-                    <option value="unassigned">Unassigned</option>
-                    {% for user in team_members %}
-                    <option value="{{ user.id }}">{{ user.username }}</option>
-                    {% endfor %}
-                </select>
-                
-                <select id="priority-filter" class="filter-select">
-                    <option value="">All Priorities</option>
-                    <option value="URGENT">Urgent</option>
-                    <option value="HIGH">High</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="LOW">Low</option>
-                </select>
-                
-                <!-- Date Range Filters -->
-                <div class="date-range-filters">
-                    <label for="start-date-filter">From:</label>
-                    <div class="hybrid-date-input compact">
-                        <input type="date" id="start-date-filter-native" class="date-input-native">
-                        <input type="text" id="start-date-filter" class="date-input-formatted filter-input" placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
-                        <button type="button" class="calendar-picker-btn compact" onclick="openCalendarPicker('start-date-filter')" title="Open calendar">📅</button>
-                    </div>
-                    
-                    <label for="end-date-filter">To:</label>
-                    <div class="hybrid-date-input compact">
-                        <input type="date" id="end-date-filter-native" class="date-input-native">
-                        <input type="text" id="end-date-filter" class="date-input-formatted filter-input" placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
-                        <button type="button" class="calendar-picker-btn compact" onclick="openCalendarPicker('end-date-filter')" title="Open calendar">📅</button>
-                    </div>
-                    
-                    <select id="date-field-filter" class="filter-select">
-                        <option value="created">Created Date</option>
-                        <option value="due">Due Date</option>
-                        <option value="completed">Completed Date</option>
-                    </select>
+            <!-- Smart Search -->
+            <div class="smart-search-container">
+                <div class="smart-search-box">
+                    <input type="text" id="smart-search-input" class="smart-search-input" placeholder="Search tasks... (e.g., my-tasks priority:high, project:TimeTrack, overdue)">
+                    <button type="button" class="smart-search-clear" id="smart-search-clear" title="Clear search">×</button>
                 </div>
-                
-                <!-- Sprint Filter -->
-                <select id="sprint-filter" class="filter-select">
-                    <option value="">All Sprints</option>
-                    <option value="no-sprint">No Sprint</option>
-                    <option value="current">Current Sprint</option>
-                    <!-- Sprint options will be populated dynamically -->
-                </select>
+                <div class="smart-search-suggestions" id="smart-search-suggestions" style="display: none;">
+                    <!-- Suggestions will be populated here -->
+                </div>
             </div>
             
             <!-- Actions -->
@@ -155,219 +100,155 @@
     </div>
 </div>
 
-<!-- Task Detail Modal -->
-<div id="task-modal" class="modal" style="display: none;">
-    <div class="modal-content large">
-        <div class="modal-header">
-            <h2 id="modal-title">Task Details</h2>
-            <span class="close" onclick="closeTaskModal()">&times;</span>
-        </div>
-        <div class="modal-body">
-            <form id="task-form">
-                <input type="hidden" id="task-id">
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="task-name">Task Name *</label>
-                        <input type="text" id="task-name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="task-priority">Priority</label>
-                        <select id="task-priority">
-                            <option value="LOW">Low</option>
-                            <option value="MEDIUM">Medium</option>
-                            <option value="HIGH">High</option>
-                            <option value="URGENT">Urgent</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="task-description">Description</label>
-                    <textarea id="task-description" rows="4"></textarea>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="task-project">Project</label>
-                        <select id="task-project">
-                            <option value="">Select Project</option>
-                            {% for project in available_projects %}
-                            <option value="{{ project.id }}">{{ project.code }} - {{ project.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="task-assignee">Assigned To</label>
-                        <select id="task-assignee">
-                            <option value="">Unassigned</option>
-                            {% for user in team_members %}
-                            <option value="{{ user.id }}">{{ user.username }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="task-sprint">Sprint</label>
-                        <select id="task-sprint">
-                            <option value="">No Sprint</option>
-                            <!-- Sprint options will be populated dynamically -->
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="task-estimated-hours">Estimated Hours</label>
-                        <input type="number" id="task-estimated-hours" min="0" step="0.5">
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="task-due-date">Due Date</label>
-                        <div class="hybrid-date-input">
-                            <input type="date" id="task-due-date-native" class="date-input-native">
-                            <input type="text" id="task-due-date" class="date-input-formatted" placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
-                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('task-due-date')" title="Open calendar">📅</button>
-                        </div>
-                        <div class="date-error" id="task-due-date-error" style="display: none; color: #dc3545; font-size: 0.8rem; margin-top: 0.25rem;"></div>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="task-status">Status</label>
-                    <select id="task-status">
-                        <option value="NOT_STARTED">Not Started</option>
-                        <option value="IN_PROGRESS">In Progress</option>
-                        <option value="ON_HOLD">On Hold</option>
-                        <option value="COMPLETED">Completed</option>
-                    </select>
-                </div>
-                
-                <!-- Subtasks Section -->
-                <div class="subtasks-section">
-                    <h3>Subtasks</h3>
-                    <div id="subtasks-container">
-                        <!-- Subtasks will be populated here -->
-                    </div>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="addSubtask()">+ Add Subtask</button>
-                </div>
-            </form>
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeTaskModal()">Cancel</button>
-            <button type="button" class="btn btn-primary" onclick="saveTask()">Save Task</button>
-            <button type="button" class="btn btn-danger" onclick="deleteTask()" id="delete-task-btn" style="display: none;">Delete Task</button>
-        </div>
-    </div>
-</div>
+<!-- Include Task Modal -->
+{% include 'task_modal.html' %}
 
 <!-- Styles -->
 <style>
-/* Task-specific filters */
-.task-filters {
+/* Smart Search Styles */
+.smart-search-container {
+    margin-bottom: 1rem;
+    position: relative;
+    width: 100%;
+    flex: 1;
+}
+
+.smart-search-box {
+    position: relative;
     display: flex;
+    align-items: center;
+}
+
+.smart-search-input {
+    width: 100%;
+    padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: white;
+}
+
+.smart-search-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.smart-search-clear {
+    position: absolute;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: #999;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 3px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.smart-search-clear:hover {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.smart-search-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.suggestion-item {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: center;
     gap: 0.5rem;
+    transition: background-color 0.1s;
+    font-size: 14px;
+}
+
+.suggestion-item:hover,
+.suggestion-item.active {
+    background-color: #f8f9fa;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-type {
+    background: #e9ecef;
+    color: #495057;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.suggestion-value {
+    font-weight: 500;
+    color: #333;
+}
+
+.suggestion-description {
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+
+/* Task Management Layout */
+.task-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
     flex-wrap: wrap;
 }
 
-.filter-select {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.filter-input {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.date-range-filters {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: #f8f9fa;
-    padding: 0.5rem;
-    border-radius: 6px;
-    border: 1px solid #e9ecef;
-}
-
-.date-range-filters label {
-    font-size: 0.875rem;
-    color: #666;
-    margin: 0;
-    white-space: nowrap;
-}
-
-/* Hybrid Date Input Styles */
-.hybrid-date-input {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.hybrid-date-input.compact {
-    display: inline-flex;
-}
-
-.date-input-native {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: calc(100% - 35px); /* Leave space for calendar button */
-    height: 100%;
-    opacity: 0;
-    cursor: pointer;
-    z-index: 2;
-    pointer-events: auto;
-}
-
-.date-input-formatted {
+.task-controls .smart-search-container {
     flex: 1;
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-    background: white;
-    position: relative;
-    z-index: 2;
+    min-width: 300px;
+    max-width: 600px;
 }
 
-.calendar-picker-btn {
-    background: #f8f9fa;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 0.5rem;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background-color 0.2s;
-    z-index: 3;
-    position: relative;
+.task-controls .management-actions {
+    flex-shrink: 0;
 }
 
-.calendar-picker-btn:hover {
-    background: #e9ecef;
+@media (max-width: 768px) {
+    .task-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+    
+    .task-controls .smart-search-container {
+        min-width: auto;
+        max-width: none;
+    }
 }
 
-.calendar-picker-btn.compact {
-    padding: 0.375rem 0.5rem;
-    font-size: 12px;
-}
 
-.hybrid-date-input.compact .date-input-formatted {
-    padding: 0.375rem;
-    font-size: 12px;
-    width: 100px;
-    flex: none;
-}
 
 .task-board {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     gap: 1rem;
     margin-bottom: 2rem;
 }
@@ -434,6 +315,24 @@
     margin-bottom: 0.5rem;
 }
 
+.task-title-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+}
+
+.task-number {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #007bff;
+    background: #e3f2fd;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    align-self: flex-start;
+}
+
 .task-title {
     font-weight: bold;
     margin: 0;
@@ -471,36 +370,7 @@
 
 
 
-.subtasks-section {
-    margin-top: 1.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid #eee;
-}
 
-.subtasks-section h3 {
-    margin-bottom: 1rem;
-    color: #333;
-}
-
-.subtask-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-    padding: 0.5rem;
-    background: #f8f9fa;
-    border-radius: 4px;
-}
-
-.subtask-item input[type="text"] {
-    flex: 1;
-    margin: 0;
-}
-
-.subtask-item button {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-}
 
 @media (max-width: 768px) {
     .task-board {
@@ -686,6 +556,312 @@ function openCalendarPicker(inputId) {
     }
 }
 
+// Smart Search Parser
+class SmartTaskSearch {
+    constructor() {
+        this.searchTokens = {
+            'assigned:': { 
+                type: 'user', 
+                suggestions: [],
+                description: 'Filter by assigned user'
+            },
+            'created-by:': { 
+                type: 'user', 
+                suggestions: [],
+                description: 'Filter by task creator'
+            },
+            'project:': { 
+                type: 'project', 
+                suggestions: [],
+                description: 'Filter by project'
+            },
+            'sprint:': { 
+                type: 'sprint', 
+                suggestions: [],
+                description: 'Filter by sprint'
+            },
+            'status:': { 
+                type: 'status', 
+                suggestions: ['not-started', 'in-progress', 'on-hold', 'completed'],
+                description: 'Filter by task status'
+            },
+            'priority:': { 
+                type: 'priority', 
+                suggestions: ['low', 'medium', 'high', 'urgent'],
+                description: 'Filter by priority level'
+            },
+            'due:': { 
+                type: 'date', 
+                suggestions: ['today', 'tomorrow', 'this-week', 'next-week', 'overdue'],
+                description: 'Filter by due date'
+            },
+            'created:': { 
+                type: 'date', 
+                suggestions: ['today', 'yesterday', 'this-week', 'last-week'],
+                description: 'Filter by creation date'
+            }
+        };
+        
+        this.specialKeywords = [
+            { value: 'overdue', type: 'keyword', description: 'Tasks past their due date' },
+            { value: 'unassigned', type: 'keyword', description: 'Tasks without assignee' },
+            { value: 'my-tasks', type: 'view', description: 'Tasks assigned to me' },
+            { value: 'all-tasks', type: 'view', description: 'All tasks in the system' },
+            { value: 'project-tasks', type: 'view', description: 'Tasks grouped by project' },
+            { value: 'urgent', type: 'keyword', description: 'High priority tasks' }
+        ];
+        
+        // Add team-tasks only if user has a team
+        const hasTeam = {{ 'true' if g.user.team_id else 'false' }};
+        if (hasTeam) {
+            this.specialKeywords.splice(4, 0, { 
+                value: 'team-tasks', 
+                type: 'view', 
+                description: 'Tasks for my team' 
+            });
+        }
+        
+        this.currentSuggestionIndex = -1;
+    }
+    
+    parseQuery(searchText) {
+        const filters = {
+            assignee: '',
+            creator: '',
+            project: '',
+            sprint: '',
+            status: '',
+            priority: '',
+            dueDate: '',
+            createdDate: '',
+            view: '',
+            keywords: []
+        };
+        
+        // Split search text into tokens
+        const tokens = searchText.match(/\S+/g) || [];
+        
+        for (const token of tokens) {
+            if (token.includes(':')) {
+                const [key, value] = token.split(':', 2);
+                const fullKey = key + ':';
+                
+                switch (fullKey) {
+                    case 'assigned:':
+                        filters.assignee = value.replace('@', '');
+                        break;
+                    case 'created-by:':
+                        filters.creator = value.replace('@', '');
+                        break;
+                    case 'project:':
+                        filters.project = value;
+                        break;
+                    case 'sprint:':
+                        filters.sprint = value;
+                        break;
+                    case 'status:':
+                        filters.status = this.normalizeStatus(value);
+                        break;
+                    case 'priority:':
+                        filters.priority = value.toUpperCase();
+                        break;
+                    case 'due:':
+                        filters.dueDate = this.parseDate(value);
+                        break;
+                    case 'created:':
+                        filters.createdDate = this.parseDate(value);
+                        break;
+                }
+            } else {
+                // Handle special keywords and view keywords
+                const lowerToken = token.toLowerCase();
+                if (['my-tasks', 'all-tasks', 'team-tasks', 'project-tasks'].includes(lowerToken)) {
+                    filters.view = lowerToken;
+                } else {
+                    filters.keywords.push(lowerToken);
+                }
+            }
+        }
+        
+        return filters;
+    }
+    
+    normalizeStatus(status) {
+        const statusMap = {
+            'not-started': 'NOT_STARTED',
+            'in-progress': 'IN_PROGRESS',
+            'on-hold': 'ON_HOLD',
+            'completed': 'COMPLETED'
+        };
+        return statusMap[status.toLowerCase()] || status.toUpperCase();
+    }
+    
+    parseDate(dateStr) {
+        const today = new Date();
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        
+        switch (dateStr.toLowerCase()) {
+            case 'today':
+                return {
+                    start: todayStart,
+                    end: new Date(todayStart.getTime() + 24 * 60 * 60 * 1000 - 1)
+                };
+            case 'yesterday':
+                const yesterday = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+                return {
+                    start: yesterday,
+                    end: new Date(yesterday.getTime() + 24 * 60 * 60 * 1000 - 1)
+                };
+            case 'tomorrow':
+                const tomorrow = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+                return {
+                    start: tomorrow,
+                    end: new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000 - 1)
+                };
+            case 'this-week':
+                const startOfWeek = new Date(todayStart);
+                startOfWeek.setDate(todayStart.getDate() - todayStart.getDay());
+                const endOfWeek = new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
+                return { start: startOfWeek, end: endOfWeek };
+            case 'overdue':
+                return { end: todayStart, type: 'before' };
+            default:
+                // Try to parse as ISO date
+                if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                    const date = new Date(dateStr);
+                    return {
+                        start: date,
+                        end: new Date(date.getTime() + 24 * 60 * 60 * 1000 - 1)
+                    };
+                }
+                return null;
+        }
+    }
+    
+    async getSuggestions(query, cursorPosition) {
+        const suggestions = [];
+        
+        // Get the current token being typed
+        const beforeCursor = query.substring(0, cursorPosition);
+        const tokens = beforeCursor.split(/\s+/);
+        const currentToken = tokens[tokens.length - 1] || '';
+        
+        // Check if we're typing a token with ':'
+        if (currentToken.includes(':')) {
+            const [key, partial] = currentToken.split(':', 2);
+            const fullKey = key + ':';
+            
+            if (this.searchTokens[fullKey]) {
+                const tokenInfo = this.searchTokens[fullKey];
+                
+                // Get suggestions for this token type
+                if (tokenInfo.type === 'user') {
+                    const users = await this.fetchUserSuggestions(partial);
+                    users.forEach(user => {
+                        suggestions.push({
+                            type: 'user',
+                            value: `${key}:@${user.username}`,
+                            display: `@${user.username}`,
+                            description: `Assigned to ${user.username}`
+                        });
+                    });
+                } else if (tokenInfo.type === 'project') {
+                    const projects = await this.fetchProjectSuggestions(partial);
+                    projects.forEach(project => {
+                        suggestions.push({
+                            type: 'project',
+                            value: `${key}:${project.code}`,
+                            display: project.code,
+                            description: project.name
+                        });
+                    });
+                } else if (tokenInfo.type === 'sprint') {
+                    const sprints = await this.fetchSprintSuggestions(partial);
+                    sprints.forEach(sprint => {
+                        suggestions.push({
+                            type: 'sprint',
+                            value: `${key}:${sprint.name}`,
+                            display: sprint.name,
+                            description: `Sprint (${sprint.status})`
+                        });
+                    });
+                } else {
+                    // Static suggestions
+                    tokenInfo.suggestions
+                        .filter(s => s.toLowerCase().includes(partial.toLowerCase()))
+                        .forEach(suggestion => {
+                            suggestions.push({
+                                type: tokenInfo.type,
+                                value: `${key}:${suggestion}`,
+                                display: suggestion,
+                                description: tokenInfo.description
+                            });
+                        });
+                }
+            }
+        } else {
+            // Suggest token keys
+            Object.keys(this.searchTokens).forEach(tokenKey => {
+                if (tokenKey.toLowerCase().includes(currentToken.toLowerCase())) {
+                    suggestions.push({
+                        type: 'token',
+                        value: tokenKey,
+                        display: tokenKey,
+                        description: this.searchTokens[tokenKey].description
+                    });
+                }
+            });
+            
+            // Suggest special keywords
+            this.specialKeywords
+                .filter(keyword => keyword.value.toLowerCase().includes(currentToken.toLowerCase()))
+                .forEach(keyword => {
+                    suggestions.push({
+                        type: keyword.type,
+                        value: keyword.value,
+                        display: keyword.value,
+                        description: keyword.description
+                    });
+                });
+        }
+        
+        return suggestions.slice(0, 8); // Limit to 8 suggestions
+    }
+    
+    async fetchUserSuggestions(partial) {
+        try {
+            const response = await fetch(`/api/search/users?q=${encodeURIComponent(partial)}`);
+            const data = await response.json();
+            return data.success ? data.users : [];
+        } catch (error) {
+            console.error('Error fetching user suggestions:', error);
+            return [];
+        }
+    }
+    
+    async fetchProjectSuggestions(partial) {
+        try {
+            const response = await fetch(`/api/search/projects?q=${encodeURIComponent(partial)}`);
+            const data = await response.json();
+            return data.success ? data.projects : [];
+        } catch (error) {
+            console.error('Error fetching project suggestions:', error);
+            return [];
+        }
+    }
+    
+    async fetchSprintSuggestions(partial) {
+        try {
+            const response = await fetch(`/api/search/sprints?q=${encodeURIComponent(partial)}`);
+            const data = await response.json();
+            return data.success ? data.sprints : [];
+        } catch (error) {
+            console.error('Error fetching sprint suggestions:', error);
+            return [];
+        }
+    }
+}
+
 // Task Management Controller
 class UnifiedTaskManager {
     constructor() {
@@ -695,6 +871,7 @@ class UnifiedTaskManager {
             project: '',
             assignee: '',
             priority: '',
+            status: '',
             startDate: '',
             endDate: '',
             dateField: 'created',
@@ -703,60 +880,22 @@ class UnifiedTaskManager {
         this.currentTask = null;
         this.sortableInstances = [];
         this.currentUserId = {{ g.user.id|tojson }};
+        this.smartSearch = new SmartTaskSearch();
+        this.searchQuery = '';
+        this.isSearching = false;
     }
 
     async init() {
         this.setupEventListeners();
         this.setupSortable();
-        await this.loadSprints();
         await this.loadTasks();
     }
 
     setupEventListeners() {
-        // View switcher
-        document.querySelectorAll('.view-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.switchView(e.target.dataset.view);
-            });
-        });
+        // Smart Search
+        this.setupSmartSearch();
+        
 
-        // Filters
-        document.getElementById('project-filter').addEventListener('change', () => {
-            this.filters.project = document.getElementById('project-filter').value;
-            this.applyFilters();
-        });
-
-        document.getElementById('assignee-filter').addEventListener('change', () => {
-            this.filters.assignee = document.getElementById('assignee-filter').value;
-            this.applyFilters();
-        });
-
-        document.getElementById('priority-filter').addEventListener('change', () => {
-            this.filters.priority = document.getElementById('priority-filter').value;
-            this.applyFilters();
-        });
-
-        // Date range filters
-        document.getElementById('start-date-filter').addEventListener('change', () => {
-            this.filters.startDate = parseUserDate(document.getElementById('start-date-filter').value) || '';
-            this.applyFilters();
-        });
-
-        document.getElementById('end-date-filter').addEventListener('change', () => {
-            this.filters.endDate = parseUserDate(document.getElementById('end-date-filter').value) || '';
-            this.applyFilters();
-        });
-
-        document.getElementById('date-field-filter').addEventListener('change', () => {
-            this.filters.dateField = document.getElementById('date-field-filter').value;
-            this.applyFilters();
-        });
-
-        // Sprint filter
-        document.getElementById('sprint-filter').addEventListener('change', () => {
-            this.filters.sprint = document.getElementById('sprint-filter').value;
-            this.applyFilters();
-        });
 
         // Actions
         document.getElementById('add-task-btn').addEventListener('click', () => {
@@ -776,8 +915,6 @@ class UnifiedTaskManager {
         
         // Setup hybrid date inputs
         setupHybridDateInput('task-due-date');
-        setupHybridDateInput('start-date-filter');
-        setupHybridDateInput('end-date-filter');
     }
 
     setupSortable() {
@@ -794,45 +931,314 @@ class UnifiedTaskManager {
         });
     }
 
-    switchView(view) {
-        // Update button states
-        document.querySelectorAll('.view-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        document.querySelector(`[data-view="${view}"]`).classList.add('active');
+    setupSmartSearch() {
+        const searchInput = document.getElementById('smart-search-input');
+        const searchClear = document.getElementById('smart-search-clear');
+        const suggestions = document.getElementById('smart-search-suggestions');
         
-        this.currentView = view;
+        let suggestionTimeout;
+        
+        // Search input handling
+        searchInput.addEventListener('input', async (e) => {
+            const query = e.target.value;
+            this.searchQuery = query;
+            
+            // Clear previous timeout
+            clearTimeout(suggestionTimeout);
+            
+            if (query.trim() === '') {
+                suggestions.style.display = 'none';
+                this.clearSmartSearch();
+                return;
+            }
+            
+            // Debounce suggestions
+            suggestionTimeout = setTimeout(async () => {
+                await this.showSuggestions(query, e.target.selectionStart);
+            }, 200);
+        });
+        
+        // Handle key navigation
+        searchInput.addEventListener('keydown', (e) => {
+            if (suggestions.style.display === 'none') return;
+            
+            const suggestionItems = suggestions.querySelectorAll('.suggestion-item');
+            
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    this.smartSearch.currentSuggestionIndex = 
+                        Math.min(this.smartSearch.currentSuggestionIndex + 1, suggestionItems.length - 1);
+                    this.updateSuggestionSelection();
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    this.smartSearch.currentSuggestionIndex = 
+                        Math.max(this.smartSearch.currentSuggestionIndex - 1, -1);
+                    this.updateSuggestionSelection();
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    if (this.smartSearch.currentSuggestionIndex >= 0) {
+                        this.applySuggestion(suggestionItems[this.smartSearch.currentSuggestionIndex]);
+                    } else {
+                        this.applySmartSearch();
+                    }
+                    break;
+                case 'Escape':
+                    suggestions.style.display = 'none';
+                    break;
+                case 'Tab':
+                    if (this.smartSearch.currentSuggestionIndex >= 0) {
+                        e.preventDefault();
+                        this.applySuggestion(suggestionItems[this.smartSearch.currentSuggestionIndex]);
+                    }
+                    break;
+            }
+        });
+        
+        // Apply search on enter or when losing focus
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && suggestions.style.display === 'none') {
+                this.applySmartSearch();
+            }
+        });
+        
+        searchInput.addEventListener('blur', () => {
+            // Delay hiding suggestions to allow clicking
+            setTimeout(() => {
+                suggestions.style.display = 'none';
+            }, 200);
+        });
+        
+        // Clear search
+        searchClear.addEventListener('click', () => {
+            searchInput.value = '';
+            this.searchQuery = '';
+            suggestions.style.display = 'none';
+            this.clearSmartSearch();
+        });
+        
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.smart-search-container')) {
+                suggestions.style.display = 'none';
+            }
+        });
+    }
+    
+    async showSuggestions(query, cursorPosition) {
+        const suggestions = document.getElementById('smart-search-suggestions');
+        const suggestionItems = await this.smartSearch.getSuggestions(query, cursorPosition);
+        
+        if (suggestionItems.length === 0) {
+            suggestions.style.display = 'none';
+            return;
+        }
+        
+        suggestions.innerHTML = '';
+        suggestionItems.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'suggestion-item';
+            div.innerHTML = `
+                <span class="suggestion-type">${item.type}</span>
+                <span class="suggestion-value">${item.display}</span>
+                <span class="suggestion-description">${item.description}</span>
+            `;
+            
+            div.addEventListener('click', () => {
+                this.applySuggestion(div, item);
+            });
+            
+            suggestions.appendChild(div);
+        });
+        
+        suggestions.style.display = 'block';
+        this.smartSearch.currentSuggestionIndex = -1;
+    }
+    
+    updateSuggestionSelection() {
+        const suggestionItems = document.querySelectorAll('.suggestion-item');
+        suggestionItems.forEach((item, index) => {
+            item.classList.toggle('active', index === this.smartSearch.currentSuggestionIndex);
+        });
+    }
+    
+    applySuggestion(suggestionElement, suggestionData = null) {
+        const searchInput = document.getElementById('smart-search-input');
+        const suggestions = document.getElementById('smart-search-suggestions');
+        
+        if (!suggestionData) {
+            const type = suggestionElement.querySelector('.suggestion-type').textContent;
+            const value = suggestionElement.querySelector('.suggestion-value').textContent;
+            suggestionData = { type, value, display: value };
+        }
+        
+        // Get current query and replace last token
+        const currentQuery = searchInput.value;
+        const cursorPos = searchInput.selectionStart;
+        const beforeCursor = currentQuery.substring(0, cursorPos);
+        const afterCursor = currentQuery.substring(cursorPos);
+        
+        const tokens = beforeCursor.split(/\s+/);
+        tokens[tokens.length - 1] = suggestionData.value;
+        
+        const newQuery = tokens.join(' ') + ' ' + afterCursor;
+        searchInput.value = newQuery.trim();
+        this.searchQuery = newQuery.trim();
+        
+        // Position cursor after the completed token
+        const newCursorPos = tokens.join(' ').length;
+        searchInput.setSelectionRange(newCursorPos, newCursorPos);
+        
+        suggestions.style.display = 'none';
+        searchInput.focus();
+        
+        // Apply the search immediately if it's a complete filter
+        if (suggestionData.type !== 'token') {
+            this.applySmartSearch();
+        }
+    }
+    
+    applySmartSearch() {
+        if (!this.searchQuery.trim()) {
+            this.clearSmartSearch();
+            return;
+        }
+        
+        const parsedFilters = this.smartSearch.parseQuery(this.searchQuery);
+        
+        // Convert smart search filters to existing filter format
+        if (parsedFilters.assignee) {
+            // Find user by username
+            const user = this.getTeamMemberByUsername(parsedFilters.assignee);
+            this.filters.assignee = user ? user.id : '';
+        }
+        
+        if (parsedFilters.project) {
+            // Find project by code
+            const project = this.getProjectByCode(parsedFilters.project);
+            this.filters.project = project ? project.id : '';
+        }
+        
+        if (parsedFilters.sprint) {
+            // Find sprint by name
+            const sprint = this.getSprintByName(parsedFilters.sprint);
+            this.filters.sprint = sprint ? sprint.id : parsedFilters.sprint;
+        }
+        
+        if (parsedFilters.status) {
+            this.filters.status = parsedFilters.status;
+        }
+        
+        if (parsedFilters.priority) {
+            this.filters.priority = parsedFilters.priority;
+        }
+        
+        // Handle date filters
+        if (parsedFilters.dueDate) {
+            this.filters.dateField = 'due';
+            if (parsedFilters.dueDate.start) {
+                this.filters.startDate = parsedFilters.dueDate.start.toISOString().split('T')[0];
+            }
+            if (parsedFilters.dueDate.end) {
+                this.filters.endDate = parsedFilters.dueDate.end.toISOString().split('T')[0];
+            }
+        }
+        
+        if (parsedFilters.createdDate) {
+            this.filters.dateField = 'created';
+            if (parsedFilters.createdDate.start) {
+                this.filters.startDate = parsedFilters.createdDate.start.toISOString().split('T')[0];
+            }
+            if (parsedFilters.createdDate.end) {
+                this.filters.endDate = parsedFilters.createdDate.end.toISOString().split('T')[0];
+            }
+        }
+        
+        // Handle view switching
+        if (parsedFilters.view) {
+            switch (parsedFilters.view) {
+                case 'my-tasks':
+                    this.currentView = 'personal';
+                    break;
+                case 'all-tasks':
+                    this.currentView = 'all';
+                    break;
+                case 'team-tasks':
+                    this.currentView = 'team';
+                    break;
+                case 'project-tasks':
+                    this.currentView = 'project';
+                    break;
+            }
+        }
+        
+        // Handle special keywords
+        if (parsedFilters.keywords.includes('overdue')) {
+            this.filters.dateField = 'due';
+            this.filters.endDate = new Date().toISOString().split('T')[0];
+        }
+        
+        if (parsedFilters.keywords.includes('unassigned')) {
+            this.filters.assignee = 'unassigned';
+        }
+        
+        if (parsedFilters.keywords.includes('urgent')) {
+            this.filters.priority = 'URGENT';
+        }
+        
+        this.isSearching = true;
         this.applyFilters();
     }
+    
+    clearSmartSearch() {
+        // Reset all filters and view
+        this.filters = {
+            project: '',
+            assignee: '',
+            priority: '',
+            status: '',
+            startDate: '',
+            endDate: '',
+            dateField: 'created',
+            sprint: ''
+        };
+        this.currentView = 'all'; // Reset to default view
+        this.isSearching = false;
+        this.applyFilters();
+    }
+    
+    // Helper methods for finding data by name/code
+    getTeamMemberByUsername(username) {
+        // This would need to be populated from the available team members
+        // For now, return null and let the backend handle it
+        return null;
+    }
+    
+    getProjectByCode(code) {
+        // This would need to be populated from available projects
+        return null;
+    }
+    
+    getSprintByName(name) {
+        // This would need to be populated from available sprints
+        return null;
+    }
 
-    async loadSprints() {
+    async loadSprintsForModal() {
         try {
             const response = await fetch('/api/sprints');
             const data = await response.json();
             
             if (data.success) {
-                // Update sprint filter dropdown
-                const sprintFilter = document.getElementById('sprint-filter');
-                
-                // Clear existing options except the default ones
-                const defaultOptions = Array.from(sprintFilter.children).slice(0, 3);
-                sprintFilter.innerHTML = '';
-                defaultOptions.forEach(option => sprintFilter.appendChild(option));
-                
                 // Update task modal sprint dropdown
                 const taskSprintSelect = document.getElementById('task-sprint');
                 // Clear existing options except the default "No Sprint" option
                 taskSprintSelect.innerHTML = '<option value="">No Sprint</option>';
                 
-                // Add sprint options to both dropdowns
+                // Add sprint options to modal dropdown
                 data.sprints.forEach(sprint => {
-                    // Add to filter dropdown
-                    const filterOption = document.createElement('option');
-                    filterOption.value = sprint.id;
-                    filterOption.textContent = `${sprint.name} (${sprint.status})`;
-                    sprintFilter.appendChild(filterOption);
-                    
-                    // Add to task modal dropdown
                     const modalOption = document.createElement('option');
                     modalOption.value = sprint.id;
                     modalOption.textContent = `${sprint.name} (${sprint.status})`;
@@ -939,6 +1345,11 @@ class UnifiedTaskManager {
                 return false;
             }
 
+            // Status filter
+            if (this.filters.status && task.status !== this.filters.status) {
+                return false;
+            }
+
             // Date range filter
             if (this.filters.startDate || this.filters.endDate) {
                 let taskDate = null;
@@ -997,7 +1408,10 @@ class UnifiedTaskManager {
 
         card.innerHTML = `
             <div class="task-card-header">
-                <h4 class="task-title">${task.name}</h4>
+                <div class="task-title-section">
+                    <span class="task-number">${task.task_number || 'TSK-???'}</span>
+                    <h4 class="task-title">${task.name}</h4>
+                </div>
                 <span class="priority-badge ${task.priority}">${task.priority}</span>
             </div>
             ${task.project_name ? `<div class="task-project">${task.project_code} - ${task.project_name}</div>` : ''}
@@ -1060,9 +1474,12 @@ class UnifiedTaskManager {
         }
     }
 
-    openTaskModal(task = null) {
+    async openTaskModal(task = null) {
         this.currentTask = task;
         const modal = document.getElementById('task-modal');
+        
+        // Load sprints for the modal dropdown
+        await this.loadSprintsForModal();
         
         if (task) {
             document.getElementById('modal-title').textContent = 'Edit Task';
@@ -1077,11 +1494,17 @@ class UnifiedTaskManager {
             document.getElementById('task-status').value = task.status;
             document.getElementById('task-sprint').value = task.sprint_id || '';
             document.getElementById('delete-task-btn').style.display = 'inline-block';
+            
+            // Load dependencies
+            await this.loadDependencies(task.id);
         } else {
             document.getElementById('modal-title').textContent = 'Add New Task';
             document.getElementById('task-form').reset();
             document.getElementById('task-id').value = '';
             document.getElementById('delete-task-btn').style.display = 'none';
+            
+            // Clear dependencies
+            this.clearDependencies();
         }
         
         modal.style.display = 'block';
@@ -1156,6 +1579,134 @@ class UnifiedTaskManager {
             }
         }
     }
+    
+    // Dependency management methods
+    async loadDependencies(taskId) {
+        try {
+            const response = await fetch(`/api/tasks/${taskId}/dependencies`);
+            const data = await response.json();
+            
+            if (data.success) {
+                this.renderDependencies(data.dependencies);
+            } else {
+                console.error('Failed to load dependencies:', data.message);
+            }
+        } catch (error) {
+            console.error('Error loading dependencies:', error);
+        }
+    }
+    
+    renderDependencies(dependencies) {
+        const blockedByContainer = document.getElementById('blocked-by-container');
+        const blocksContainer = document.getElementById('blocks-container');
+        
+        // Clear existing dependencies
+        blockedByContainer.innerHTML = '';
+        blocksContainer.innerHTML = '';
+        
+        // Render blocked by dependencies
+        dependencies.blocked_by.forEach(dep => {
+            const depElement = this.createDependencyElement(dep, 'blocked_by');
+            blockedByContainer.appendChild(depElement);
+        });
+        
+        // Render blocks dependencies
+        dependencies.blocks.forEach(dep => {
+            const depElement = this.createDependencyElement(dep, 'blocks');
+            blocksContainer.appendChild(depElement);
+        });
+    }
+    
+    createDependencyElement(dependency, type) {
+        const element = document.createElement('div');
+        element.className = 'dependency-item';
+        
+        element.innerHTML = `
+            <div class="dependency-task-info">
+                <span class="dependency-task-number">${dependency.task_number}</span>
+                <span class="dependency-task-title">${dependency.name}</span>
+            </div>
+            <button class="dependency-remove-btn" onclick="taskManager.removeDependency(${dependency.id}, '${type}')">Remove</button>
+        `;
+        
+        return element;
+    }
+    
+    clearDependencies() {
+        document.getElementById('blocked-by-container').innerHTML = '';
+        document.getElementById('blocks-container').innerHTML = '';
+        document.getElementById('blocked-by-input').value = '';
+        document.getElementById('blocks-input').value = '';
+    }
+    
+    async addDependency(taskNumber, type) {
+        const taskId = document.getElementById('task-id').value;
+        if (!taskId) {
+            alert('Please save the task first before adding dependencies.');
+            return;
+        }
+        
+        if (!taskNumber || taskNumber.trim() === '') {
+            alert('Please enter a task number.');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/tasks/${taskId}/dependencies`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    task_number: taskNumber.trim(),
+                    type: type
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                // Reload dependencies
+                await this.loadDependencies(taskId);
+                // Clear input
+                document.getElementById(`${type.replace('_', '-')}-input`).value = '';
+            } else {
+                alert('Failed to add dependency: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error adding dependency:', error);
+            alert('Failed to add dependency: ' + error.message);
+        }
+    }
+    
+    async removeDependency(dependencyTaskId, type) {
+        const taskId = document.getElementById('task-id').value;
+        if (!taskId) return;
+        
+        if (confirm('Are you sure you want to remove this dependency?')) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}/dependencies/${dependencyTaskId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: type
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    // Reload dependencies
+                    await this.loadDependencies(taskId);
+                } else {
+                    alert('Failed to remove dependency: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error removing dependency:', error);
+                alert('Failed to remove dependency: ' + error.message);
+            }
+        }
+    }
 }
 
 // Global functions
@@ -1181,6 +1732,22 @@ function deleteTask() {
 
 function addSubtask() {
     // TODO: Implement subtask functionality
+}
+
+function addBlockedBy() {
+    const input = document.getElementById('blocked-by-input');
+    const taskNumber = input.value.trim();
+    if (taskNumber) {
+        taskManager.addDependency(taskNumber, 'blocked_by');
+    }
+}
+
+function addBlocks() {
+    const input = document.getElementById('blocks-input');
+    const taskNumber = input.value.trim();
+    if (taskNumber) {
+        taskManager.addDependency(taskNumber, 'blocks');
+    }
 }
 
 // Close modal when clicking outside
