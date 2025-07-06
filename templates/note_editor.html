@@ -3,9 +3,68 @@
 {% block content %}
 <div class="timetrack-container note-editor-container">
     <div class="editor-header">
-        <h2>{% if note %}Edit Note{% else %}Create Note{% endif %}</h2>
+        <h2>{% if note %}Edit: {{ note.title }}{% else %}New Note{% endif %}</h2>
         <div class="editor-actions">
-            <a href="{{ url_for('notes_list') }}" class="btn btn-secondary">Cancel</a>
+            <button type="button" class="btn-icon settings-btn" id="settings-toggle" title="Settings">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="1"></circle>
+                    <circle cx="12" cy="5" r="1"></circle>
+                    <circle cx="12" cy="19" r="1"></circle>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Settings dropdown menu -->
+    <div class="settings-dropdown" id="settings-dropdown">
+        <div class="settings-content">
+            <h3>Note Settings</h3>
+            
+            <div class="settings-group">
+                <label for="visibility">Visibility</label>
+                <select id="visibility" name="visibility" class="form-control" required>
+                    <option value="Private" {% if not note or note.visibility.value == 'Private' %}selected{% endif %}>
+                        🔒 Private - Only you can see this
+                    </option>
+                    <option value="Team" {% if note and note.visibility.value == 'Team' %}selected{% endif %}>
+                        👥 Team - Your team members can see this
+                    </option>
+                    <option value="Company" {% if note and note.visibility.value == 'Company' %}selected{% endif %}>
+                        🏢 Company - Everyone in your company can see this
+                    </option>
+                </select>
+            </div>
+
+            <div class="settings-group">
+                <label for="project_id">Project (Optional)</label>
+                <select id="project_id" name="project_id" class="form-control">
+                    <option value="">No project</option>
+                    {% for project in projects %}
+                    <option value="{{ project.id }}" {% if note and note.project_id == project.id %}selected{% endif %}>
+                        {{ project.code }} - {{ project.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="settings-group">
+                <label for="task_id">Task (Optional)</label>
+                <select id="task_id" name="task_id" class="form-control">
+                    <option value="">No task</option>
+                    {% for task in tasks %}
+                    <option value="{{ task.id }}" {% if note and note.task_id == task.id %}selected{% endif %}>
+                        #{{ task.id }} - {{ task.title }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="settings-group">
+                <label for="tags">Tags (comma-separated)</label>
+                <input type="text" id="tags" name="tags" class="form-control" 
+                       placeholder="documentation, meeting-notes, technical"
+                       value="{{ ', '.join(note.tags) if note and note.tags else '' }}">
+            </div>
         </div>
     </div>
 
@@ -13,62 +72,9 @@
         <div class="editor-layout">
             <!-- Editor Panel -->
             <div class="editor-panel">
-                <div class="form-group">
-                    <label for="title">Title</label>
-                    <input type="text" id="title" name="title" class="form-control" 
-                           value="{{ note.title if note else '' }}" required autofocus>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="visibility">Visibility</label>
-                        <select id="visibility" name="visibility" class="form-control" required>
-                            <option value="Private" {% if not note or note.visibility.value == 'Private' %}selected{% endif %}>
-                                🔒 Private - Only you can see this
-                            </option>
-                            <option value="Team" {% if note and note.visibility.value == 'Team' %}selected{% endif %}>
-                                👥 Team - Your team members can see this
-                            </option>
-                            <option value="Company" {% if note and note.visibility.value == 'Company' %}selected{% endif %}>
-                                🏢 Company - Everyone in your company can see this
-                            </option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="project_id">Project (Optional)</label>
-                        <select id="project_id" name="project_id" class="form-control">
-                            <option value="">No project</option>
-                            {% for project in projects %}
-                            <option value="{{ project.id }}" {% if note and note.project_id == project.id %}selected{% endif %}>
-                                {{ project.code }} - {{ project.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="task_id">Task (Optional)</label>
-                        <select id="task_id" name="task_id" class="form-control">
-                            <option value="">No task</option>
-                            {% for task in tasks %}
-                            <option value="{{ task.id }}" {% if note and note.task_id == task.id %}selected{% endif %}>
-                                #{{ task.id }} - {{ task.title }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="tags">Tags (comma-separated)</label>
-                    <input type="text" id="tags" name="tags" class="form-control" 
-                           placeholder="documentation, meeting-notes, technical"
-                           value="{{ ', '.join(note.tags) if note and note.tags else '' }}">
-                </div>
-
+                <input type="hidden" id="title" name="title" value="{{ note.title if note else '' }}" required>
+                
                 <div class="form-group editor-group">
-                    <label for="content">Content (Markdown)</label>
                     <div class="editor-toolbar">
                         <button type="button" class="toolbar-btn toolbar-bold" onclick="insertMarkdown('**', '**')" title="Bold">
                             <b>B</b>
@@ -127,8 +133,13 @@
             </div>
 
             <!-- Preview Panel -->
-            <div class="preview-panel">
-                <h3>Preview</h3>
+            <div class="preview-panel" id="preview-panel">
+                <div class="preview-header">
+                    <h3>Preview</h3>
+                    <button type="button" class="btn-icon collapse-btn" id="preview-toggle" title="Toggle Preview">
+                        <span class="collapse-icon">&lt;&lt;</span>
+                    </button>
+                </div>
                 <div id="preview-content" class="markdown-content">
                     <p class="preview-placeholder">Start typing to see the preview...</p>
                 </div>
@@ -167,6 +178,83 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
+    position: relative;
+}
+
+.editor-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.btn-icon {
+    width: 40px;
+    height: 40px;
+    border: 1px solid #dee2e6;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.btn-icon:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.btn-icon:active {
+    background: #e9ecef;
+}
+
+.btn-icon svg {
+    color: #666;
+}
+
+.settings-dropdown {
+    position: fixed;
+    width: 320px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    display: none;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.settings-dropdown.show {
+    display: block;
+}
+
+.settings-content {
+    padding: 1.5rem;
+}
+
+.settings-content h3 {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.1rem;
+    color: #333;
+}
+
+.settings-group {
+    margin-bottom: 1.25rem;
+}
+
+.settings-group:last-child {
+    margin-bottom: 0;
+}
+
+.settings-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #555;
+    font-size: 0.9rem;
 }
 
 .editor-layout {
@@ -174,6 +262,11 @@
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
     min-height: 600px;
+    transition: grid-template-columns 0.3s ease;
+}
+
+.editor-layout.preview-collapsed {
+    grid-template-columns: 1fr 60px;
 }
 
 .editor-panel, .preview-panel {
@@ -185,12 +278,68 @@
 
 .preview-panel {
     background: #f8f9fa;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
 }
 
-.preview-panel h3 {
-    margin-top: 0;
+.preview-panel.collapsed {
+    cursor: pointer;
+}
+
+.preview-panel.collapsed .markdown-content {
+    display: none;
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 1rem;
+}
+
+.preview-header h3 {
+    margin: 0;
     color: #666;
+    transition: transform 0.3s ease;
+}
+
+.preview-panel.collapsed .preview-header {
+    font-size: small;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    width: max-content;
+}
+
+.preview-panel.collapsed .preview-header h3 {
+    margin: 0;
+}
+
+.collapse-btn {
+    transition: transform 0.3s ease;
+    z-index: 10;
+    position: relative;
+}
+
+.preview-panel.collapsed .collapse-btn {
+    display: none;
+}
+
+.collapse-icon {
+    font-size: 16px;
+    font-weight: normal;
+    font-family: monospace;
+    display: inline-block;
+    transition: transform 0.3s ease;
+    line-height: 1;
+    letter-spacing: -2px;
+    color: #666;
+}
+
+.editor-layout.preview-collapsed .collapse-icon {
+    transform: rotate(180deg);
 }
 
 .form-row {
@@ -416,9 +565,19 @@
     font-style: italic;
 }
 
+/* Form elements inside settings dropdown */
+.settings-dropdown .form-control {
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+}
+
 /* Responsive design */
 @media (max-width: 1024px) {
     .editor-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .editor-layout.preview-collapsed {
         grid-template-columns: 1fr;
     }
     
@@ -428,8 +587,26 @@
         max-height: 400px;
     }
     
+    .preview-panel.collapsed {
+        min-height: 60px;
+        max-height: 60px;
+    }
+    
+    .preview-panel.collapsed .preview-header {
+        position: static;
+        transform: none;
+    }
+    
+    .preview-panel.collapsed .collapse-btn {
+        display: flex;
+    }
+    
     .form-row {
         grid-template-columns: 1fr;
+    }
+    
+    .settings-dropdown {
+        width: 300px;
     }
 }
 </style>
@@ -476,12 +653,43 @@ function insertMarkdown(before, after) {
     syncContentAndUpdatePreview();
 }
 
+// Extract title from first line of content
+function extractTitleFromContent(content) {
+    const lines = content.split('\n');
+    let firstLine = '';
+    
+    // Find the first non-empty line
+    for (let line of lines) {
+        const trimmed = line.trim();
+        if (trimmed) {
+            // Remove markdown headers if present
+            firstLine = trimmed.replace(/^#+\s*/, '');
+            break;
+        }
+    }
+    
+    // If no non-empty line found, use default
+    return firstLine || 'Untitled Note';
+}
+
 // Sync Ace Editor content with hidden textarea and update preview
 function syncContentAndUpdatePreview() {
     if (!aceEditor) return;
     
     const content = aceEditor.getValue();
     document.getElementById('content').value = content;
+    
+    // Update title from first line
+    const title = extractTitleFromContent(content);
+    document.getElementById('title').value = title;
+    
+    // Update the page header to show current title
+    const headerTitle = document.querySelector('.editor-header h2');
+    if (headerTitle) {
+        const isEdit = headerTitle.textContent.includes('Edit');
+        headerTitle.textContent = title ? (isEdit ? `Edit: ${title}` : title) : (isEdit ? 'Edit Note' : 'Create Note');
+    }
+    
     updatePreview();
 }
 
@@ -549,6 +757,12 @@ function initializeAceEditor() {
     const initialContent = document.getElementById('content').value;
     aceEditor.setValue(initialContent, -1); // -1 moves cursor to start
     
+    // If editing and has content, extract title
+    if (initialContent) {
+        const title = extractTitleFromContent(initialContent);
+        document.getElementById('title').value = title;
+    }
+    
     // Listen for changes in Ace Editor
     aceEditor.on('change', function() {
         syncContentAndUpdatePreview();
@@ -562,8 +776,8 @@ function initializeAceEditor() {
         submitBtn.textContent = 'Saving...';
     });
     
-    // Set focus to title field initially
-    document.getElementById('title').focus();
+    // Set focus to ace editor
+    aceEditor.focus();
 }
 
 // Initialize when DOM is ready
@@ -594,6 +808,106 @@ document.addEventListener('DOMContentLoaded', function() {
             exec: function() { insertMarkdown('[', '](url)'); }
         });
     }
+    
+    // Settings dropdown toggle
+    const settingsBtn = document.getElementById('settings-toggle');
+    const settingsDropdown = document.getElementById('settings-dropdown');
+    
+    function positionDropdown() {
+        const btnRect = settingsBtn.getBoundingClientRect();
+        const dropdownWidth = 320;
+        const dropdownHeight = settingsDropdown.offsetHeight;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // Calculate position
+        let left = btnRect.right - dropdownWidth;
+        let top = btnRect.bottom + 8;
+        
+        // Adjust if it goes off the right edge
+        if (left + dropdownWidth > viewportWidth - 20) {
+            left = viewportWidth - dropdownWidth - 20;
+        }
+        
+        // Adjust if it goes off the left edge
+        if (left < 20) {
+            left = 20;
+        }
+        
+        // Adjust if it goes off the bottom
+        if (top + dropdownHeight > viewportHeight - 20) {
+            // Show above the button instead
+            top = btnRect.top - dropdownHeight - 8;
+        }
+        
+        settingsDropdown.style.left = left + 'px';
+        settingsDropdown.style.top = top + 'px';
+    }
+    
+    settingsBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const isShowing = settingsDropdown.classList.contains('show');
+        
+        if (!isShowing) {
+            settingsDropdown.classList.add('show');
+            // Position after showing to get correct dimensions
+            positionDropdown();
+        } else {
+            settingsDropdown.classList.remove('show');
+        }
+    });
+    
+    // Reposition on window resize
+    window.addEventListener('resize', function() {
+        if (settingsDropdown.classList.contains('show')) {
+            positionDropdown();
+        }
+    });
+    
+    // Close settings dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!settingsDropdown.contains(e.target) && !settingsBtn.contains(e.target)) {
+            settingsDropdown.classList.remove('show');
+        }
+    });
+    
+    // Prevent dropdown from closing when clicking inside
+    settingsDropdown.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Preview panel collapse/expand
+    const previewToggle = document.getElementById('preview-toggle');
+    const previewPanel = document.getElementById('preview-panel');
+    const editorLayout = document.querySelector('.editor-layout');
+    
+    previewToggle.addEventListener('click', function(e) {
+        e.stopPropagation(); // Prevent event bubbling
+        previewPanel.classList.toggle('collapsed');
+        editorLayout.classList.toggle('preview-collapsed');
+        
+        // Resize Ace Editor after animation
+        setTimeout(function() {
+            if (aceEditor) {
+                aceEditor.resize();
+            }
+        }, 300);
+    });
+    
+    // Click on collapsed preview to expand
+    previewPanel.addEventListener('click', function(e) {
+        if (this.classList.contains('collapsed')) {
+            this.classList.remove('collapsed');
+            editorLayout.classList.remove('preview-collapsed');
+            
+            // Resize Ace Editor after animation
+            setTimeout(function() {
+                if (aceEditor) {
+                    aceEditor.resize();
+                }
+            }, 300);
+        }
+    });
 });
 </script>
 
