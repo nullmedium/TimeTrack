@@ -608,6 +608,96 @@ footer {
     margin: 0 0.5rem;
 }
 
+/* Email Nag Banner */
+.email-nag-banner {
+    background-color: #e3f2fd;
+    border-bottom: 2px solid #1976d2;
+    padding: 0.75rem 1rem;
+    position: relative;
+    animation: slideDown 0.3s ease-out;
+}
+
+.email-nag-banner.email-verify {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+}
+
+.email-nag-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.email-nag-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.email-nag-text {
+    flex: 1;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.email-nag-dismiss {
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.email-nag-dismiss:hover {
+    background-color: rgba(0,0,0,0.1);
+    color: #333;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .email-nag-content {
+        padding-right: 2rem;
+    }
+    
+    .email-nag-text {
+        font-size: 0.875rem;
+    }
+}
+
 /* Full width footer when no user (no sidebar) */
 body:not(.has-user) footer {
     margin-left: 0;

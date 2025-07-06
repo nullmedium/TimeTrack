@@ -206,6 +206,31 @@
             {% endif %}
         {% endwith %}
         
+        <!-- Email Nag Screens -->
+        {% if g.show_email_nag %}
+            <div class="email-nag-banner">
+                <div class="email-nag-content">
+                    <span class="email-nag-icon">📧</span>
+                    <span class="email-nag-text">
+                        <strong>Add your email address</strong> to enable account recovery and receive important notifications.
+                    </span>
+                    <a href="{{ url_for('profile') }}" class="btn btn-sm btn-primary">Add Email</a>
+                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session">×</button>
+                </div>
+            </div>
+        {% elif g.show_email_verification_nag %}
+            <div class="email-nag-banner email-verify">
+                <div class="email-nag-content">
+                    <span class="email-nag-icon">✉️</span>
+                    <span class="email-nag-text">
+                        <strong>Please verify your email address</strong> to ensure you can recover your account if needed.
+                    </span>
+                    <a href="{{ url_for('profile') }}" class="btn btn-sm btn-warning">Verify Email</a>
+                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session">×</button>
+                </div>
+            </div>
+        {% endif %}
+        
         {% block content %}{% endblock %}
     </main>
 
@@ -229,6 +254,28 @@
     <script src="{{ url_for('static', filename='js/password-strength.js') }}"></script>
     {% if g.user %}
     <script src="{{ url_for('static', filename='js/user-dropdown.js') }}"></script>
+    <script>
+        function dismissEmailNag() {
+            // Hide the banner with animation
+            const banner = document.querySelector('.email-nag-banner');
+            if (banner) {
+                banner.style.animation = 'slideUp 0.3s ease-out';
+                setTimeout(() => {
+                    banner.style.display = 'none';
+                }, 300);
+            }
+            // Store in session storage to not show again this session
+            sessionStorage.setItem('emailNagDismissed', 'true');
+        }
+        
+        // Check if already dismissed this session
+        if (sessionStorage.getItem('emailNagDismissed') === 'true') {
+            const banner = document.querySelector('.email-nag-banner');
+            if (banner) {
+                banner.style.display = 'none';
+            }
+        }
+    </script>
     {% else %}
     <script src="{{ url_for('static', filename='js/splash.js') }}"></script>
     {% endif %}

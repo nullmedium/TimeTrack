@@ -397,13 +397,18 @@ def load_logged_in_user():
             else:
                 g.company = None
 
-            # Check if user is verified
-            if not g.user.is_verified and request.endpoint not in ['verify_email', 'static', 'logout', 'setup_company']:
-                # Allow unverified users to access only verification and static resources
-                if request.endpoint not in ['login', 'register']:
-                    flash('Please verify your email address before accessing this page.', 'warning')
-                    session.clear()
-                    return redirect(url_for('login'))
+            # Check if user has email but not verified
+            if g.user and not g.user.is_verified and g.user.email:
+                # Add a flag for templates to show email verification nag
+                g.show_email_verification_nag = True
+            else:
+                g.show_email_verification_nag = False
+                
+            # Check if user has no email at all
+            if g.user and not g.user.email:
+                g.show_email_nag = True
+            else:
+                g.show_email_nag = False
         else:
             g.company = None
     
@@ -569,8 +574,6 @@ def register():
         error = None
         if not username:
             error = 'Username is required'
-        elif not email:
-            error = 'Email is required'
         elif not password:
             error = 'Password is required'
         elif password != confirm_password:
@@ -596,7 +599,7 @@ def register():
         if company and not error:
             if User.query.filter_by(username=username, company_id=company.id).first():
                 error = 'Username already exists in this company'
-            elif User.query.filter_by(email=email, company_id=company.id).first():
+            elif email and User.query.filter_by(email=email, company_id=company.id).first():
                 error = 'Email already registered in this company'
 
         if error is None and company:
@@ -690,8 +693,6 @@ def register_freelancer():
         error = None
         if not username:
             error = 'Username is required'
-        elif not email:
-            error = 'Email is required'
         elif not password:
             error = 'Password is required'
         elif password != confirm_password:
@@ -708,7 +709,7 @@ def register_freelancer():
         if not error:
             if User.query.filter_by(username=username).first():
                 error = 'Username already exists'
-            elif User.query.filter_by(email=email).first():
+            elif email and User.query.filter_by(email=email).first():
                 error = 'Email already registered'
 
         if error is None:
