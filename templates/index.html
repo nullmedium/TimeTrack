@@ -63,9 +63,9 @@
         </div>
     </section>
 
-    <!-- Why TimeTrack Section -->
+    <!-- Why Choose Section -->
     <section class="statistics">
-        <h2 class="section-title">Why Choose TimeTrack?</h2>
+        <h2 class="section-title">Why Choose {{ g.branding.app_name if g.branding else 'TimeTrack' }}?</h2>
         <div class="stat-item">
             <div class="stat-number">100%</div>
             <div class="stat-label">Free & Open Source</div>
@@ -112,7 +112,7 @@
         <div class="pricing-cards">
             <div class="pricing-card featured">
                 <div class="badge">100% Free</div>
-                <h3>TimeTrack Community</h3>
+                <h3>{{ g.branding.app_name if g.branding else 'TimeTrack' }} Community</h3>
                 <div class="price">$0<span>/forever</span></div>
                 <ul class="pricing-features">
                     <li>✓ Unlimited users</li>
@@ -128,7 +128,10 @@
             </div>
         </div>
         <p style="text-align: center; margin-top: 2rem; color: #666;">
-            TimeTrack is open source software. Host it yourself or use our free hosted version.
+            The software {{ g.branding.app_name if g.branding else 'TimeTrack' }} runs is open source software.<br />
+            Host it yourself or use our free hosted version.<br />
+            The source is available on GitHub:
+            <a href="https://github.com/nullmedium/TimeTrack" target="_blank">https://github.com/nullmedium/TimeTrack</a>
         </p>
     </section>
 
