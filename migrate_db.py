@@ -1280,7 +1280,21 @@ def migrate_postgresql_schema():
                 WHERE table_name = 'note'
             """))
             
-            if not result.fetchone():
+            if result.fetchone():
+                # Table exists, check for folder column
+                result = db.session.execute(text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'note' AND column_name = 'folder'
+                """))
+                
+                if not result.fetchone():
+                    print("Adding folder column to note table...")
+                    db.session.execute(text("ALTER TABLE note ADD COLUMN folder VARCHAR(100)"))
+                    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_note_folder ON note(folder)"))
+                    db.session.commit()
+                    print("Folder column added successfully!")
+            else:
                 print("Creating note and note_link tables...")
                 
                 # Create NoteVisibility enum type
@@ -1299,6 +1313,7 @@ def migrate_postgresql_schema():
                         content TEXT NOT NULL,
                         slug VARCHAR(100) NOT NULL,
                         visibility notevisibility NOT NULL DEFAULT 'Private',
+                        folder VARCHAR(100),
                         company_id INTEGER NOT NULL,
                         created_by_id INTEGER NOT NULL,
                         project_id INTEGER,
@@ -1327,6 +1342,31 @@ def migrate_postgresql_schema():
                     )
                 """))
                 
+                # Check if note_folder table exists
+                result = db.session.execute(text("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_name = 'note_folder'
+                """))
+                
+                if not result.fetchone():
+                    print("Creating note_folder table...")
+                    db.session.execute(text("""
+                        CREATE TABLE note_folder (
+                            id SERIAL PRIMARY KEY,
+                            name VARCHAR(100) NOT NULL,
+                            path VARCHAR(500) NOT NULL,
+                            parent_path VARCHAR(500),
+                            description TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            created_by_id INTEGER NOT NULL,
+                            company_id INTEGER NOT NULL,
+                            FOREIGN KEY (created_by_id) REFERENCES "user" (id),
+                            FOREIGN KEY (company_id) REFERENCES company (id),
+                            CONSTRAINT uq_folder_path_company UNIQUE (path, company_id)
+                        )
+                    """))
+                
                 # Create indexes
                 db.session.execute(text("CREATE INDEX idx_note_company ON note(company_id)"))
                 db.session.execute(text("CREATE INDEX idx_note_created_by ON note(created_by_id)"))
@@ -1334,10 +1374,22 @@ def migrate_postgresql_schema():
                 db.session.execute(text("CREATE INDEX idx_note_task ON note(task_id)"))
                 db.session.execute(text("CREATE INDEX idx_note_slug ON note(company_id, slug)"))
                 db.session.execute(text("CREATE INDEX idx_note_visibility ON note(visibility)"))
-                db.session.execute(text("CREATE INDEX idx_note_archived ON note(archived)"))
+                db.session.execute(text("CREATE INDEX idx_note_archived ON note(is_archived)"))
                 db.session.execute(text("CREATE INDEX idx_note_created_at ON note(created_at DESC)"))
+                db.session.execute(text("CREATE INDEX idx_note_folder ON note(folder)"))
                 db.session.execute(text("CREATE INDEX idx_note_link_source ON note_link(source_note_id)"))
                 db.session.execute(text("CREATE INDEX idx_note_link_target ON note_link(target_note_id)"))
+                
+                # Create indexes for note_folder if table was created
+                result = db.session.execute(text("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_name = 'note_folder'
+                """))
+                if result.fetchone():
+                    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_note_folder_company ON note_folder(company_id)"))
+                    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_note_folder_parent_path ON note_folder(parent_path)"))
+                    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_note_folder_created_by ON note_folder(created_by_id)"))
                 
                 db.session.commit()
             
@@ -1568,7 +1620,46 @@ def migrate_notes_system(db_file=None):
         # Check if note table already exists
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='note'")
         if cursor.fetchone():
-            print("Note table already exists. Skipping migration.")
+            print("Note table already exists. Checking for updates...")
+            
+            # Check if folder column exists
+            cursor.execute("PRAGMA table_info(note)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'folder' not in columns:
+                print("Adding folder column to note table...")
+                cursor.execute("ALTER TABLE note ADD COLUMN folder VARCHAR(100)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_note_folder ON note(folder)")
+                conn.commit()
+                print("Folder column added successfully!")
+            
+            # Check if note_folder table exists
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='note_folder'")
+            if not cursor.fetchone():
+                print("Creating note_folder table...")
+                cursor.execute("""
+                CREATE TABLE note_folder (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name VARCHAR(100) NOT NULL,
+                    path VARCHAR(500) NOT NULL,
+                    parent_path VARCHAR(500),
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by_id INTEGER NOT NULL,
+                    company_id INTEGER NOT NULL,
+                    FOREIGN KEY (created_by_id) REFERENCES user(id),
+                    FOREIGN KEY (company_id) REFERENCES company(id),
+                    UNIQUE(path, company_id)
+                )
+                """)
+                
+                # Create indexes for note_folder
+                cursor.execute("CREATE INDEX idx_note_folder_company ON note_folder(company_id)")
+                cursor.execute("CREATE INDEX idx_note_folder_parent_path ON note_folder(parent_path)")
+                cursor.execute("CREATE INDEX idx_note_folder_created_by ON note_folder(created_by_id)")
+                conn.commit()
+                print("Note folder table created successfully!")
+            
             return True
 
         print("Creating Notes system tables...")
@@ -1581,6 +1672,7 @@ def migrate_notes_system(db_file=None):
             content TEXT NOT NULL,
             slug VARCHAR(100) NOT NULL,
             visibility VARCHAR(20) NOT NULL DEFAULT 'Private',
+            folder VARCHAR(100),
             company_id INTEGER NOT NULL,
             created_by_id INTEGER NOT NULL,
             project_id INTEGER,
@@ -1625,6 +1717,28 @@ def migrate_notes_system(db_file=None):
         # Create indexes for note links
         cursor.execute("CREATE INDEX idx_note_link_source ON note_link(source_note_id)")
         cursor.execute("CREATE INDEX idx_note_link_target ON note_link(target_note_id)")
+        
+        # Create note_folder table
+        cursor.execute("""
+        CREATE TABLE note_folder (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) NOT NULL,
+            path VARCHAR(500) NOT NULL,
+            parent_path VARCHAR(500),
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_by_id INTEGER NOT NULL,
+            company_id INTEGER NOT NULL,
+            FOREIGN KEY (created_by_id) REFERENCES user(id),
+            FOREIGN KEY (company_id) REFERENCES company(id),
+            UNIQUE(path, company_id)
+        )
+        """)
+        
+        # Create indexes for note_folder
+        cursor.execute("CREATE INDEX idx_note_folder_company ON note_folder(company_id)")
+        cursor.execute("CREATE INDEX idx_note_folder_parent_path ON note_folder(parent_path)")
+        cursor.execute("CREATE INDEX idx_note_folder_created_by ON note_folder(created_by_id)")
 
         conn.commit()
         print("Notes system migration completed successfully!")

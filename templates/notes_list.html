@@ -5,14 +5,60 @@
     <div class="admin-header">
         <h2>Notes</h2>
         <div class="admin-actions">
+            <button type="button" class="btn btn-sm btn-secondary" id="toggle-sidebar">
+                <span>📁</span> Toggle Folders
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary" id="toggle-view">
+                <span class="view-icon">☰</span> List View
+            </button>
+            <a href="{{ url_for('notes_folders') }}" class="btn btn-sm btn-info">
+                <span>⚙️</span> Manage Folders
+            </a>
             <a href="{{ url_for('create_note') }}" class="btn btn-md btn-success">Create New Note</a>
         </div>
     </div>
+    
+    <div class="notes-layout">
+        <!-- Folder Tree Sidebar -->
+        <div class="folder-sidebar" id="folder-sidebar">
+            <div class="sidebar-header">
+                <h3>Folders</h3>
+                <button type="button" class="btn-icon" onclick="showCreateFolderModal()" title="Create Folder">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="folder-tree" id="folder-tree">
+                <div class="folder-item root-folder" data-folder="">
+                    <div class="folder-content" onclick="filterByFolder('')">
+                        <span class="folder-icon">🏠</span>
+                        <span class="folder-name">All Notes</span>
+                        <span class="folder-count">({{ notes|length }})</span>
+                    </div>
+                </div>
+                {{ render_folder_tree(folder_tree)|safe }}
+            </div>
+        </div>
+        
+        <!-- Main Notes Content -->
+        <div class="notes-content">
 
     <!-- Filter Section -->
     <div class="notes-filter-section">
         <form method="GET" action="{{ url_for('notes_list') }}" class="filter-form">
             <div class="filter-row">
+                <div class="filter-group">
+                    <label for="folder">Folder:</label>
+                    <select name="folder" id="folder" onchange="this.form.submit()">
+                        <option value="">All Folders</option>
+                        {% for folder in all_folders %}
+                        <option value="{{ folder }}" {% if request.args.get('folder') == folder %}selected{% endif %}>
+                            📁 {{ folder }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <div class="filter-group">
                     <label for="visibility">Visibility:</label>
                     <select name="visibility" id="visibility" onchange="this.form.submit()">
@@ -31,17 +77,6 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="filter-group">
-                    <label for="project_id">Project:</label>
-                    <select name="project_id" id="project_id" onchange="this.form.submit()">
-                        <option value="">All Projects</option>
-                        {% for project in projects %}
-                        <option value="{{ project.id }}" {% if request.args.get('project_id')|int == project.id %}selected{% endif %}>
-                            {{ project.code }} - {{ project.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
                 <div class="filter-group search-group">
                     <label for="search">Search:</label>
                     <input type="text" name="search" id="search" placeholder="Search notes..." 
@@ -53,78 +88,159 @@
     </div>
 
     {% if notes %}
-    <div class="notes-grid">
-        {% for note in notes %}
-        <div class="note-card">
-            <div class="note-header">
-                <h3 class="note-title">
-                    <a href="{{ url_for('view_note', slug=note.slug) }}">{{ note.title }}</a>
-                </h3>
-                <div class="note-meta">
-                    <span class="visibility-badge visibility-{{ note.visibility.value.lower() }}">
-                        {% if note.visibility.value == 'Private' %}🔒{% elif note.visibility.value == 'Team' %}👥{% else %}🏢{% endif %}
-                        {{ note.visibility.value }}
-                    </span>
-                    {% if note.updated_at > note.created_at %}
-                    <span class="note-date">Updated {{ note.updated_at|format_date }}</span>
-                    {% else %}
-                    <span class="note-date">Created {{ note.created_at|format_date }}</span>
-                    {% endif %}
-                </div>
-            </div>
-            
-            <div class="note-preview">
-                {{ note.get_preview()|safe }}
-            </div>
-            
-            <div class="note-footer">
-                <div class="note-tags">
-                    {% if note.tags %}
-                        {% for tag in note.tags %}
-                        <a href="{{ url_for('notes_list', tag=tag) }}" class="tag-badge">{{ tag }}</a>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-                <div class="note-associations">
-                    {% if note.project %}
-                    <span class="association-badge project">
-                        📁 {{ note.project.code }}
-                    </span>
-                    {% endif %}
-                    {% if note.task %}
-                    <span class="association-badge task">
-                        ✓ Task #{{ note.task.id }}
-                    </span>
-                    {% endif %}
-                    {% if note.outgoing_links or note.incoming_links %}
-                    <span class="association-badge links">
-                        🔗 {{ (note.outgoing_links|length + note.incoming_links|length) }} link{% if (note.outgoing_links|length + note.incoming_links|length) != 1 %}s{% endif %}
-                    </span>
-                    {% endif %}
-                </div>
-            </div>
-            
-            <div class="note-actions">
-                <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn btn-sm btn-primary">View</a>
-                {% if note.can_user_edit(g.user) %}
-                <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn btn-sm btn-info">Edit</a>
-                <form method="POST" action="{{ url_for('delete_note', slug=note.slug) }}" style="display: inline;"
-                      onsubmit="return confirm('Are you sure you want to delete this note?')">
-                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                </form>
-                {% endif %}
-            </div>
-        </div>
-        {% endfor %}
+    <!-- Table View (Default) -->
+    <div id="table-view" class="notes-view">
+        <table class="notes-table">
+            <thead>
+                <tr>
+                    <th class="column-pin"></th>
+                    <th class="column-title">Title</th>
+                    <th class="column-folder">Folder</th>
+                    <th class="column-visibility">Visibility</th>
+                    <th class="column-tags">Tags</th>
+                    <th class="column-updated">Updated</th>
+                    <th class="column-actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for note in notes %}
+                <tr class="note-row {% if note.is_pinned %}pinned{% endif %}" data-note-slug="{{ note.slug }}">
+                    <td class="column-pin">
+                        {% if note.is_pinned %}
+                        <span class="pin-icon" title="Pinned">📌</span>
+                        {% endif %}
+                    </td>
+                    <td class="column-title">
+                        <a href="{{ url_for('view_note', slug=note.slug) }}" class="note-link">
+                            {{ note.title }}
+                        </a>
+                        <div class="note-associations">
+                            {% if note.project %}
+                            <span class="association-badge project" title="Project: {{ note.project.name }}">
+                                📁 {{ note.project.code }}
+                            </span>
+                            {% endif %}
+                            {% if note.task %}
+                            <span class="association-badge task" title="Task #{{ note.task.id }}">
+                                ✓ #{{ note.task.id }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="column-folder">
+                        {% if note.folder %}
+                        <span class="folder-path">{{ note.folder }}</span>
+                        {% else %}
+                        <span class="folder-path muted">Root</span>
+                        {% endif %}
+                    </td>
+                    <td class="column-visibility">
+                        <span class="visibility-badge visibility-{{ note.visibility.value.lower() }}">
+                            {% if note.visibility.value == 'Private' %}🔒{% elif note.visibility.value == 'Team' %}👥{% else %}🏢{% endif %}
+                            {{ note.visibility.value }}
+                        </span>
+                    </td>
+                    <td class="column-tags">
+                        {% if note.tags %}
+                            {% for tag in note.get_tags_list() %}
+                            <a href="{{ url_for('notes_list', tag=tag) }}" class="tag-badge">{{ tag }}</a>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                    <td class="column-updated">
+                        <span class="date-text">{{ note.updated_at|format_date }}</span>
+                    </td>
+                    <td class="column-actions">
+                        <div class="note-actions">
+                            <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn btn-xs btn-primary">View</a>
+                            {% if note.can_user_edit(g.user) %}
+                            <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn btn-xs btn-info">Edit</a>
+                            <form method="POST" action="{{ url_for('delete_note', slug=note.slug) }}" style="display: inline;"
+                                  onsubmit="return confirm('Are you sure you want to delete this note?')">
+                                <button type="submit" class="btn btn-xs btn-danger">Delete</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-    
+
+    <!-- Grid View (Hidden by default) -->
+    <div id="grid-view" class="notes-view" style="display: none;">
+        <div class="notes-grid">
+            {% for note in notes %}
+            <div class="note-card" data-note-slug="{{ note.slug }}">
+                <div class="note-header">
+                    <h3 class="note-title">
+                        <a href="{{ url_for('view_note', slug=note.slug) }}">{{ note.title }}</a>
+                        {% if note.is_pinned %}
+                        <span class="pin-icon" title="Pinned">📌</span>
+                        {% endif %}
+                    </h3>
+                    <div class="note-meta">
+                        <span class="visibility-badge visibility-{{ note.visibility.value.lower() }}">
+                            {% if note.visibility.value == 'Private' %}🔒{% elif note.visibility.value == 'Team' %}👥{% else %}🏢{% endif %}
+                            {{ note.visibility.value }}
+                        </span>
+                        {% if note.folder %}
+                        <span class="folder-badge">📁 {{ note.folder }}</span>
+                        {% endif %}
+                        <span class="note-date">{{ note.updated_at|format_date }}</span>
+                    </div>
+                </div>
+                
+                <div class="note-preview">
+                    {{ note.get_preview()|safe }}
+                </div>
+                
+                <div class="note-footer">
+                    <div class="note-tags">
+                        {% if note.tags %}
+                            {% for tag in note.get_tags_list() %}
+                            <a href="{{ url_for('notes_list', tag=tag) }}" class="tag-badge">{{ tag }}</a>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    <div class="note-associations">
+                        {% if note.project %}
+                        <span class="association-badge project">
+                            📁 {{ note.project.code }}
+                        </span>
+                        {% endif %}
+                        {% if note.task %}
+                        <span class="association-badge task">
+                            ✓ Task #{{ note.task.id }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="note-actions">
+                    <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn btn-sm btn-primary">View</a>
+                    {% if note.can_user_edit(g.user) %}
+                    <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn btn-sm btn-info">Edit</a>
+                    <form method="POST" action="{{ url_for('delete_note', slug=note.slug) }}" style="display: inline;"
+                          onsubmit="return confirm('Are you sure you want to delete this note?')">
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
     
     {% else %}
     <div class="no-data">
         <p>No notes found. <a href="{{ url_for('create_note') }}">Create your first note</a>.</p>
     </div>
     {% endif %}
-</div>
+        </div> <!-- End notes-content -->
+    </div> <!-- End notes-layout -->
+</div> <!-- End notes-list-container -->
 
 <style>
 /* Notes list specific styles */
@@ -133,6 +249,177 @@
     width: 100% !important;
     padding: 1rem !important;
     margin: 0 !important;
+}
+
+/* Sidebar layout */
+.notes-layout {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.folder-sidebar {
+    width: 250px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.sidebar-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #333;
+}
+
+.btn-icon {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #dee2e6;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+}
+
+.btn-icon:hover {
+    background: #f8f9fa;
+    color: #333;
+}
+
+.notes-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notes-layout.sidebar-hidden .notes-content {
+    margin-left: 0;
+}
+
+/* Folder tree styles */
+.folder-tree {
+    font-size: 0.9rem;
+}
+
+.folder-item {
+    position: relative;
+    margin: 0.25rem 0;
+}
+
+.folder-item.has-children > .folder-content::before {
+    content: "▶";
+    position: absolute;
+    left: -15px;
+    transition: transform 0.2s;
+    cursor: pointer;
+}
+
+.folder-item.has-children.expanded > .folder-content::before {
+    transform: rotate(90deg);
+}
+
+.folder-content {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    margin-left: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+    position: relative;
+}
+
+.folder-content:hover {
+    background: #f8f9fa;
+}
+
+.folder-content.drag-over {
+    background: #e3f2fd;
+    border: 2px dashed #2196F3;
+}
+
+.root-folder .folder-content {
+    margin-left: 0;
+    font-weight: 500;
+}
+
+.folder-icon {
+    margin-right: 0.5rem;
+}
+
+.folder-name {
+    flex: 1;
+}
+
+.folder-count {
+    font-size: 0.85rem;
+    color: #666;
+    margin-left: 0.5rem;
+}
+
+.folder-children {
+    margin-left: 1.5rem;
+    display: none;
+}
+
+.folder-item.expanded > .folder-children {
+    display: block;
+}
+
+/* Drag and drop styles */
+.note-row.dragging,
+.note-card.dragging {
+    opacity: 0.5;
+    cursor: move;
+}
+
+.note-row,
+.note-card {
+    cursor: grab;
+}
+
+.note-row:active,
+.note-card:active {
+    cursor: grabbing;
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.admin-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+#toggle-view {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.view-icon {
+    font-size: 1.2rem;
 }
 
 .notes-filter-section {
@@ -186,6 +473,185 @@
     flex: 1;
 }
 
+/* Table View Styles */
+.notes-table {
+    width: 100%;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.notes-table thead {
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.notes-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.notes-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #f1f3f5;
+    vertical-align: middle;
+}
+
+.notes-table tr:hover {
+    background: #f8f9fa;
+}
+
+.notes-table tr.pinned {
+    background: #fffbf0;
+}
+
+.column-pin {
+    width: 40px;
+    text-align: center;
+}
+
+.pin-icon {
+    font-size: 1rem;
+}
+
+.column-title {
+    min-width: 300px;
+}
+
+.note-link {
+    color: #333;
+    text-decoration: none;
+    font-weight: 500;
+    display: block;
+}
+
+.note-link:hover {
+    color: var(--primary-color);
+}
+
+.column-folder {
+    width: 150px;
+}
+
+.folder-path {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.folder-path.muted {
+    color: #aaa;
+    font-style: italic;
+}
+
+.folder-badge {
+    background: #e9ecef;
+    color: #495057;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.column-visibility {
+    width: 120px;
+}
+
+.column-tags {
+    min-width: 200px;
+}
+
+.column-updated {
+    width: 150px;
+}
+
+.date-text {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.column-actions {
+    width: 180px;
+}
+
+.note-associations {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.visibility-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.visibility-private {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.visibility-team {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.visibility-company {
+    background: #d4edda;
+    color: #155724;
+}
+
+.tag-badge {
+    background: #e9ecef;
+    color: #495057;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-decoration: none;
+    transition: background 0.2s ease;
+    display: inline-block;
+    margin-right: 0.25rem;
+}
+
+.tag-badge:hover {
+    background: #dee2e6;
+    color: #333;
+}
+
+.association-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.association-badge.project {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.association-badge.task {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.note-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.btn-xs {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+/* Grid View Styles */
 .notes-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -214,6 +680,9 @@
 .note-title {
     margin: 0 0 0.5rem 0;
     font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .note-title a {
@@ -227,32 +696,11 @@
 
 .note-meta {
     display: flex;
-    gap: 1rem;
+    gap: 0.75rem;
     align-items: center;
     font-size: 0.85rem;
     color: #666;
-}
-
-.visibility-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: 500;
-}
-
-.visibility-private {
-    background: #f8d7da;
-    color: #721c24;
-}
-
-.visibility-team {
-    background: #d1ecf1;
-    color: #0c5460;
-}
-
-.visibility-company {
-    background: #d4edda;
-    color: #155724;
+    flex-wrap: wrap;
 }
 
 .note-preview {
@@ -281,73 +729,14 @@
     flex-wrap: wrap;
 }
 
-.tag-badge {
-    background: #e9ecef;
-    color: #495057;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    text-decoration: none;
-    transition: background 0.2s ease;
-}
-
-.tag-badge:hover {
-    background: #dee2e6;
-    color: #333;
-}
-
-.note-associations {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.association-badge {
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.association-badge.project {
-    background: #fff3cd;
-    color: #856404;
-}
-
-.association-badge.task {
-    background: #cce5ff;
-    color: #004085;
-}
-
-.association-badge.links {
-    background: #f5c6cb;
-    color: #721c24;
-}
-
-.note-actions {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-start;
-}
-
-.note-actions form {
-    margin: 0;
-}
-
-.pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-    margin-top: 2rem;
-}
-
-.page-info {
-    color: #666;
-    font-size: 0.9rem;
-}
-
 /* Responsive design */
+@media (max-width: 1024px) {
+    .column-folder,
+    .column-tags {
+        display: none;
+    }
+}
+
 @media (max-width: 768px) {
     .filter-row {
         flex-direction: column;
@@ -365,7 +754,359 @@
     .notes-grid {
         grid-template-columns: 1fr;
     }
+    
+    .column-visibility,
+    .column-updated {
+        display: none;
+    }
+    
+    .notes-table {
+        font-size: 0.85rem;
+    }
+}
+
+/* Modal styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    width: 90%;
+    max-width: 500px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    color: #333;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 0.95rem;
 }
 </style>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('toggle-view');
+    const tableView = document.getElementById('table-view');
+    const gridView = document.getElementById('grid-view');
+    const viewIcon = toggleBtn.querySelector('.view-icon');
+    
+    // Load saved view preference
+    const savedView = localStorage.getItem('notes-view') || 'table';
+    if (savedView === 'grid') {
+        tableView.style.display = 'none';
+        gridView.style.display = 'block';
+        viewIcon.textContent = '⊞';
+        toggleBtn.innerHTML = '<span class="view-icon">⊞</span> Grid View';
+    }
+    
+    toggleBtn.addEventListener('click', function() {
+        if (tableView.style.display === 'none') {
+            // Switch to table view
+            tableView.style.display = 'block';
+            gridView.style.display = 'none';
+            viewIcon.textContent = '☰';
+            toggleBtn.innerHTML = '<span class="view-icon">☰</span> List View';
+            localStorage.setItem('notes-view', 'table');
+        } else {
+            // Switch to grid view
+            tableView.style.display = 'none';
+            gridView.style.display = 'block';
+            viewIcon.textContent = '⊞';
+            toggleBtn.innerHTML = '<span class="view-icon">⊞</span> Grid View';
+            localStorage.setItem('notes-view', 'grid');
+        }
+    });
+    
+    // Toggle sidebar functionality
+    const toggleSidebarBtn = document.getElementById('toggle-sidebar');
+    const folderSidebar = document.getElementById('folder-sidebar');
+    const notesLayout = document.querySelector('.notes-layout');
+    
+    // Load saved sidebar preference
+    const sidebarVisible = localStorage.getItem('notes-sidebar-visible') !== 'false';
+    if (!sidebarVisible) {
+        folderSidebar.style.display = 'none';
+        notesLayout.classList.add('sidebar-hidden');
+    }
+    
+    toggleSidebarBtn.addEventListener('click', function() {
+        if (folderSidebar.style.display === 'none') {
+            folderSidebar.style.display = 'block';
+            notesLayout.classList.remove('sidebar-hidden');
+            localStorage.setItem('notes-sidebar-visible', 'true');
+        } else {
+            folderSidebar.style.display = 'none';
+            notesLayout.classList.add('sidebar-hidden');
+            localStorage.setItem('notes-sidebar-visible', 'false');
+        }
+    });
+    
+    // Enable drag and drop for notes
+    enableDragAndDrop();
+});
+
+// Folder tree functions
+function toggleFolder(event, folderPath) {
+    event.stopPropagation();
+    const folderItem = event.currentTarget.closest('.folder-item');
+    folderItem.classList.toggle('expanded');
+}
+
+function filterByFolder(folderPath) {
+    // Update the folder filter and submit the form
+    const folderSelect = document.getElementById('folder');
+    if (folderSelect) {
+        folderSelect.value = folderPath;
+        folderSelect.form.submit();
+    }
+}
+
+// Drag and drop functionality
+function enableDragAndDrop() {
+    // Make notes draggable
+    const noteRows = document.querySelectorAll('.note-row');
+    const noteCards = document.querySelectorAll('.note-card');
+    
+    [...noteRows, ...noteCards].forEach(note => {
+        note.draggable = true;
+        note.addEventListener('dragstart', handleDragStart);
+        note.addEventListener('dragend', handleDragEnd);
+    });
+    
+    // Make folders droppable
+    const folderItems = document.querySelectorAll('.folder-content');
+    folderItems.forEach(folder => {
+        folder.addEventListener('dragover', handleDragOver);
+        folder.addEventListener('drop', handleDrop);
+        folder.addEventListener('dragleave', handleDragLeave);
+    });
+}
+
+let draggedNote = null;
+
+function handleDragStart(e) {
+    draggedNote = this;
+    this.classList.add('dragging');
+    
+    // Get note slug from data attribute
+    const noteSlug = this.dataset.noteSlug;
+    
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', noteSlug);
+}
+
+function handleDragEnd(e) {
+    this.classList.remove('dragging');
+    draggedNote = null;
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    
+    e.dataTransfer.dropEffect = 'move';
+    this.classList.add('drag-over');
+    return false;
+}
+
+function handleDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+    
+    this.classList.remove('drag-over');
+    
+    const noteSlug = e.dataTransfer.getData('text/html');
+    const folderPath = this.closest('.folder-item').dataset.folder;
+    
+    if (noteSlug && draggedNote) {
+        // Update note folder via API
+        updateNoteFolder(noteSlug, folderPath);
+    }
+    
+    return false;
+}
+
+function updateNoteFolder(noteSlug, folderPath) {
+    fetch(`/api/notes/${noteSlug}/folder`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ folder: folderPath })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Reload the page to show updated folder
+            window.location.reload();
+        } else {
+            alert('Error moving note: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error moving note to folder');
+    });
+}
+
+// Create folder modal functions
+function showCreateFolderModal() {
+    // Create a simple modal for folder creation
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Folder</h3>
+                <button type="button" class="close-btn" onclick="this.closest('.modal').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createFolderForm">
+                    <div class="form-group">
+                        <label for="folderName">Folder Name</label>
+                        <input type="text" id="folderName" name="name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="parentFolder">Parent Folder (Optional)</label>
+                        <select id="parentFolder" name="parent" class="form-control">
+                            <option value="">Root</option>
+                            {% for folder in all_folders %}
+                            <option value="{{ folder }}">{{ folder }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createFolder()">Create</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    document.getElementById('folderName').focus();
+}
+
+function createFolder() {
+    const form = document.getElementById('createFolderForm');
+    const formData = new FormData(form);
+    
+    fetch('/api/notes/folders', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            name: formData.get('name'),
+            parent: formData.get('parent')
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating folder');
+    });
+}
+</script>
+
 {% endblock %}
+
+{% macro render_folder_tree(tree, level=0) %}
+    {% for folder, children in tree.items() %}
+        <div class="folder-item {% if children %}has-children{% endif %}" data-folder="{{ folder }}">
+            <div class="folder-content" onclick="filterByFolder('{{ folder }}')">
+                {% if children %}
+                    <span onclick="toggleFolder(event, '{{ folder }}')" style="position: absolute; left: -15px; cursor: pointer;">▶</span>
+                {% endif %}
+                <span class="folder-icon">📁</span>
+                <span class="folder-name">{{ folder.split('/')[-1] }}</span>
+                <span class="folder-count">({{ folder_counts.get(folder, 0) }})</span>
+            </div>
+            {% if children %}
+                <div class="folder-children">
+                    {{ render_folder_tree(children, level + 1)|safe }}
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+{% endmacro %}

@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file, abort
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings, Note, NoteLink, NoteVisibility
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings, Note, NoteLink, NoteVisibility, NoteFolder
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data, format_burndown_data
@@ -1616,6 +1616,7 @@ def notes_list():
     # Get filter parameters
     visibility_filter = request.args.get('visibility', 'all')
     tag_filter = request.args.get('tag')
+    folder_filter = request.args.get('folder')
     search_query = request.args.get('search', request.args.get('q'))
     
     # Base query - all notes in user's company
@@ -1654,6 +1655,10 @@ def notes_list():
     if tag_filter:
         query = query.filter(Note.tags.like(f'%{tag_filter}%'))
     
+    # Apply folder filter
+    if folder_filter:
+        query = query.filter_by(folder=folder_filter)
+    
     # Apply search
     if search_query:
         query = query.filter(
@@ -1672,16 +1677,66 @@ def notes_list():
     for note in Note.query.filter_by(company_id=g.user.company_id, is_archived=False).all():
         all_tags.update(note.get_tags_list())
     
+    # Get all unique folders for filter dropdown
+    all_folders = set()
+    
+    # Get folders from NoteFolder table
+    folder_records = NoteFolder.query.filter_by(company_id=g.user.company_id).all()
+    for folder in folder_records:
+        all_folders.add(folder.path)
+    
+    # Also get folders from notes (for backward compatibility)
+    folder_notes = Note.query.filter_by(company_id=g.user.company_id, is_archived=False).filter(Note.folder != None).all()
+    for note in folder_notes:
+        if note.folder:
+            all_folders.add(note.folder)
+    
     # Get projects for filter
     projects = Project.query.filter_by(company_id=g.user.company_id, is_active=True).all()
+    
+    # Build folder tree structure for sidebar
+    folder_counts = {}
+    for note in Note.query.filter_by(company_id=g.user.company_id, is_archived=False).all():
+        if note.folder and note.can_user_view(g.user):
+            # Add this folder and all parent folders
+            parts = note.folder.split('/')
+            for i in range(len(parts)):
+                folder_path = '/'.join(parts[:i+1])
+                folder_counts[folder_path] = folder_counts.get(folder_path, 0) + (1 if i == len(parts)-1 else 0)
+    
+    # Initialize counts for empty folders
+    for folder_path in all_folders:
+        if folder_path not in folder_counts:
+            folder_counts[folder_path] = 0
+    
+    # Build folder tree structure
+    folder_tree = {}
+    for folder in sorted(all_folders):
+        parts = folder.split('/')
+        current = folder_tree
+        
+        for i, part in enumerate(parts):
+            if i == len(parts) - 1:
+                # Leaf folder
+                current[folder] = {}
+            else:
+                # Navigate to parent
+                parent_path = '/'.join(parts[:i+1])
+                if parent_path not in current:
+                    current[parent_path] = {}
+                current = current[parent_path]
     
     return render_template('notes_list.html',
                          title='Notes',
                          notes=notes,
                          visibility_filter=visibility_filter,
                          tag_filter=tag_filter,
+                         folder_filter=folder_filter,
                          search_query=search_query,
                          all_tags=sorted(list(all_tags)),
+                         all_folders=sorted(list(all_folders)),
+                         folder_tree=folder_tree,
+                         folder_counts=folder_counts,
                          projects=projects,
                          NoteVisibility=NoteVisibility)
 
@@ -1695,6 +1750,7 @@ def create_note():
         title = request.form.get('title', '').strip()
         content = request.form.get('content', '').strip()
         visibility = request.form.get('visibility', 'Private')
+        folder = request.form.get('folder', '').strip()
         tags = request.form.get('tags', '').strip()
         project_id = request.form.get('project_id')
         task_id = request.form.get('task_id')
@@ -1719,6 +1775,7 @@ def create_note():
                 title=title,
                 content=content,
                 visibility=NoteVisibility[visibility.upper()],  # Convert to uppercase for enum access
+                folder=folder if folder else None,
                 tags=','.join(tag_list) if tag_list else None,
                 created_by_id=g.user.id,
                 company_id=g.user.company_id
@@ -1758,11 +1815,26 @@ def create_note():
     projects = Project.query.filter_by(company_id=g.user.company_id, is_active=True).all()
     tasks = []
     
+    # Get all existing folders for suggestions
+    all_folders = set()
+    
+    # Get folders from NoteFolder table
+    folder_records = NoteFolder.query.filter_by(company_id=g.user.company_id).all()
+    for folder in folder_records:
+        all_folders.add(folder.path)
+    
+    # Also get folders from notes (for backward compatibility)
+    folder_notes = Note.query.filter_by(company_id=g.user.company_id, is_archived=False).filter(Note.folder != None).all()
+    for note in folder_notes:
+        if note.folder:
+            all_folders.add(note.folder)
+    
     return render_template('note_editor.html',
                          title='New Note',
                          note=None,
                          projects=projects,
                          tasks=tasks,
+                         all_folders=sorted(list(all_folders)),
                          NoteVisibility=NoteVisibility)
 
 
@@ -1826,6 +1898,7 @@ def edit_note(slug):
         title = request.form.get('title', '').strip()
         content = request.form.get('content', '').strip()
         visibility = request.form.get('visibility', 'Private')
+        folder = request.form.get('folder', '').strip()
         tags = request.form.get('tags', '').strip()
         project_id = request.form.get('project_id')
         task_id = request.form.get('task_id')
@@ -1849,6 +1922,7 @@ def edit_note(slug):
             note.title = title
             note.content = content
             note.visibility = NoteVisibility[visibility.upper()]  # Convert to uppercase for enum access
+            note.folder = folder if folder else None
             note.tags = ','.join(tag_list) if tag_list else None
             
             # Update team_id if visibility is Team
@@ -1895,11 +1969,26 @@ def edit_note(slug):
     if note.project_id:
         tasks = Task.query.filter_by(project_id=note.project_id).all()
     
+    # Get all existing folders for suggestions
+    all_folders = set()
+    
+    # Get folders from NoteFolder table
+    folder_records = NoteFolder.query.filter_by(company_id=g.user.company_id).all()
+    for folder in folder_records:
+        all_folders.add(folder.path)
+    
+    # Also get folders from notes (for backward compatibility)
+    folder_notes = Note.query.filter_by(company_id=g.user.company_id, is_archived=False).filter(Note.folder != None).all()
+    for n in folder_notes:
+        if n.folder:
+            all_folders.add(n.folder)
+    
     return render_template('note_editor.html',
                          title=f'Edit: {note.title}',
                          note=note,
                          projects=projects,
                          tasks=tasks,
+                         all_folders=sorted(list(all_folders)),
                          NoteVisibility=NoteVisibility)
 
 
@@ -1928,6 +2017,296 @@ def delete_note(slug):
         logger.error(f"Error deleting note: {str(e)}")
         flash('Error deleting note', 'error')
         return redirect(url_for('view_note', slug=slug))
+
+
+@app.route('/notes/folders')
+@login_required
+@company_required
+def notes_folders():
+    """Manage note folders"""
+    # Get all folders from NoteFolder table
+    all_folders = set()
+    folder_records = NoteFolder.query.filter_by(company_id=g.user.company_id).all()
+    
+    for folder in folder_records:
+        all_folders.add(folder.path)
+    
+    # Also get folders from notes (for backward compatibility)
+    folder_notes = Note.query.filter_by(company_id=g.user.company_id, is_archived=False).filter(Note.folder != None).all()
+    
+    folder_counts = {}
+    for note in folder_notes:
+        if note.folder and note.can_user_view(g.user):
+            # Add this folder and all parent folders
+            parts = note.folder.split('/')
+            for i in range(len(parts)):
+                folder_path = '/'.join(parts[:i+1])
+                all_folders.add(folder_path)
+                folder_counts[folder_path] = folder_counts.get(folder_path, 0) + (1 if i == len(parts)-1 else 0)
+    
+    # Initialize counts for empty folders
+    for folder_path in all_folders:
+        if folder_path not in folder_counts:
+            folder_counts[folder_path] = 0
+    
+    # Build folder tree structure
+    folder_tree = {}
+    for folder in sorted(all_folders):
+        parts = folder.split('/')
+        current = folder_tree
+        
+        for i, part in enumerate(parts):
+            if i == len(parts) - 1:
+                # Leaf folder
+                current[folder] = {}
+            else:
+                # Navigate to parent
+                parent_path = '/'.join(parts[:i+1])
+                if parent_path not in current:
+                    current[parent_path] = {}
+                current = current[parent_path]
+    
+    return render_template('notes_folders.html',
+                         title='Note Folders',
+                         all_folders=sorted(list(all_folders)),
+                         folder_tree=folder_tree,
+                         folder_counts=folder_counts)
+
+
+@app.route('/api/notes/folder-details')
+@login_required
+@company_required
+def api_folder_details():
+    """Get details about a specific folder"""
+    folder_path = request.args.get('path', '')
+    
+    if not folder_path:
+        return jsonify({'error': 'Folder path required'}), 400
+    
+    # Get notes in this folder
+    notes = Note.query.filter_by(
+        company_id=g.user.company_id,
+        folder=folder_path,
+        is_archived=False
+    ).all()
+    
+    # Filter by visibility
+    visible_notes = [n for n in notes if n.can_user_view(g.user)]
+    
+    # Get subfolders
+    all_folders = set()
+    folder_notes = Note.query.filter_by(company_id=g.user.company_id, is_archived=False).filter(
+        Note.folder.like(f'{folder_path}/%')
+    ).all()
+    
+    for note in folder_notes:
+        if note.folder and note.can_user_view(g.user):
+            # Get immediate subfolder
+            subfolder = note.folder[len(folder_path)+1:]
+            if '/' in subfolder:
+                subfolder = subfolder.split('/')[0]
+            all_folders.add(subfolder)
+    
+    # Get recent notes (last 5)
+    recent_notes = sorted(visible_notes, key=lambda n: n.updated_at, reverse=True)[:5]
+    
+    return jsonify({
+        'name': folder_path.split('/')[-1],
+        'path': folder_path,
+        'note_count': len(visible_notes),
+        'subfolder_count': len(all_folders),
+        'recent_notes': [
+            {
+                'title': n.title,
+                'slug': n.slug,
+                'updated_at': n.updated_at.strftime('%Y-%m-%d %H:%M')
+            } for n in recent_notes
+        ]
+    })
+
+
+@app.route('/api/notes/folders', methods=['POST'])
+@login_required
+@company_required
+def api_create_folder():
+    """Create a new folder"""
+    data = request.get_json()
+    folder_name = data.get('name', '').strip()
+    parent_folder = data.get('parent', '').strip()
+    
+    if not folder_name:
+        return jsonify({'success': False, 'message': 'Folder name is required'}), 400
+    
+    # Validate folder name (no special characters except dash and underscore)
+    import re
+    if not re.match(r'^[a-zA-Z0-9_\- ]+$', folder_name):
+        return jsonify({'success': False, 'message': 'Folder name can only contain letters, numbers, spaces, dashes, and underscores'}), 400
+    
+    # Create full path
+    full_path = f"{parent_folder}/{folder_name}" if parent_folder else folder_name
+    
+    # Check if folder already exists
+    existing_folder = NoteFolder.query.filter_by(
+        company_id=g.user.company_id,
+        path=full_path
+    ).first()
+    
+    if existing_folder:
+        return jsonify({'success': False, 'message': 'Folder already exists'}), 400
+    
+    # Create the folder
+    try:
+        folder = NoteFolder(
+            name=folder_name,
+            path=full_path,
+            parent_path=parent_folder if parent_folder else None,
+            description=data.get('description', ''),
+            created_by_id=g.user.id,
+            company_id=g.user.company_id
+        )
+        
+        db.session.add(folder)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Folder created successfully',
+            'folder': {
+                'name': folder_name,
+                'path': full_path
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error creating folder: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error creating folder'}), 500
+
+
+@app.route('/api/notes/folders', methods=['PUT'])
+@login_required
+@company_required
+def api_rename_folder():
+    """Rename an existing folder"""
+    data = request.get_json()
+    old_path = data.get('old_path', '').strip()
+    new_name = data.get('new_name', '').strip()
+    
+    if not old_path or not new_name:
+        return jsonify({'success': False, 'message': 'Old path and new name are required'}), 400
+    
+    # Validate folder name
+    import re
+    if not re.match(r'^[a-zA-Z0-9_\- ]+$', new_name):
+        return jsonify({'success': False, 'message': 'Folder name can only contain letters, numbers, spaces, dashes, and underscores'}), 400
+    
+    # Build new path
+    path_parts = old_path.split('/')
+    path_parts[-1] = new_name
+    new_path = '/'.join(path_parts)
+    
+    # Update all notes in this folder and subfolders
+    notes_to_update = Note.query.filter(
+        Note.company_id == g.user.company_id,
+        db.or_(
+            Note.folder == old_path,
+            Note.folder.like(f'{old_path}/%')
+        )
+    ).all()
+    
+    # Check permissions for all notes
+    for note in notes_to_update:
+        if not note.can_user_edit(g.user):
+            return jsonify({'success': False, 'message': 'You do not have permission to modify all notes in this folder'}), 403
+    
+    # Update folder paths
+    try:
+        for note in notes_to_update:
+            if note.folder == old_path:
+                note.folder = new_path
+            else:
+                # Update subfolder path
+                note.folder = new_path + note.folder[len(old_path):]
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Renamed folder to {new_name}',
+            'updated_count': len(notes_to_update)
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error renaming folder: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error renaming folder'}), 500
+
+
+@app.route('/api/notes/folders', methods=['DELETE'])
+@login_required
+@company_required
+def api_delete_folder():
+    """Delete an empty folder"""
+    folder_path = request.args.get('path', '').strip()
+    
+    if not folder_path:
+        return jsonify({'success': False, 'message': 'Folder path is required'}), 400
+    
+    # Check if folder has any notes
+    notes_in_folder = Note.query.filter_by(
+        company_id=g.user.company_id,
+        folder=folder_path,
+        is_archived=False
+    ).all()
+    
+    if notes_in_folder:
+        return jsonify({'success': False, 'message': 'Cannot delete folder that contains notes'}), 400
+    
+    # Check if folder has subfolders with notes
+    notes_in_subfolders = Note.query.filter(
+        Note.company_id == g.user.company_id,
+        Note.folder.like(f'{folder_path}/%'),
+        Note.is_archived == False
+    ).first()
+    
+    if notes_in_subfolders:
+        return jsonify({'success': False, 'message': 'Cannot delete folder that contains subfolders with notes'}), 400
+    
+    # Since we don't have a separate folders table, we just return success
+    # The folder will disappear from the UI when there are no notes in it
+    
+    return jsonify({
+        'success': True,
+        'message': 'Folder deleted successfully'
+    })
+
+
+@app.route('/api/notes/<slug>/folder', methods=['PUT'])
+@login_required
+@company_required
+def update_note_folder(slug):
+    """Update a note's folder via drag and drop"""
+    note = Note.query.filter_by(slug=slug, company_id=g.user.company_id).first_or_404()
+    
+    # Check permissions
+    if not note.can_user_edit(g.user):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    folder_path = data.get('folder', '').strip()
+    
+    try:
+        # Update the note's folder
+        note.folder = folder_path if folder_path else None
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Note moved successfully',
+            'folder': folder_path
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating note folder: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error updating note folder'}), 500
 
 
 @app.route('/api/notes/<int:note_id>/link', methods=['POST'])

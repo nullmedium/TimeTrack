@@ -60,6 +60,19 @@
             </div>
 
             <div class="settings-group">
+                <label for="folder">Folder</label>
+                <input type="text" id="folder" name="folder" class="form-control" 
+                       placeholder="e.g., Work/Projects or Personal"
+                       value="{{ note.folder if note and note.folder else '' }}"
+                       list="folder-suggestions">
+                <datalist id="folder-suggestions">
+                    {% for folder in all_folders %}
+                    <option value="{{ folder }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+            
+            <div class="settings-group">
                 <label for="tags">Tags (comma-separated)</label>
                 <input type="text" id="tags" name="tags" class="form-control" 
                        placeholder="documentation, meeting-notes, technical"

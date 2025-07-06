@@ -1261,6 +1261,9 @@ class Note(db.Model):
     # Visibility and sharing
     visibility = db.Column(db.Enum(NoteVisibility), nullable=False, default=NoteVisibility.PRIVATE)
     
+    # Folder organization
+    folder = db.Column(db.String(100), nullable=True)  # Folder path like "Work/Projects" or "Personal"
+    
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
@@ -1418,3 +1421,29 @@ class NoteLink(db.Model):
     
     def __repr__(self):
         return f'<NoteLink {self.source_note_id} -> {self.target_note_id}>'
+
+
+class NoteFolder(db.Model):
+    """Represents a folder for organizing notes"""
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Folder properties
+    name = db.Column(db.String(100), nullable=False)
+    path = db.Column(db.String(500), nullable=False)  # Full path like "Work/Projects/Q1"
+    parent_path = db.Column(db.String(500), nullable=True)  # Parent folder path
+    description = db.Column(db.Text, nullable=True)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
+    
+    # Relationships
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    company = db.relationship('Company', foreign_keys=[company_id])
+    
+    # Unique constraint to prevent duplicate paths within a company
+    __table_args__ = (db.UniqueConstraint('path', 'company_id', name='uq_folder_path_company'),)
+    
+    def __repr__(self):
+        return f'<NoteFolder {self.path}>'
