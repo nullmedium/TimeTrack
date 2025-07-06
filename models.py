@@ -1242,3 +1242,179 @@ class WidgetTemplate(db.Model):
         required_level = role_hierarchy.get(self.required_role, 0)
         
         return user_level >= required_level
+
+
+# Note Sharing Visibility
+class NoteVisibility(enum.Enum):
+    PRIVATE = "Private"
+    TEAM = "Team"
+    COMPANY = "Company"
+
+
+class Note(db.Model):
+    """Markdown notes with sharing capabilities"""
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)  # Markdown content
+    slug = db.Column(db.String(100), nullable=False)  # URL-friendly identifier
+    
+    # Visibility and sharing
+    visibility = db.Column(db.Enum(NoteVisibility), nullable=False, default=NoteVisibility.PRIVATE)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Associations
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
+    
+    # Optional associations
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)  # For team-specific notes
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)  # Link to project
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=True)  # Link to task
+    
+    # Tags for organization
+    tags = db.Column(db.String(500))  # Comma-separated tags
+    
+    # Pin important notes
+    is_pinned = db.Column(db.Boolean, default=False)
+    
+    # Soft delete
+    is_archived = db.Column(db.Boolean, default=False)
+    archived_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='notes')
+    company = db.relationship('Company', backref='notes')
+    team = db.relationship('Team', backref='notes')
+    project = db.relationship('Project', backref='notes')
+    task = db.relationship('Task', backref='notes')
+    
+    # Unique constraint on slug per company
+    __table_args__ = (db.UniqueConstraint('company_id', 'slug', name='uq_note_slug_per_company'),)
+    
+    def __repr__(self):
+        return f'<Note {self.title}>'
+    
+    def generate_slug(self):
+        """Generate URL-friendly slug from title"""
+        import re
+        # Remove special characters and convert to lowercase
+        slug = re.sub(r'[^\w\s-]', '', self.title.lower())
+        # Replace spaces with hyphens
+        slug = re.sub(r'[-\s]+', '-', slug)
+        # Remove leading/trailing hyphens
+        slug = slug.strip('-')
+        
+        # Ensure uniqueness within company
+        base_slug = slug
+        counter = 1
+        while Note.query.filter_by(company_id=self.company_id, slug=slug).filter(Note.id != self.id).first():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        
+        return slug
+    
+    def can_user_view(self, user):
+        """Check if user can view this note"""
+        # Creator can always view
+        if user.id == self.created_by_id:
+            return True
+        
+        # Check company match
+        if user.company_id != self.company_id:
+            return False
+        
+        # Check visibility
+        if self.visibility == NoteVisibility.COMPANY:
+            return True
+        elif self.visibility == NoteVisibility.TEAM:
+            # Check if user is in the same team
+            if self.team_id and user.team_id == self.team_id:
+                return True
+            # Admins can view all team notes
+            if user.role in [Role.ADMIN, Role.SYSTEM_ADMIN]:
+                return True
+        
+        return False
+    
+    def can_user_edit(self, user):
+        """Check if user can edit this note"""
+        # Creator can always edit
+        if user.id == self.created_by_id:
+            return True
+        
+        # Admins can edit company notes
+        if user.role in [Role.ADMIN, Role.SYSTEM_ADMIN] and user.company_id == self.company_id:
+            return True
+        
+        return False
+    
+    def get_tags_list(self):
+        """Get tags as a list"""
+        if not self.tags:
+            return []
+        return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
+    
+    def set_tags_list(self, tags_list):
+        """Set tags from a list"""
+        self.tags = ','.join(tags_list) if tags_list else None
+    
+    def get_preview(self, length=200):
+        """Get a plain text preview of the note content"""
+        # Strip markdown formatting for preview
+        import re
+        text = self.content
+        # Remove headers
+        text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+        # Remove emphasis
+        text = re.sub(r'\*{1,2}([^\*]+)\*{1,2}', r'\1', text)
+        text = re.sub(r'_{1,2}([^_]+)_{1,2}', r'\1', text)
+        # Remove links
+        text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+        # Remove code blocks
+        text = re.sub(r'```[^`]*```', '', text, flags=re.DOTALL)
+        text = re.sub(r'`([^`]+)`', r'\1', text)
+        # Clean up whitespace
+        text = ' '.join(text.split())
+        
+        if len(text) > length:
+            return text[:length] + '...'
+        return text
+    
+    def render_html(self):
+        """Render markdown content to HTML"""
+        try:
+            import markdown
+            # Use extensions for better markdown support
+            html = markdown.markdown(self.content, extensions=['extra', 'codehilite', 'toc'])
+            return html
+        except ImportError:
+            # Fallback if markdown not installed
+            return f'<pre>{self.content}</pre>'
+
+
+class NoteLink(db.Model):
+    """Links between notes for creating relationships"""
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Source and target notes
+    source_note_id = db.Column(db.Integer, db.ForeignKey('note.id'), nullable=False)
+    target_note_id = db.Column(db.Integer, db.ForeignKey('note.id'), nullable=False)
+    
+    # Link metadata
+    link_type = db.Column(db.String(50), default='related')  # related, parent, child, etc.
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Relationships
+    source_note = db.relationship('Note', foreign_keys=[source_note_id], backref='outgoing_links')
+    target_note = db.relationship('Note', foreign_keys=[target_note_id], backref='incoming_links')
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    
+    # Unique constraint to prevent duplicate links
+    __table_args__ = (db.UniqueConstraint('source_note_id', 'target_note_id', name='uq_note_link'),)
+    
+    def __repr__(self):
+        return f'<NoteLink {self.source_note_id} -> {self.target_note_id}>'

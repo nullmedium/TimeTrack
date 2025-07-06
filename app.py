@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file, abort
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings, Note, NoteLink, NoteVisibility
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data, format_burndown_data
@@ -1605,6 +1605,404 @@ def imprint():
 def contact():
     # redacted
     return render_template('contact.html', title='Contact')
+
+
+# Notes Management Routes
+@app.route('/notes')
+@login_required
+@company_required
+def notes_list():
+    """List all notes accessible to the user"""
+    # Get filter parameters
+    visibility_filter = request.args.get('visibility', 'all')
+    tag_filter = request.args.get('tag')
+    search_query = request.args.get('search', request.args.get('q'))
+    
+    # Base query - all notes in user's company
+    query = Note.query.filter_by(company_id=g.user.company_id, is_archived=False)
+    
+    # Apply visibility filter
+    if visibility_filter == 'private':
+        query = query.filter_by(created_by_id=g.user.id, visibility=NoteVisibility.PRIVATE)
+    elif visibility_filter == 'team':
+        query = query.filter_by(visibility=NoteVisibility.TEAM)
+        if g.user.role not in [Role.ADMIN, Role.SYSTEM_ADMIN]:
+            query = query.filter_by(team_id=g.user.team_id)
+    elif visibility_filter == 'company':
+        query = query.filter_by(visibility=NoteVisibility.COMPANY)
+    else:  # 'all' - show all accessible notes
+        # Complex filter for visibility
+        from sqlalchemy import or_, and_
+        conditions = [
+            # User's own notes
+            Note.created_by_id == g.user.id,
+            # Company-wide notes
+            Note.visibility == NoteVisibility.COMPANY,
+            # Team notes if user is in the team
+            and_(
+                Note.visibility == NoteVisibility.TEAM,
+                Note.team_id == g.user.team_id
+            )
+        ]
+        # Admins can see all team notes
+        if g.user.role in [Role.ADMIN, Role.SYSTEM_ADMIN]:
+            conditions.append(Note.visibility == NoteVisibility.TEAM)
+        
+        query = query.filter(or_(*conditions))
+    
+    # Apply tag filter
+    if tag_filter:
+        query = query.filter(Note.tags.like(f'%{tag_filter}%'))
+    
+    # Apply search
+    if search_query:
+        query = query.filter(
+            db.or_(
+                Note.title.ilike(f'%{search_query}%'),
+                Note.content.ilike(f'%{search_query}%'),
+                Note.tags.ilike(f'%{search_query}%')
+            )
+        )
+    
+    # Order by pinned first, then by updated date
+    notes = query.order_by(Note.is_pinned.desc(), Note.updated_at.desc()).all()
+    
+    # Get all unique tags for filter dropdown
+    all_tags = set()
+    for note in Note.query.filter_by(company_id=g.user.company_id, is_archived=False).all():
+        all_tags.update(note.get_tags_list())
+    
+    # Get projects for filter
+    projects = Project.query.filter_by(company_id=g.user.company_id, is_active=True).all()
+    
+    return render_template('notes_list.html',
+                         title='Notes',
+                         notes=notes,
+                         visibility_filter=visibility_filter,
+                         tag_filter=tag_filter,
+                         search_query=search_query,
+                         all_tags=sorted(list(all_tags)),
+                         projects=projects,
+                         NoteVisibility=NoteVisibility)
+
+
+@app.route('/notes/new', methods=['GET', 'POST'])
+@login_required
+@company_required
+def create_note():
+    """Create a new note"""
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        content = request.form.get('content', '').strip()
+        visibility = request.form.get('visibility', 'Private')
+        tags = request.form.get('tags', '').strip()
+        project_id = request.form.get('project_id')
+        task_id = request.form.get('task_id')
+        
+        # Validate
+        if not title:
+            flash('Title is required', 'error')
+            return redirect(url_for('create_note'))
+        
+        if not content:
+            flash('Content is required', 'error')
+            return redirect(url_for('create_note'))
+        
+        try:
+            # Parse tags
+            tag_list = []
+            if tags:
+                tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+            
+            # Create note
+            note = Note(
+                title=title,
+                content=content,
+                visibility=NoteVisibility[visibility.upper()],  # Convert to uppercase for enum access
+                tags=','.join(tag_list) if tag_list else None,
+                created_by_id=g.user.id,
+                company_id=g.user.company_id
+            )
+            
+            # Set team_id if visibility is Team
+            if visibility == 'Team' and g.user.team_id:
+                note.team_id = g.user.team_id
+            
+            # Set optional associations
+            if project_id:
+                project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
+                if project:
+                    note.project_id = project.id
+            
+            if task_id:
+                task = Task.query.filter_by(id=task_id).first()
+                if task and task.project.company_id == g.user.company_id:
+                    note.task_id = task.id
+            
+            # Generate slug
+            note.slug = note.generate_slug()
+            
+            db.session.add(note)
+            db.session.commit()
+            
+            flash('Note created successfully', 'success')
+            return redirect(url_for('view_note', slug=note.slug))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error creating note: {str(e)}")
+            flash('Error creating note', 'error')
+            return redirect(url_for('create_note'))
+    
+    # GET request - show form
+    projects = Project.query.filter_by(company_id=g.user.company_id, is_active=True).all()
+    tasks = []
+    
+    return render_template('note_editor.html',
+                         title='New Note',
+                         note=None,
+                         projects=projects,
+                         tasks=tasks,
+                         NoteVisibility=NoteVisibility)
+
+
+@app.route('/notes/<slug>')
+@login_required
+@company_required
+def view_note(slug):
+    """View a specific note"""
+    note = Note.query.filter_by(slug=slug, company_id=g.user.company_id).first_or_404()
+    
+    # Check permissions
+    if not note.can_user_view(g.user):
+        abort(403)
+    
+    # Get linked notes
+    outgoing_links = []
+    incoming_links = []
+    
+    for link in note.outgoing_links:
+        if link.target_note.can_user_view(g.user):
+            outgoing_links.append(link)
+    
+    for link in note.incoming_links:
+        if link.source_note.can_user_view(g.user):
+            incoming_links.append(link)
+    
+    # Get linkable notes for the modal
+    linkable_notes = []
+    if note.can_user_edit(g.user):
+        # Get all notes the user can view
+        all_notes = Note.query.filter_by(company_id=g.user.company_id, is_archived=False).all()
+        for n in all_notes:
+            if n.id != note.id and n.can_user_view(g.user):
+                # Check if not already linked
+                already_linked = any(link.target_note_id == n.id for link in note.outgoing_links)
+                already_linked = already_linked or any(link.source_note_id == n.id for link in note.incoming_links)
+                if not already_linked:
+                    linkable_notes.append(n)
+    
+    return render_template('note_view.html',
+                         title=note.title,
+                         note=note,
+                         outgoing_links=outgoing_links,
+                         incoming_links=incoming_links,
+                         linkable_notes=linkable_notes,
+                         can_edit=note.can_user_edit(g.user))
+
+
+@app.route('/notes/<slug>/edit', methods=['GET', 'POST'])
+@login_required
+@company_required
+def edit_note(slug):
+    """Edit an existing note"""
+    note = Note.query.filter_by(slug=slug, company_id=g.user.company_id).first_or_404()
+    
+    # Check permissions
+    if not note.can_user_edit(g.user):
+        abort(403)
+    
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        content = request.form.get('content', '').strip()
+        visibility = request.form.get('visibility', 'Private')
+        tags = request.form.get('tags', '').strip()
+        project_id = request.form.get('project_id')
+        task_id = request.form.get('task_id')
+        
+        # Validate
+        if not title:
+            flash('Title is required', 'error')
+            return redirect(url_for('edit_note', slug=slug))
+        
+        if not content:
+            flash('Content is required', 'error')
+            return redirect(url_for('edit_note', slug=slug))
+        
+        try:
+            # Parse tags
+            tag_list = []
+            if tags:
+                tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+            
+            # Update note
+            note.title = title
+            note.content = content
+            note.visibility = NoteVisibility[visibility.upper()]  # Convert to uppercase for enum access
+            note.tags = ','.join(tag_list) if tag_list else None
+            
+            # Update team_id if visibility is Team
+            if visibility == 'Team' and g.user.team_id:
+                note.team_id = g.user.team_id
+            else:
+                note.team_id = None
+            
+            # Update optional associations
+            if project_id:
+                project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
+                note.project_id = project.id if project else None
+            else:
+                note.project_id = None
+            
+            if task_id:
+                task = Task.query.filter_by(id=task_id).first()
+                if task and task.project.company_id == g.user.company_id:
+                    note.task_id = task.id
+                else:
+                    note.task_id = None
+            else:
+                note.task_id = None
+            
+            # Regenerate slug if title changed
+            new_slug = note.generate_slug()
+            if new_slug != note.slug:
+                note.slug = new_slug
+            
+            db.session.commit()
+            
+            flash('Note updated successfully', 'success')
+            return redirect(url_for('view_note', slug=note.slug))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating note: {str(e)}")
+            flash('Error updating note', 'error')
+            return redirect(url_for('edit_note', slug=slug))
+    
+    # GET request - show form
+    projects = Project.query.filter_by(company_id=g.user.company_id, is_active=True).all()
+    tasks = []
+    if note.project_id:
+        tasks = Task.query.filter_by(project_id=note.project_id).all()
+    
+    return render_template('note_editor.html',
+                         title=f'Edit: {note.title}',
+                         note=note,
+                         projects=projects,
+                         tasks=tasks,
+                         NoteVisibility=NoteVisibility)
+
+
+@app.route('/notes/<slug>/delete', methods=['POST'])
+@login_required
+@company_required
+def delete_note(slug):
+    """Delete (archive) a note"""
+    note = Note.query.filter_by(slug=slug, company_id=g.user.company_id).first_or_404()
+    
+    # Check permissions
+    if not note.can_user_edit(g.user):
+        abort(403)
+    
+    try:
+        # Soft delete
+        note.is_archived = True
+        note.archived_at = datetime.now()
+        db.session.commit()
+        
+        flash('Note deleted successfully', 'success')
+        return redirect(url_for('notes_list'))
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting note: {str(e)}")
+        flash('Error deleting note', 'error')
+        return redirect(url_for('view_note', slug=slug))
+
+
+@app.route('/api/notes/<int:note_id>/link', methods=['POST'])
+@login_required
+@company_required
+def link_notes(note_id):
+    """Create a link between two notes"""
+    source_note = Note.query.filter_by(id=note_id, company_id=g.user.company_id).first_or_404()
+    
+    # Check permissions
+    if not source_note.can_user_edit(g.user):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    target_note_id = data.get('target_note_id')
+    link_type = data.get('link_type', 'related')
+    
+    if not target_note_id:
+        return jsonify({'success': False, 'message': 'Target note ID required'}), 400
+    
+    target_note = Note.query.filter_by(id=target_note_id, company_id=g.user.company_id).first()
+    if not target_note:
+        return jsonify({'success': False, 'message': 'Target note not found'}), 404
+    
+    if not target_note.can_user_view(g.user):
+        return jsonify({'success': False, 'message': 'Cannot link to this note'}), 403
+    
+    try:
+        # Check if link already exists (in either direction)
+        existing_link = NoteLink.query.filter(
+            db.or_(
+                db.and_(
+                    NoteLink.source_note_id == note_id,
+                    NoteLink.target_note_id == target_note_id
+                ),
+                db.and_(
+                    NoteLink.source_note_id == target_note_id,
+                    NoteLink.target_note_id == note_id
+                )
+            )
+        ).first()
+        
+        if existing_link:
+            return jsonify({'success': False, 'message': 'Link already exists between these notes'}), 400
+        
+        # Create link
+        link = NoteLink(
+            source_note_id=note_id,
+            target_note_id=target_note_id,
+            link_type=link_type,
+            created_by_id=g.user.id
+        )
+        
+        db.session.add(link)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Notes linked successfully',
+            'link': {
+                'id': link.id,
+                'source_note_id': link.source_note_id,
+                'target_note_id': link.target_note_id,
+                'target_note': {
+                    'id': target_note.id,
+                    'title': target_note.title,
+                    'slug': target_note.slug
+                }
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error linking notes: {str(e)}")
+        return jsonify({'success': False, 'message': f'Error linking notes: {str(e)}'}), 500
 
 # We can keep this route as a redirect to home for backward compatibility
 @app.route('/timetrack')
@@ -5939,6 +6337,74 @@ def search_sprints():
         
     except Exception as e:
         logger.error(f"Error in search_sprints: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+# Markdown rendering API
+@app.route('/api/render-markdown', methods=['POST'])
+@login_required
+def render_markdown():
+    """Render markdown content to HTML for preview"""
+    try:
+        data = request.get_json()
+        content = data.get('content', '')
+        
+        if not content:
+            return jsonify({'html': ''})
+        
+        # Import markdown here to avoid issues if not installed
+        import markdown
+        html = markdown.markdown(content, extensions=['extra', 'codehilite', 'toc'])
+        
+        return jsonify({'html': html})
+        
+    except Exception as e:
+        logger.error(f"Error rendering markdown: {str(e)}")
+        return jsonify({'html': '<p>Error rendering markdown</p>'})
+
+# Note link deletion endpoint
+@app.route('/api/notes/<int:note_id>/link', methods=['DELETE'])
+@login_required
+@company_required
+def unlink_notes(note_id):
+    """Remove a link between two notes"""
+    try:
+        note = Note.query.filter_by(id=note_id, company_id=g.user.company_id).first()
+        
+        if not note:
+            return jsonify({'success': False, 'message': 'Note not found'})
+        
+        if not note.can_user_edit(g.user):
+            return jsonify({'success': False, 'message': 'Permission denied'})
+        
+        data = request.get_json()
+        target_note_id = data.get('target_note_id')
+        
+        if not target_note_id:
+            return jsonify({'success': False, 'message': 'Target note ID required'})
+        
+        # Find and remove the link
+        link = NoteLink.query.filter_by(
+            source_note_id=note_id,
+            target_note_id=target_note_id
+        ).first()
+        
+        if not link:
+            # Try reverse direction
+            link = NoteLink.query.filter_by(
+                source_note_id=target_note_id,
+                target_note_id=note_id
+            ).first()
+        
+        if link:
+            db.session.delete(link)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Link removed successfully'})
+        else:
+            return jsonify({'success': False, 'message': 'Link not found'})
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error removing note link: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
 if __name__ == '__main__':

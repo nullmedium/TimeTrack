@@ -1,0 +1,371 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="timetrack-container notes-list-container">
+    <div class="admin-header">
+        <h2>Notes</h2>
+        <div class="admin-actions">
+            <a href="{{ url_for('create_note') }}" class="btn btn-md btn-success">Create New Note</a>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="notes-filter-section">
+        <form method="GET" action="{{ url_for('notes_list') }}" class="filter-form">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label for="visibility">Visibility:</label>
+                    <select name="visibility" id="visibility" onchange="this.form.submit()">
+                        <option value="">All Notes</option>
+                        <option value="private" {% if request.args.get('visibility') == 'private' %}selected{% endif %}>Private</option>
+                        <option value="team" {% if request.args.get('visibility') == 'team' %}selected{% endif %}>Team</option>
+                        <option value="company" {% if request.args.get('visibility') == 'company' %}selected{% endif %}>Company</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="tag">Tag:</label>
+                    <select name="tag" id="tag" onchange="this.form.submit()">
+                        <option value="">All Tags</option>
+                        {% for tag in all_tags %}
+                        <option value="{{ tag }}" {% if request.args.get('tag') == tag %}selected{% endif %}>{{ tag }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="project_id">Project:</label>
+                    <select name="project_id" id="project_id" onchange="this.form.submit()">
+                        <option value="">All Projects</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}" {% if request.args.get('project_id')|int == project.id %}selected{% endif %}>
+                            {{ project.code }} - {{ project.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group search-group">
+                    <label for="search">Search:</label>
+                    <input type="text" name="search" id="search" placeholder="Search notes..." 
+                           value="{{ request.args.get('search', '') }}" class="search-input">
+                    <button type="submit" class="btn btn-sm btn-primary">Search</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if notes %}
+    <div class="notes-grid">
+        {% for note in notes %}
+        <div class="note-card">
+            <div class="note-header">
+                <h3 class="note-title">
+                    <a href="{{ url_for('view_note', slug=note.slug) }}">{{ note.title }}</a>
+                </h3>
+                <div class="note-meta">
+                    <span class="visibility-badge visibility-{{ note.visibility.value.lower() }}">
+                        {% if note.visibility.value == 'Private' %}🔒{% elif note.visibility.value == 'Team' %}👥{% else %}🏢{% endif %}
+                        {{ note.visibility.value }}
+                    </span>
+                    {% if note.updated_at > note.created_at %}
+                    <span class="note-date">Updated {{ note.updated_at|format_date }}</span>
+                    {% else %}
+                    <span class="note-date">Created {{ note.created_at|format_date }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="note-preview">
+                {{ note.get_preview()|safe }}
+            </div>
+            
+            <div class="note-footer">
+                <div class="note-tags">
+                    {% if note.tags %}
+                        {% for tag in note.tags %}
+                        <a href="{{ url_for('notes_list', tag=tag) }}" class="tag-badge">{{ tag }}</a>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                <div class="note-associations">
+                    {% if note.project %}
+                    <span class="association-badge project">
+                        📁 {{ note.project.code }}
+                    </span>
+                    {% endif %}
+                    {% if note.task %}
+                    <span class="association-badge task">
+                        ✓ Task #{{ note.task.id }}
+                    </span>
+                    {% endif %}
+                    {% if note.outgoing_links or note.incoming_links %}
+                    <span class="association-badge links">
+                        🔗 {{ (note.outgoing_links|length + note.incoming_links|length) }} link{% if (note.outgoing_links|length + note.incoming_links|length) != 1 %}s{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="note-actions">
+                <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn btn-sm btn-primary">View</a>
+                {% if note.can_user_edit(g.user) %}
+                <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn btn-sm btn-info">Edit</a>
+                <form method="POST" action="{{ url_for('delete_note', slug=note.slug) }}" style="display: inline;"
+                      onsubmit="return confirm('Are you sure you want to delete this note?')">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    
+    {% else %}
+    <div class="no-data">
+        <p>No notes found. <a href="{{ url_for('create_note') }}">Create your first note</a>.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+/* Notes list specific styles */
+.notes-list-container {
+    max-width: none !important;
+    width: 100% !important;
+    padding: 1rem !important;
+    margin: 0 !important;
+}
+
+.notes-filter-section {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.filter-form {
+    width: 100%;
+}
+
+.filter-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.filter-group select,
+.filter-group input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.search-group {
+    flex: 2;
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.search-input {
+    flex: 1;
+}
+
+.notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.note-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.note-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.note-header {
+    margin-bottom: 1rem;
+}
+
+.note-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+}
+
+.note-title a {
+    color: #333;
+    text-decoration: none;
+}
+
+.note-title a:hover {
+    color: var(--primary-color);
+}
+
+.note-meta {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.visibility-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.visibility-private {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.visibility-team {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.visibility-company {
+    background: #d4edda;
+    color: #155724;
+}
+
+.note-preview {
+    flex: 1;
+    margin-bottom: 1rem;
+    color: #555;
+    line-height: 1.6;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.note-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.note-tags {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.tag-badge {
+    background: #e9ecef;
+    color: #495057;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-decoration: none;
+    transition: background 0.2s ease;
+}
+
+.tag-badge:hover {
+    background: #dee2e6;
+    color: #333;
+}
+
+.note-associations {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.association-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.association-badge.project {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.association-badge.task {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.association-badge.links {
+    background: #f5c6cb;
+    color: #721c24;
+}
+
+.note-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-start;
+}
+
+.note-actions form {
+    margin: 0;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.page-info {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .filter-row {
+        flex-direction: column;
+    }
+    
+    .filter-group {
+        min-width: 100%;
+    }
+    
+    .search-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .notes-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+{% endblock %}

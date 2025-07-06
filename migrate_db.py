@@ -76,6 +76,7 @@ def run_all_migrations(db_path=None):
     migrate_system_events(db_path)
     migrate_dashboard_system(db_path)
     migrate_comment_system(db_path)
+    migrate_notes_system(db_path)
     
     # Run PostgreSQL-specific migrations if applicable
     if FLASK_AVAILABLE:
@@ -1272,6 +1273,74 @@ def migrate_postgresql_schema():
                 """))
                 db.session.commit()
             
+            # Check if note table exists
+            result = db.session.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_name = 'note'
+            """))
+            
+            if not result.fetchone():
+                print("Creating note and note_link tables...")
+                
+                # Create NoteVisibility enum type
+                db.session.execute(text("""
+                    DO $$ BEGIN
+                        CREATE TYPE notevisibility AS ENUM ('Private', 'Team', 'Company');
+                    EXCEPTION
+                        WHEN duplicate_object THEN null;
+                    END $$;
+                """))
+                
+                db.session.execute(text("""
+                    CREATE TABLE note (
+                        id SERIAL PRIMARY KEY,
+                        title VARCHAR(200) NOT NULL,
+                        content TEXT NOT NULL,
+                        slug VARCHAR(100) NOT NULL,
+                        visibility notevisibility NOT NULL DEFAULT 'Private',
+                        company_id INTEGER NOT NULL,
+                        created_by_id INTEGER NOT NULL,
+                        project_id INTEGER,
+                        task_id INTEGER,
+                        tags TEXT[],
+                        is_archived BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (company_id) REFERENCES company (id),
+                        FOREIGN KEY (created_by_id) REFERENCES "user" (id),
+                        FOREIGN KEY (project_id) REFERENCES project (id),
+                        FOREIGN KEY (task_id) REFERENCES task (id)
+                    )
+                """))
+                
+                # Create note_link table
+                db.session.execute(text("""
+                    CREATE TABLE note_link (
+                        source_note_id INTEGER NOT NULL,
+                        target_note_id INTEGER NOT NULL,
+                        link_type VARCHAR(50) DEFAULT 'related',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (source_note_id, target_note_id),
+                        FOREIGN KEY (source_note_id) REFERENCES note (id) ON DELETE CASCADE,
+                        FOREIGN KEY (target_note_id) REFERENCES note (id) ON DELETE CASCADE
+                    )
+                """))
+                
+                # Create indexes
+                db.session.execute(text("CREATE INDEX idx_note_company ON note(company_id)"))
+                db.session.execute(text("CREATE INDEX idx_note_created_by ON note(created_by_id)"))
+                db.session.execute(text("CREATE INDEX idx_note_project ON note(project_id)"))
+                db.session.execute(text("CREATE INDEX idx_note_task ON note(task_id)"))
+                db.session.execute(text("CREATE INDEX idx_note_slug ON note(company_id, slug)"))
+                db.session.execute(text("CREATE INDEX idx_note_visibility ON note(visibility)"))
+                db.session.execute(text("CREATE INDEX idx_note_archived ON note(archived)"))
+                db.session.execute(text("CREATE INDEX idx_note_created_at ON note(created_at DESC)"))
+                db.session.execute(text("CREATE INDEX idx_note_link_source ON note_link(source_note_id)"))
+                db.session.execute(text("CREATE INDEX idx_note_link_target ON note_link(target_note_id)"))
+                
+                db.session.commit()
+            
             print("PostgreSQL schema migration completed successfully!")
             
     except Exception as e:
@@ -1478,6 +1547,94 @@ def migrate_comment_system(db_file=None):
         print(f"Error during Comment system migration: {e}")
         conn.rollback()
         raise
+    finally:
+        conn.close()
+
+
+def migrate_notes_system(db_file=None):
+    """Migrate to add Notes system with markdown support."""
+    db_path = get_db_path(db_file)
+
+    print(f"Migrating Notes system in {db_path}...")
+
+    if not os.path.exists(db_path):
+        print(f"Database file {db_path} does not exist. Run basic migration first.")
+        return False
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        # Check if note table already exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='note'")
+        if cursor.fetchone():
+            print("Note table already exists. Skipping migration.")
+            return True
+
+        print("Creating Notes system tables...")
+
+        # Create note table
+        cursor.execute("""
+        CREATE TABLE note (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title VARCHAR(200) NOT NULL,
+            content TEXT NOT NULL,
+            slug VARCHAR(100) NOT NULL,
+            visibility VARCHAR(20) NOT NULL DEFAULT 'Private',
+            company_id INTEGER NOT NULL,
+            created_by_id INTEGER NOT NULL,
+            project_id INTEGER,
+            task_id INTEGER,
+            tags TEXT,
+            archived BOOLEAN DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES company (id),
+            FOREIGN KEY (created_by_id) REFERENCES user (id),
+            FOREIGN KEY (project_id) REFERENCES project (id),
+            FOREIGN KEY (task_id) REFERENCES task (id)
+        )
+        """)
+
+        # Create note_link table for linking notes
+        cursor.execute("""
+        CREATE TABLE note_link (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_note_id INTEGER NOT NULL,
+            target_note_id INTEGER NOT NULL,
+            link_type VARCHAR(50) DEFAULT 'related',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_by_id INTEGER NOT NULL,
+            FOREIGN KEY (source_note_id) REFERENCES note (id) ON DELETE CASCADE,
+            FOREIGN KEY (target_note_id) REFERENCES note (id) ON DELETE CASCADE,
+            FOREIGN KEY (created_by_id) REFERENCES user (id),
+            UNIQUE(source_note_id, target_note_id)
+        )
+        """)
+
+        # Create indexes for better performance
+        cursor.execute("CREATE INDEX idx_note_company ON note(company_id)")
+        cursor.execute("CREATE INDEX idx_note_created_by ON note(created_by_id)")
+        cursor.execute("CREATE INDEX idx_note_project ON note(project_id)")
+        cursor.execute("CREATE INDEX idx_note_task ON note(task_id)")
+        cursor.execute("CREATE INDEX idx_note_slug ON note(company_id, slug)")
+        cursor.execute("CREATE INDEX idx_note_visibility ON note(visibility)")
+        cursor.execute("CREATE INDEX idx_note_archived ON note(archived)")
+        cursor.execute("CREATE INDEX idx_note_created_at ON note(created_at DESC)")
+        
+        # Create indexes for note links
+        cursor.execute("CREATE INDEX idx_note_link_source ON note_link(source_note_id)")
+        cursor.execute("CREATE INDEX idx_note_link_target ON note_link(target_note_id)")
+
+        conn.commit()
+        print("Notes system migration completed successfully!")
+        return True
+
+    except Exception as e:
+        print(f"Error during Notes system migration: {e}")
+        conn.rollback()
+        return False
+
     finally:
         conn.close()
 
