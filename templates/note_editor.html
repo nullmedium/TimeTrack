@@ -76,7 +76,7 @@
                 <label for="tags">Tags (comma-separated)</label>
                 <input type="text" id="tags" name="tags" class="form-control" 
                        placeholder="documentation, meeting-notes, technical"
-                       value="{{ ', '.join(note.tags) if note and note.tags else '' }}">
+                       value="{{ note.tags if note and note.tags else '' }}">
             </div>
         </div>
     </div>

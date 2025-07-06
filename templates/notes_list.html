@@ -31,13 +31,80 @@
             </div>
             <div class="folder-tree" id="folder-tree">
                 <div class="folder-item root-folder" data-folder="">
-                    <div class="folder-content" onclick="filterByFolder('')">
+                    <div class="folder-content {% if not folder_filter %}active{% endif %}" onclick="filterByFolder('')">
                         <span class="folder-icon">🏠</span>
                         <span class="folder-name">All Notes</span>
                         <span class="folder-count">({{ notes|length }})</span>
                     </div>
                 </div>
                 {{ render_folder_tree(folder_tree)|safe }}
+            </div>
+            
+            <!-- Tags Section -->
+            <div class="tags-section">
+                <div class="section-header">
+                    <div class="section-title" onclick="toggleSection('tags')">
+                        <span class="section-toggle" id="tags-toggle">▼</span>
+                        <h3>Tags</h3>
+                        <span class="tags-count">({{ all_tags|length }})</span>
+                    </div>
+                    <button type="button" class="btn-icon" onclick="showAddTagModal()" title="Add Tag">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="tags-list" id="tags-list">
+                    {% if tag_filter %}
+                        <div class="tag-item clear-filter" onclick="filterByTag('')">
+                            <span class="tag-icon">✖️</span>
+                            <span class="tag-name">Clear filter</span>
+                        </div>
+                    {% endif %}
+                    {% if all_tags %}
+                        {% for tag in all_tags %}
+                        <div class="tag-item {% if tag_filter == tag %}active{% endif %}" onclick="filterByTag('{{ tag }}')">
+                            <span class="tag-icon">🏷️</span>
+                            <span class="tag-name">{{ tag }}</span>
+                            <span class="tag-count">({{ tag_counts.get(tag, 0) }})</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="no-tags">No tags yet</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Visibility Section -->
+            <div class="visibility-section">
+                <div class="section-header">
+                    <div class="section-title" onclick="toggleSection('visibility')">
+                        <span class="section-toggle" id="visibility-toggle">▼</span>
+                        <h3>Visibility</h3>
+                    </div>
+                </div>
+                <div class="visibility-list" id="visibility-list">
+                    <div class="visibility-item {% if not visibility_filter %}active{% endif %}" onclick="filterByVisibility('')">
+                        <span class="visibility-icon">👁️</span>
+                        <span class="visibility-name">All Notes</span>
+                        <span class="visibility-count">({{ notes|length }})</span>
+                    </div>
+                    <div class="visibility-item {% if visibility_filter == 'private' %}active{% endif %}" onclick="filterByVisibility('private')">
+                        <span class="visibility-icon">🔒</span>
+                        <span class="visibility-name">Private</span>
+                        <span class="visibility-count">({{ visibility_counts.get('private', 0) }})</span>
+                    </div>
+                    <div class="visibility-item {% if visibility_filter == 'team' %}active{% endif %}" onclick="filterByVisibility('team')">
+                        <span class="visibility-icon">👥</span>
+                        <span class="visibility-name">Team</span>
+                        <span class="visibility-count">({{ visibility_counts.get('team', 0) }})</span>
+                    </div>
+                    <div class="visibility-item {% if visibility_filter == 'company' %}active{% endif %}" onclick="filterByVisibility('company')">
+                        <span class="visibility-icon">🏢</span>
+                        <span class="visibility-name">Company</span>
+                        <span class="visibility-count">({{ visibility_counts.get('company', 0) }})</span>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -46,43 +113,41 @@
 
     <!-- Filter Section -->
     <div class="notes-filter-section">
-        <form method="GET" action="{{ url_for('notes_list') }}" class="filter-form">
+        <form method="GET" action="{{ url_for('notes_list') }}" class="filter-form" id="filter-form">
+            <!-- Hidden inputs for sidebar filters -->
+            <input type="hidden" name="folder" id="folder" value="{{ folder_filter or '' }}">
+            <input type="hidden" name="tag" id="tag" value="{{ tag_filter or '' }}">
+            <input type="hidden" name="visibility" id="visibility" value="{{ visibility_filter or '' }}">
+            
             <div class="filter-row">
-                <div class="filter-group">
-                    <label for="folder">Folder:</label>
-                    <select name="folder" id="folder" onchange="this.form.submit()">
-                        <option value="">All Folders</option>
-                        {% for folder in all_folders %}
-                        <option value="{{ folder }}" {% if request.args.get('folder') == folder %}selected{% endif %}>
-                            📁 {{ folder }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label for="visibility">Visibility:</label>
-                    <select name="visibility" id="visibility" onchange="this.form.submit()">
-                        <option value="">All Notes</option>
-                        <option value="private" {% if request.args.get('visibility') == 'private' %}selected{% endif %}>Private</option>
-                        <option value="team" {% if request.args.get('visibility') == 'team' %}selected{% endif %}>Team</option>
-                        <option value="company" {% if request.args.get('visibility') == 'company' %}selected{% endif %}>Company</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label for="tag">Tag:</label>
-                    <select name="tag" id="tag" onchange="this.form.submit()">
-                        <option value="">All Tags</option>
-                        {% for tag in all_tags %}
-                        <option value="{{ tag }}" {% if request.args.get('tag') == tag %}selected{% endif %}>{{ tag }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
                 <div class="filter-group search-group">
-                    <label for="search">Search:</label>
-                    <input type="text" name="search" id="search" placeholder="Search notes..." 
+                    <input type="text" name="search" id="search" placeholder="Search notes by title or content..." 
                            value="{{ request.args.get('search', '') }}" class="search-input">
                     <button type="submit" class="btn btn-sm btn-primary">Search</button>
                 </div>
+                
+                {% if folder_filter or tag_filter or visibility_filter %}
+                <div class="active-filters">
+                    <span class="filter-label">Active filters:</span>
+                    {% if folder_filter %}
+                    <span class="filter-badge" onclick="clearFilter('folder')">
+                        📁 {{ folder_filter }} <span class="remove">×</span>
+                    </span>
+                    {% endif %}
+                    {% if tag_filter %}
+                    <span class="filter-badge" onclick="clearFilter('tag')">
+                        🏷️ {{ tag_filter }} <span class="remove">×</span>
+                    </span>
+                    {% endif %}
+                    {% if visibility_filter %}
+                    <span class="filter-badge" onclick="clearFilter('visibility')">
+                        {% if visibility_filter == 'private' %}🔒{% elif visibility_filter == 'team' %}👥{% else %}🏢{% endif %}
+                        {{ visibility_filter|title }} <span class="remove">×</span>
+                    </span>
+                    {% endif %}
+                    <button type="button" class="btn btn-xs btn-link" onclick="clearAllFilters()">Clear all</button>
+                </div>
+                {% endif %}
             </div>
         </form>
     </div>
@@ -349,6 +414,11 @@
     background: #f8f9fa;
 }
 
+.folder-content.active {
+    background: #e3f2fd;
+    font-weight: 500;
+}
+
 .folder-content.drag-over {
     background: #e3f2fd;
     border: 2px dashed #2196F3;
@@ -380,6 +450,240 @@
 
 .folder-item.expanded > .folder-children {
     display: block;
+}
+
+/* Tags section styles */
+.tags-section {
+    margin-top: 2rem;
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 0.5rem;
+    margin: -0.5rem;
+    border-radius: 4px;
+    transition: background 0.2s;
+    flex: 1;
+}
+
+.section-title:hover {
+    background: #f8f9fa;
+}
+
+.section-title h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #333;
+    flex: 1;
+    margin-left: 0.5rem;
+}
+
+.section-toggle {
+    font-size: 0.8rem;
+    transition: transform 0.2s;
+}
+
+.section-toggle.collapsed {
+    transform: rotate(-90deg);
+}
+
+.tags-count {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.tags-list {
+    margin-top: 0.5rem;
+    transition: max-height 0.3s ease-out;
+    overflow: hidden;
+}
+
+.tags-list.collapsed {
+    max-height: 0;
+}
+
+.tag-item {
+    display: flex;
+    align-items: center;
+    padding: 0.4rem 0.75rem;
+    margin: 0.25rem 0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.tag-item:hover {
+    background: #f8f9fa;
+}
+
+.tag-item.active {
+    background: #e3f2fd;
+    font-weight: 500;
+}
+
+.tag-item.clear-filter {
+    color: #dc3545;
+    font-size: 0.85rem;
+}
+
+.tag-icon {
+    margin-right: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.tag-name {
+    flex: 1;
+    font-size: 0.9rem;
+}
+
+.tag-count {
+    font-size: 0.85rem;
+    color: #666;
+    margin-left: 0.5rem;
+}
+
+.no-tags {
+    padding: 1rem;
+    text-align: center;
+    color: #999;
+    font-size: 0.9rem;
+}
+
+/* Visibility section styles */
+.visibility-section {
+    margin-top: 2rem;
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+}
+
+.visibility-list {
+    margin-top: 0.5rem;
+    transition: max-height 0.3s ease-out;
+    overflow: hidden;
+}
+
+.visibility-list.collapsed {
+    max-height: 0;
+}
+
+.visibility-item {
+    display: flex;
+    align-items: center;
+    padding: 0.4rem 0.75rem;
+    margin: 0.25rem 0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.visibility-item:hover {
+    background: #f8f9fa;
+}
+
+.visibility-item.active {
+    background: #e3f2fd;
+    font-weight: 500;
+}
+
+.visibility-icon {
+    margin-right: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.visibility-name {
+    flex: 1;
+    font-size: 0.9rem;
+}
+
+.visibility-count {
+    font-size: 0.85rem;
+    color: #666;
+    margin-left: 0.5rem;
+}
+
+/* Simplified filter section */
+.notes-filter-section {
+    background: #f8f9fa;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.filter-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-group {
+    flex: 1;
+    display: flex;
+    gap: 0.5rem;
+    min-width: 300px;
+}
+
+.search-input {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 0.95rem;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.active-filters {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-label {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.filter-badge {
+    background: #e3f2fd;
+    color: #333;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filter-badge:hover {
+    background: #bbdefb;
+}
+
+.filter-badge .remove {
+    font-weight: bold;
+    color: #666;
+}
+
+.btn-xs {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
 }
 
 /* Drag and drop styles */
@@ -441,37 +745,7 @@
     align-items: flex-end;
 }
 
-.filter-group {
-    flex: 1;
-    min-width: 200px;
-}
 
-.filter-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: #333;
-}
-
-.filter-group select,
-.filter-group input {
-    width: 100%;
-    padding: 0.5rem;
-    border: 2px solid #e9ecef;
-    border-radius: 6px;
-    font-size: 0.9rem;
-}
-
-.search-group {
-    flex: 2;
-    display: flex;
-    gap: 0.5rem;
-    align-items: flex-end;
-}
-
-.search-input {
-    flex: 1;
-}
 
 /* Table View Styles */
 .notes-table {
@@ -847,6 +1121,13 @@
     border-radius: 4px;
     font-size: 0.95rem;
 }
+
+.form-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+    color: #6c757d;
+}
 </style>
 
 <script>
@@ -925,6 +1206,69 @@ function filterByFolder(folderPath) {
         folderSelect.value = folderPath;
         folderSelect.form.submit();
     }
+}
+
+// Tags section functions
+function toggleSection(section) {
+    const toggle = document.getElementById(`${section}-toggle`);
+    const list = document.getElementById(`${section}-list`);
+    
+    toggle.classList.toggle('collapsed');
+    list.classList.toggle('collapsed');
+    
+    // Save state to localStorage
+    const isCollapsed = list.classList.contains('collapsed');
+    localStorage.setItem(`notes-${section}-collapsed`, isCollapsed);
+}
+
+// Load saved section states
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if tags section should be collapsed
+    const tagsCollapsed = localStorage.getItem('notes-tags-collapsed') === 'true';
+    if (tagsCollapsed) {
+        document.getElementById('tags-toggle').classList.add('collapsed');
+        document.getElementById('tags-list').classList.add('collapsed');
+    }
+    
+    // Check if visibility section should be collapsed
+    const visibilityCollapsed = localStorage.getItem('notes-visibility-collapsed') === 'true';
+    if (visibilityCollapsed) {
+        document.getElementById('visibility-toggle').classList.add('collapsed');
+        document.getElementById('visibility-list').classList.add('collapsed');
+    }
+});
+
+function filterByTag(tag) {
+    // Update the tag filter and submit the form
+    const tagInput = document.getElementById('tag');
+    if (tagInput) {
+        tagInput.value = tag;
+        tagInput.form.submit();
+    }
+}
+
+function filterByVisibility(visibility) {
+    // Update the visibility filter and submit the form
+    const visibilityInput = document.getElementById('visibility');
+    if (visibilityInput) {
+        visibilityInput.value = visibility;
+        visibilityInput.form.submit();
+    }
+}
+
+function clearFilter(filterType) {
+    const input = document.getElementById(filterType);
+    if (input) {
+        input.value = '';
+        input.form.submit();
+    }
+}
+
+function clearAllFilters() {
+    document.getElementById('folder').value = '';
+    document.getElementById('tag').value = '';
+    document.getElementById('visibility').value = '';
+    document.getElementById('filter-form').submit();
 }
 
 // Drag and drop functionality
@@ -1087,6 +1431,89 @@ function createFolder() {
         alert('Error creating folder');
     });
 }
+
+// Tag management functions
+function showAddTagModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Tags to Notes</h3>
+                <button type="button" class="close-btn" onclick="this.closest('.modal').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="addTagForm">
+                    <div class="form-group">
+                        <label for="newTags">Tags (comma-separated)</label>
+                        <input type="text" id="newTags" name="tags" class="form-control" 
+                               placeholder="e.g., urgent, review, documentation" required>
+                        <small class="form-text">Enter one or more tags separated by commas</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Select Notes</label>
+                        <div class="notes-selection" style="max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; padding: 0.5rem; border-radius: 4px;">
+                            {% for note in notes %}
+                            <label class="note-checkbox" style="display: block; margin: 0.5rem 0;">
+                                <input type="checkbox" name="note_ids" value="{{ note.id }}" style="margin-right: 0.5rem;">
+                                {{ note.title }}
+                                {% if note.tags %}
+                                <small style="color: #666;">({{ note.tags }})</small>
+                                {% endif %}
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="addTagsToNotes()">Add Tags</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    document.getElementById('newTags').focus();
+}
+
+function addTagsToNotes() {
+    const form = document.getElementById('addTagForm');
+    const formData = new FormData(form);
+    const tags = formData.get('tags');
+    const noteIds = Array.from(form.querySelectorAll('input[name="note_ids"]:checked'))
+                         .map(input => input.value);
+    
+    if (!tags || noteIds.length === 0) {
+        alert('Please enter tags and select at least one note');
+        return;
+    }
+    
+    // For now, we'll update each note individually
+    // In a production app, you'd want a batch update endpoint
+    Promise.all(noteIds.map(noteId => 
+        fetch(`/api/notes/${noteId}/tags`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ tags: tags })
+        })
+    ))
+    .then(responses => Promise.all(responses.map(r => r.json())))
+    .then(results => {
+        const failures = results.filter(r => !r.success);
+        if (failures.length === 0) {
+            window.location.reload();
+        } else {
+            alert(`Failed to update ${failures.length} notes`);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error adding tags to notes');
+    });
+}
 </script>
 
 {% endblock %}
@@ -1094,7 +1521,7 @@ function createFolder() {
 {% macro render_folder_tree(tree, level=0) %}
     {% for folder, children in tree.items() %}
         <div class="folder-item {% if children %}has-children{% endif %}" data-folder="{{ folder }}">
-            <div class="folder-content" onclick="filterByFolder('{{ folder }}')">
+            <div class="folder-content {% if folder_filter == folder %}active{% endif %}" onclick="filterByFolder('{{ folder }}')">
                 {% if children %}
                     <span onclick="toggleFolder(event, '{{ folder }}')" style="position: absolute; left: -15px; cursor: pointer;">▶</span>
                 {% endif %}

@@ -1672,10 +1672,21 @@ def notes_list():
     # Order by pinned first, then by updated date
     notes = query.order_by(Note.is_pinned.desc(), Note.updated_at.desc()).all()
     
-    # Get all unique tags for filter dropdown
+    # Get all unique tags for filter dropdown and count them
     all_tags = set()
+    tag_counts = {}
+    visibility_counts = {'private': 0, 'team': 0, 'company': 0}
+    
     for note in Note.query.filter_by(company_id=g.user.company_id, is_archived=False).all():
-        all_tags.update(note.get_tags_list())
+        if note.can_user_view(g.user):
+            # Count tags
+            note_tags = note.get_tags_list()
+            all_tags.update(note_tags)
+            for tag in note_tags:
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+            
+            # Count visibility
+            visibility_counts[note.visibility.value.lower()] = visibility_counts.get(note.visibility.value.lower(), 0) + 1
     
     # Get all unique folders for filter dropdown
     all_folders = set()
@@ -1737,6 +1748,8 @@ def notes_list():
                          all_folders=sorted(list(all_folders)),
                          folder_tree=folder_tree,
                          folder_counts=folder_counts,
+                         tag_counts=tag_counts,
+                         visibility_counts=visibility_counts,
                          projects=projects,
                          NoteVisibility=NoteVisibility)
 
@@ -2307,6 +2320,48 @@ def update_note_folder(slug):
         db.session.rollback()
         logger.error(f"Error updating note folder: {str(e)}")
         return jsonify({'success': False, 'message': 'Error updating note folder'}), 500
+
+
+@app.route('/api/notes/<int:note_id>/tags', methods=['POST'])
+@login_required
+@company_required
+def add_tags_to_note(note_id):
+    """Add tags to a note"""
+    note = Note.query.filter_by(id=note_id, company_id=g.user.company_id).first_or_404()
+    
+    # Check permissions
+    if not note.can_user_edit(g.user):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    new_tags = data.get('tags', '').strip()
+    
+    if not new_tags:
+        return jsonify({'success': False, 'message': 'No tags provided'}), 400
+    
+    try:
+        # Get existing tags
+        existing_tags = note.get_tags_list()
+        
+        # Parse new tags
+        new_tag_list = [tag.strip() for tag in new_tags.split(',') if tag.strip()]
+        
+        # Merge tags (avoid duplicates)
+        all_tags = list(set(existing_tags + new_tag_list))
+        
+        # Update note
+        note.set_tags_list(all_tags)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Tags added successfully',
+            'tags': note.tags
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error adding tags to note: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error adding tags'}), 500
 
 
 @app.route('/api/notes/<int:note_id>/link', methods=['POST'])
