@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register - TimeTrack</title>
+    <title>Register - {{ g.branding.app_name if g.branding else 'TimeTrack' }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
@@ -11,7 +11,7 @@
 <body class="auth-page">
 <div class="auth-container">
     <div class="auth-brand">
-        <h1>Welcome to TimeTrack</h1>
+        <h1>Welcome to {{ g.branding.app_name if g.branding else 'TimeTrack' }}</h1>
         <p>Join your company team</p>
     </div>
     

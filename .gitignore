@@ -146,3 +146,7 @@ node_modules/
 # Temporary files
 *.tmp
 *.temp
+
+# User uploaded content
+static/uploads/avatars/*
+!static/uploads/avatars/.gitkeep

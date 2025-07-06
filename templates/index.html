@@ -9,7 +9,7 @@
     <section class="splash-hero">
         <div class="hero-content">
             <h1 class="hero-title">Transform Your Productivity</h1>
-            <p class="hero-subtitle">Experience the future of time management with TimeTrack's intelligent tracking system</p>
+            <p class="hero-subtitle">Experience the future of time management with {{ g.branding.app_name if g.branding else 'TimeTrack' }}'s intelligent tracking system</p>
             <div class="cta-buttons">
                 <a href="{{ url_for('register') }}" class="btn-primary">Get Started Free</a>
                 <a href="{{ url_for('login') }}" class="btn-secondary">Sign In</a>

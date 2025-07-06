@@ -16,7 +16,8 @@ try:
     from models import (User, TimeEntry, WorkConfig, SystemSettings, Team, Role, Project,
                        Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType,
                        ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, Announcement, SystemEvent,
-                       WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility)
+                       WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility,
+                       BrandingSettings)
     from werkzeug.security import generate_password_hash
     FLASK_AVAILABLE = True
 except ImportError:
@@ -324,6 +325,25 @@ def create_missing_tables(cursor):
             FOREIGN KEY (company_id) REFERENCES company (id),
             FOREIGN KEY (created_by_id) REFERENCES user (id),
             UNIQUE(company_id)
+        )
+        """)
+
+    # Branding Settings table
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='branding_settings'")
+    if not cursor.fetchone():
+        print("Creating branding_settings table...")
+        cursor.execute("""
+        CREATE TABLE branding_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            app_name VARCHAR(100) NOT NULL DEFAULT 'Time Tracker',
+            logo_filename VARCHAR(255),
+            logo_alt_text VARCHAR(255) DEFAULT 'Logo',
+            favicon_filename VARCHAR(255),
+            primary_color VARCHAR(7) DEFAULT '#007bff',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_by_id INTEGER,
+            FOREIGN KEY (updated_by_id) REFERENCES user (id)
         )
         """)
 
@@ -1197,6 +1217,31 @@ def migrate_postgresql_schema():
                 db.session.execute(text("CREATE INDEX idx_comment_parent ON comment(parent_comment_id)"))
                 db.session.execute(text("CREATE INDEX idx_comment_created_by ON comment(created_by_id)"))
                 db.session.execute(text("CREATE INDEX idx_comment_created_at ON comment(created_at DESC)"))
+                db.session.commit()
+            
+            # Check if branding_settings table exists
+            result = db.session.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_name = 'branding_settings'
+            """))
+            
+            if not result.fetchone():
+                print("Creating branding_settings table...")
+                db.session.execute(text("""
+                    CREATE TABLE branding_settings (
+                        id SERIAL PRIMARY KEY,
+                        app_name VARCHAR(100) NOT NULL DEFAULT 'Time Tracker',
+                        logo_filename VARCHAR(255),
+                        logo_alt_text VARCHAR(255) DEFAULT 'Logo',
+                        favicon_filename VARCHAR(255),
+                        primary_color VARCHAR(7) DEFAULT '#007bff',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_by_id INTEGER,
+                        FOREIGN KEY (updated_by_id) REFERENCES "user" (id)
+                    )
+                """))
                 db.session.commit()
             
             # Check if company_settings table exists

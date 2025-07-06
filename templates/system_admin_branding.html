@@ -1,0 +1,222 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="header-section">
+        <h1>🎨 System Administrator - Branding Settings</h1>
+        <p class="subtitle">Customize the appearance and branding of your TimeTrack instance</p>
+        <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+    </div>
+
+    <!-- Current Branding Preview -->
+    <div class="stats-section">
+        <h3>👁️ Current Branding Preview</h3>
+        <div class="branding-preview">
+            <div class="preview-card">
+                <div class="preview-header">
+                    {% if branding.logo_filename %}
+                        <img src="{{ url_for('static', filename='uploads/branding/' + branding.logo_filename) }}" 
+                             alt="{{ branding.logo_alt_text }}" 
+                             class="preview-logo">
+                    {% endif %}
+                    <h4>{{ branding.app_name }}</h4>
+                </div>
+                <div class="preview-content">
+                    <p>This is how your branding will appear to users.</p>
+                    <div class="preview-button" style="background-color: {{ branding.primary_color }};">
+                        Sample Button
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Branding Settings Form -->
+    <div class="settings-section">
+        <h3>🔧 Branding Configuration</h3>
+        <form method="POST" enctype="multipart/form-data" class="settings-form">
+            <!-- Application Name -->
+            <div class="setting-group">
+                <div class="setting-header">
+                    <h4>Application Name</h4>
+                    <p>The name that appears throughout the application</p>
+                </div>
+                <div class="setting-control">
+                    <label for="app_name">Application Name:</label>
+                    <input type="text" id="app_name" name="app_name" 
+                           value="{{ branding.app_name }}" 
+                           class="form-control"
+                           placeholder="TimeTrack" 
+                           required>
+                    <small class="setting-description">
+                        This name will appear in the title, navigation, and throughout the interface.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Logo Upload -->
+            <div class="setting-group">
+                <div class="setting-header">
+                    <h4>Logo Upload</h4>
+                    <p>Upload a custom logo for your application</p>
+                </div>
+                <div class="setting-control">
+                    <label for="logo_file">Logo File:</label>
+                    <input type="file" id="logo_file" name="logo_file" 
+                           accept="image/*" 
+                           class="form-control">
+                    {% if branding.logo_filename %}
+                        <div class="current-file">
+                            <strong>Current logo:</strong>
+                            <img src="{{ url_for('static', filename='uploads/branding/' + branding.logo_filename) }}" 
+                                 alt="{{ branding.logo_alt_text }}" 
+                                 class="current-logo">
+                        </div>
+                    {% endif %}
+                    <small class="setting-description">
+                        Supported formats: PNG, JPG, GIF, SVG. Recommended size: 200x50px or similar aspect ratio.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Logo Alt Text -->
+            <div class="setting-group">
+                <div class="setting-header">
+                    <h4>Logo Alt Text</h4>
+                    <p>Alternative text for the logo (accessibility)</p>
+                </div>
+                <div class="setting-control">
+                    <label for="logo_alt_text">Alt Text:</label>
+                    <input type="text" id="logo_alt_text" name="logo_alt_text" 
+                           value="{{ branding.logo_alt_text }}" 
+                           class="form-control"
+                           placeholder="Company Logo">
+                    <small class="setting-description">
+                        This text will be read by screen readers and shown when the logo cannot be displayed.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Favicon Upload -->
+            <div class="setting-group">
+                <div class="setting-header">
+                    <h4>Favicon Upload</h4>
+                    <p>Upload a custom favicon (browser tab icon)</p>
+                </div>
+                <div class="setting-control">
+                    <label for="favicon_file">Favicon File:</label>
+                    <input type="file" id="favicon_file" name="favicon_file" 
+                           accept="image/*" 
+                           class="form-control">
+                    {% if branding.favicon_filename %}
+                        <div class="current-file">
+                            <strong>Current favicon:</strong>
+                            <img src="{{ url_for('static', filename='uploads/branding/' + branding.favicon_filename) }}" 
+                                 alt="Current favicon" 
+                                 class="current-favicon">
+                        </div>
+                    {% endif %}
+                    <small class="setting-description">
+                        Supported formats: ICO, PNG (16x16px or 32x32px recommended).
+                    </small>
+                </div>
+            </div>
+
+            <!-- Primary Color -->
+            <div class="setting-group">
+                <div class="setting-header">
+                    <h4>Primary Color</h4>
+                    <p>The primary color used throughout the application</p>
+                </div>
+                <div class="setting-control">
+                    <label for="primary_color">Primary Color:</label>
+                    <input type="color" id="primary_color" name="primary_color" 
+                           value="{{ branding.primary_color }}" 
+                           class="form-control color-picker">
+                    <small class="setting-description">
+                        This color will be used for buttons, links, and other UI elements throughout the application.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">💾 Save Branding Settings</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+/* Branding-specific styles that complement the existing design system */
+.branding-preview {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 20px;
+    margin-top: 15px;
+}
+
+.preview-card {
+    background: white;
+    border-radius: 5px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    max-width: 400px;
+}
+
+.preview-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.preview-logo {
+    max-height: 40px;
+    max-width: 150px;
+    object-fit: contain;
+}
+
+.preview-button {
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+}
+
+.current-file {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.current-logo {
+    max-height: 30px;
+    max-width: 100px;
+    object-fit: contain;
+    margin-left: 10px;
+}
+
+.current-favicon {
+    max-height: 16px;
+    max-width: 16px;
+    object-fit: contain;
+    margin-left: 10px;
+}
+
+.color-picker {
+    width: 80px !important;
+    height: 40px;
+    padding: 0 !important;
+}
+</style>
+{% endblock %}
