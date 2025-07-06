@@ -11,7 +11,7 @@
             <button type="button" class="btn btn-sm btn-secondary" onclick="toggleFullscreen()">
                 Fullscreen
             </button>
-            <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn btn-sm btn-info">
+            <a href="{{ url_for('notes.view_note', slug=note.slug) }}" class="btn btn-sm btn-info">
                 Back to Note
             </a>
         </div>

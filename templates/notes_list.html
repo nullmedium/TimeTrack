@@ -8,7 +8,7 @@
             <button type="button" class="btn btn-sm btn-secondary" id="toggle-sidebar">
                 <span>📁</span> Toggle Folders
             </button>
-            <a href="{{ url_for('notes_folders') }}" class="btn btn-sm btn-info">
+            <a href="{{ url_for('notes.notes_folders') }}" class="btn btn-sm btn-info">
                 <span>⚙️</span> Manage Folders
             </a>
         </div>
@@ -18,7 +18,7 @@
         <!-- Folder Tree Sidebar -->
         <div class="folder-sidebar" id="folder-sidebar">
             <div class="create-note-section">
-                <a href="{{ url_for('create_note') }}" class="btn btn-create-note">
+                <a href="{{ url_for('notes.create_note') }}" class="btn btn-create-note">
                     <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                         <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
                     </svg>
@@ -117,7 +117,7 @@
 
     <!-- Filter Section -->
     <div class="notes-filter-section">
-        <form method="GET" action="{{ url_for('notes_list') }}" class="filter-form" id="filter-form">
+        <form method="GET" action="{{ url_for('notes.notes_list') }}" class="filter-form" id="filter-form">
             <!-- Hidden inputs for sidebar filters -->
             <input type="hidden" name="folder" id="folder" value="{{ folder_filter or '' }}">
             <input type="hidden" name="tag" id="tag" value="{{ tag_filter or '' }}">
@@ -202,7 +202,7 @@
                         {% endif %}
                     </td>
                     <td class="column-title">
-                        <a href="{{ url_for('view_note', slug=note.slug) }}" class="note-link">
+                        <a href="{{ url_for('notes.view_note', slug=note.slug) }}" class="note-link">
                             {{ note.title }}
                         </a>
                         <div class="note-associations">
@@ -234,7 +234,7 @@
                     <td class="column-tags">
                         {% if note.tags %}
                             {% for tag in note.get_tags_list() %}
-                            <a href="{{ url_for('notes_list', tag=tag) }}" class="tag-badge">{{ tag }}</a>
+                            <a href="{{ url_for('notes.notes_list', tag=tag) }}" class="tag-badge">{{ tag }}</a>
                             {% endfor %}
                         {% endif %}
                     </td>
@@ -243,12 +243,12 @@
                     </td>
                     <td class="column-actions">
                         <div class="note-actions">
-                            <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn-action" title="View">
+                            <a href="{{ url_for('notes.view_note', slug=note.slug) }}" class="btn-action" title="View">
                                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                     <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
                                 </svg>
                             </a>
-                            <a href="{{ url_for('view_note_mindmap', slug=note.slug) }}" class="btn-action" title="Mind Map">
+                            <a href="{{ url_for('notes.view_note_mindmap', slug=note.slug) }}" class="btn-action" title="Mind Map">
                                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                     <circle cx="8" cy="8" r="2"/>
                                     <circle cx="3" cy="3" r="1.5"/>
@@ -258,19 +258,19 @@
                                     <path d="M6.5 6.5L4 4M9.5 6.5L12 4M6.5 9.5L4 12M9.5 9.5L12 12" stroke="currentColor" fill="none"/>
                                 </svg>
                             </a>
-                            <a href="{{ url_for('download_note', slug=note.slug, format='md') }}" class="btn-action" title="Download as Markdown">
+                            <a href="{{ url_for('notes_download.download_note', slug=note.slug, format='md') }}" class="btn-action" title="Download as Markdown">
                                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                     <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                                     <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
                                 </svg>
                             </a>
                             {% if note.can_user_edit(g.user) %}
-                            <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn-action" title="Edit">
+                            <a href="{{ url_for('notes.edit_note', slug=note.slug) }}" class="btn-action" title="Edit">
                                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                     <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
                                 </svg>
                             </a>
-                            <form method="POST" action="{{ url_for('delete_note', slug=note.slug) }}" style="display: inline;"
+                            <form method="POST" action="{{ url_for('notes.delete_note', slug=note.slug) }}" style="display: inline;"
                                   onsubmit="return confirm('Are you sure you want to delete this note?')">
                                 <button type="submit" class="btn-action btn-action-danger" title="Delete">
                                     <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -295,7 +295,7 @@
             <div class="note-card" data-note-slug="{{ note.slug }}">
                 <div class="note-header">
                     <h3 class="note-title">
-                        <a href="{{ url_for('view_note', slug=note.slug) }}">{{ note.title }}</a>
+                        <a href="{{ url_for('notes.view_note', slug=note.slug) }}">{{ note.title }}</a>
                         {% if note.is_pinned %}
                         <span class="pin-icon" title="Pinned">📌</span>
                         {% endif %}
@@ -320,7 +320,7 @@
                     <div class="note-tags">
                         {% if note.tags %}
                             {% for tag in note.get_tags_list() %}
-                            <a href="{{ url_for('notes_list', tag=tag) }}" class="tag-badge">{{ tag }}</a>
+                            <a href="{{ url_for('notes.notes_list', tag=tag) }}" class="tag-badge">{{ tag }}</a>
                             {% endfor %}
                         {% endif %}
                     </div>
@@ -339,12 +339,12 @@
                 </div>
                 
                 <div class="note-actions">
-                    <a href="{{ url_for('view_note', slug=note.slug) }}" class="btn-action" title="View">
+                    <a href="{{ url_for('notes.view_note', slug=note.slug) }}" class="btn-action" title="View">
                         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
                         </svg>
                     </a>
-                    <a href="{{ url_for('view_note_mindmap', slug=note.slug) }}" class="btn-action" title="Mind Map">
+                    <a href="{{ url_for('notes.view_note_mindmap', slug=note.slug) }}" class="btn-action" title="Mind Map">
                         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                             <circle cx="8" cy="8" r="2"/>
                             <circle cx="3" cy="3" r="1.5"/>
@@ -354,19 +354,19 @@
                             <path d="M6.5 6.5L4 4M9.5 6.5L12 4M6.5 9.5L4 12M9.5 9.5L12 12" stroke="currentColor" fill="none"/>
                         </svg>
                     </a>
-                    <a href="{{ url_for('download_note', slug=note.slug, format='md') }}" class="btn-action" title="Download as Markdown">
+                    <a href="{{ url_for('notes_download.download_note', slug=note.slug, format='md') }}" class="btn-action" title="Download as Markdown">
                         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                             <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
                         </svg>
                     </a>
                     {% if note.can_user_edit(g.user) %}
-                    <a href="{{ url_for('edit_note', slug=note.slug) }}" class="btn-action" title="Edit">
+                    <a href="{{ url_for('notes.edit_note', slug=note.slug) }}" class="btn-action" title="Edit">
                         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
                         </svg>
                     </a>
-                    <form method="POST" action="{{ url_for('delete_note', slug=note.slug) }}" style="display: inline;"
+                    <form method="POST" action="{{ url_for('notes.delete_note', slug=note.slug) }}" style="display: inline;"
                           onsubmit="return confirm('Are you sure you want to delete this note?')">
                         <button type="submit" class="btn-action btn-action-danger" title="Delete">
                             <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -384,7 +384,7 @@
     
     {% else %}
     <div class="no-data">
-        <p>No notes found. <a href="{{ url_for('create_note') }}">Create your first note</a>.</p>
+        <p>No notes found. <a href="{{ url_for('notes.create_note') }}">Create your first note</a>.</p>
     </div>
     {% endif %}
         </div> <!-- End notes-content -->

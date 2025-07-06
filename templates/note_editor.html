@@ -145,7 +145,7 @@
                     <button type="submit" class="btn btn-primary">
                         {% if note %}Update Note{% else %}Create Note{% endif %}
                     </button>
-                    <a href="{{ url_for('notes_list') }}" class="btn btn-secondary">Cancel</a>
+                    <a href="{{ url_for('notes.notes_list') }}" class="btn btn-secondary">Cancel</a>
                 </div>
             </div>
 
@@ -170,7 +170,7 @@
         <div class="linked-notes-list">
             {% for link in note.linked_notes %}
             <div class="linked-note-item">
-                <a href="{{ url_for('view_note', slug=link.target_note.slug) }}">
+                <a href="{{ url_for('notes.view_note', slug=link.target_note.slug) }}">
                     {{ link.target_note.title }}
                 </a>
                 <span class="link-type">{{ link.link_type }}</span>
