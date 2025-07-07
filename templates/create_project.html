@@ -4,7 +4,7 @@
 <div class="timetrack-container">
     <h2>Create New Project</h2>
     
-    <form method="POST" action="{{ url_for('create_project') }}" class="project-form">
+    <form method="POST" action="{{ url_for('projects.create_project') }}" class="project-form">
         <div class="form-row">
             <div class="form-group">
                 <label for="name">Project Name *</label>
@@ -71,7 +71,7 @@
         
         <div class="form-actions">
             <button type="submit" class="btn">Create Project</button>
-            <a href="{{ url_for('admin_projects') }}" class="btn btn-secondary">Cancel</a>
+            <a href="{{ url_for('projects.admin_projects') }}" class="btn btn-secondary">Cancel</a>
         </div>
     </form>
 </div>

@@ -1,285 +1,491 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="timetrack-container admin-projects-container">
-    <div class="admin-header">
-        <h2>Project Management</h2>
-        <div class="admin-actions">
-            <a href="{{ url_for('create_project') }}" class="btn btn-md btn-success">Create New Project</a>
-            <button id="manage-categories-btn" class="btn btn-md btn-info">Manage Categories</button>
+<div class="projects-admin-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon">📁</span>
+                    Project Management
+                </h1>
+                <p class="page-subtitle">Manage projects, categories, and track time entries</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('projects.create_project') }}" class="btn btn-primary">
+                    <span class="icon">+</span>
+                    Create New Project
+                </a>
+                <button id="manage-categories-btn" class="btn btn-secondary">
+                    <span class="icon">🏷️</span>
+                    Manage Categories
+                </button>
+            </div>
         </div>
     </div>
+
+    <!-- Project Statistics -->
+    {% if projects %}
+    <div class="stats-section">
+        <div class="stat-card">
+            <div class="stat-value">{{ projects|length }}</div>
+            <div class="stat-label">Total Projects</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ projects|selectattr('is_active')|list|length }}</div>
+            <div class="stat-label">Active Projects</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ categories|length }}</div>
+            <div class="stat-label">Categories</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ projects|map(attribute='time_entries')|map('length')|sum }}</div>
+            <div class="stat-label">Time Entries</div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Project Categories Section -->
     <div id="categories-section" class="categories-section" style="display: none;">
         <div class="section-header">
-            <h3>Project Categories</h3>
-            <button id="create-category-btn" class="btn btn-success btn-sm">Create Category</button>
+            <h2 class="section-title">
+                <span class="icon">🏷️</span>
+                Project Categories
+            </h2>
+            <button id="create-category-btn" class="btn btn-sm btn-primary">
+                <span class="icon">+</span>
+                Create Category
+            </button>
         </div>
 
         <div class="categories-grid">
             {% for category in categories %}
             <div class="category-card" data-category-id="{{ category.id }}">
-                <div class="category-header" style="background-color: {{ category.color }}20; border-left: 4px solid {{ category.color }};">
+                <div class="category-header" style="background: linear-gradient(135deg, {{ category.color }}20 0%, {{ category.color }}10 100%); border-left: 4px solid {{ category.color }};">
                     <div class="category-title">
                         <span class="category-icon">{{ category.icon or '📁' }}</span>
                         <span class="category-name">{{ category.name }}</span>
                     </div>
-                    <div class="category-actions">
-                        <button class="edit-category-btn btn btn-xs btn-primary" data-id="{{ category.id }}">Edit</button>
-                        <button class="delete-category-btn btn btn-xs btn-danger" data-id="{{ category.id }}">Delete</button>
+                    <div class="category-stats">
+                        <span class="stat-badge">{{ category.projects|length }} projects</span>
                     </div>
                 </div>
                 <div class="category-body">
-                    <p class="category-description">{{ category.description or 'No description' }}</p>
-                    <small class="category-projects">{{ category.projects|length }} project(s)</small>
+                    <p class="category-description">{{ category.description or 'No description provided' }}</p>
+                    <div class="category-actions">
+                        <button class="btn btn-sm btn-edit edit-category-btn" data-id="{{ category.id }}">
+                            <span class="icon">✏️</span>
+                            Edit
+                        </button>
+                        <button class="btn btn-sm btn-delete delete-category-btn" data-id="{{ category.id }}">
+                            <span class="icon">🗑️</span>
+                            Delete
+                        </button>
+                    </div>
                 </div>
             </div>
             {% else %}
-            <div class="no-categories">
-                <p>No categories created yet. <button id="first-category-btn" class="btn btn-link">Create your first category</button>.</p>
+            <div class="empty-categories">
+                <div class="empty-icon">🏷️</div>
+                <p class="empty-message">No categories created yet</p>
+                <button id="first-category-btn" class="btn btn-primary">Create your first category</button>
             </div>
             {% endfor %}
         </div>
     </div>
 
-    {% if projects %}
-    <div class="projects-table">
-        <table class="time-history">
-            <thead>
-                <tr>
-                    <th>Code</th>
-                    <th>Name</th>
-                    <th>Category</th>
-                    <th>Team</th>
-                    <th>Status</th>
-                    <th>Start Date</th>
-                    <th>End Date</th>
-                    <th>Created By</th>
-                    <th>Time Entries</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for project in projects %}
-                <tr class="{% if not project.is_active %}inactive-project{% endif %}">
-                    <td><strong>{{ project.code }}</strong></td>
-                    <td>{{ project.name }}</td>
-                    <td>
-                        {% if project.category %}
-                            <span class="category-badge" style="background-color: {{ project.category.color }}20; color: {{ project.category.color }};">
-                                {{ project.category.icon or '📁' }} {{ project.category.name }}
-                            </span>
-                        {% else %}
-                            <em>No category</em>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if project.team %}
-                            {{ project.team.name }}
-                        {% else %}
-                            <em>All Teams</em>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span class="status-badge {% if project.is_active %}active{% else %}inactive{% endif %}">
-                            {{ 'Active' if project.is_active else 'Inactive' }}
-                        </span>
-                    </td>
-                    <td>{{ project.start_date.strftime('%Y-%m-%d') if project.start_date else '-' }}</td>
-                    <td>{{ project.end_date.strftime('%Y-%m-%d') if project.end_date else '-' }}</td>
-                    <td>{{ project.created_by.username }}</td>
-                    <td>{{ project.time_entries|length }}</td>
-                    <td class="actions">
-                        <a href="{{ url_for('edit_project', project_id=project.id) }}" class="btn btn-sm btn-primary">Edit</a>
-                        <a href="{{ url_for('manage_project_tasks', project_id=project.id) }}" class="btn btn-sm btn-info">Tasks</a>
-                        {% if g.user.role == Role.ADMIN and project.time_entries|length == 0 %}
-                        <form method="POST" action="{{ url_for('delete_project', project_id=project.id) }}" style="display: inline;"
-                              onsubmit="return confirm('Are you sure you want to delete this project?')">
-                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                        </form>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <!-- Main Content -->
+    <div class="projects-content">
+        {% if projects %}
+            <!-- View Controls -->
+            <div class="view-controls">
+                <div class="search-container">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" 
+                           class="search-input" 
+                           id="projectSearch" 
+                           placeholder="Search projects by name, code, or category...">
+                </div>
+                <div class="view-toggle">
+                    <button class="toggle-btn active" data-view="grid" title="Grid View">
+                        <span class="icon">⊞</span>
+                    </button>
+                    <button class="toggle-btn" data-view="list" title="List View">
+                        <span class="icon">☰</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grid View -->
+            <div class="view-container grid-view active" id="gridView">
+                <div class="projects-grid" id="projectsGrid">
+                    {% for project in projects %}
+                        <div class="project-card {% if not project.is_active %}inactive{% endif %}" 
+                             data-project-name="{{ project.name.lower() }}" 
+                             data-project-code="{{ project.code.lower() }}"
+                             data-project-category="{{ project.category.name.lower() if project.category else '' }}">
+                            <div class="project-header" {% if project.category %}style="background: linear-gradient(135deg, {{ project.category.color }}15 0%, {{ project.category.color }}05 100%);"{% endif %}>
+                                <div class="project-code-badge">{{ project.code }}</div>
+                                <div class="project-status">
+                                    <span class="status-badge {% if project.is_active %}status-active{% else %}status-inactive{% endif %}">
+                                        {{ 'Active' if project.is_active else 'Inactive' }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="project-body">
+                                <h3 class="project-name">{{ project.name }}</h3>
+                                
+                                {% if project.category %}
+                                <div class="project-category">
+                                    <span class="category-badge" style="background-color: {{ project.category.color }}20; color: {{ project.category.color }};">
+                                        {{ project.category.icon or '📁' }} {{ project.category.name }}
+                                    </span>
+                                </div>
+                                {% endif %}
+                                
+                                <div class="project-info">
+                                    <div class="info-item">
+                                        <span class="info-icon">👥</span>
+                                        <span class="info-text">{{ project.team.name if project.team else 'All Teams' }}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-icon">📅</span>
+                                        <span class="info-text">
+                                            {% if project.start_date %}
+                                                {{ project.start_date.strftime('%b %d, %Y') }}
+                                                {% if project.end_date %} - {{ project.end_date.strftime('%b %d, %Y') }}{% endif %}
+                                            {% else %}
+                                                No dates set
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-icon">⏱️</span>
+                                        <span class="info-text">{{ project.time_entries|length }} time entries</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-icon">👤</span>
+                                        <span class="info-text">Created by {{ project.created_by.username }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="project-actions">
+                                <a href="{{ url_for('projects.edit_project', project_id=project.id) }}" class="btn btn-edit">
+                                    <span class="icon">✏️</span>
+                                    Edit
+                                </a>
+                                <a href="{{ url_for('projects.manage_project_tasks', project_id=project.id) }}" class="btn btn-tasks">
+                                    <span class="icon">📋</span>
+                                    Tasks
+                                </a>
+                                {% if g.user.role in [Role.ADMIN, Role.SYSTEM_ADMIN] %}
+                                <form method="POST" action="{{ url_for('projects.delete_project', project_id=project.id) }}" class="delete-form"
+                                      onsubmit="return confirm('Are you sure you want to delete this project? This will delete all tasks, time entries, and related data!')">
+                                    <button type="submit" class="btn btn-delete" title="Delete project">
+                                        <span class="icon">🗑️</span>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- List View -->
+            <div class="view-container list-view" id="listView">
+                <div class="table-container">
+                    <table class="projects-table">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>Team</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                                <th>Created By</th>
+                                <th>Entries</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="projectsTableBody">
+                            {% for project in projects %}
+                                <tr class="project-row {% if not project.is_active %}inactive{% endif %}"
+                                    data-project-name="{{ project.name.lower() }}" 
+                                    data-project-code="{{ project.code.lower() }}"
+                                    data-project-category="{{ project.category.name.lower() if project.category else '' }}">
+                                    <td>
+                                        <span class="code-badge">{{ project.code }}</span>
+                                    </td>
+                                    <td class="project-name-cell">{{ project.name }}</td>
+                                    <td>
+                                        {% if project.category %}
+                                            <span class="category-badge" style="background-color: {{ project.category.color }}20; color: {{ project.category.color }};">
+                                                {{ project.category.icon or '📁' }} {{ project.category.name }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ project.team.name if project.team else 'All Teams' }}</td>
+                                    <td>
+                                        <span class="status-badge {% if project.is_active %}status-active{% else %}status-inactive{% endif %}">
+                                            {{ 'Active' if project.is_active else 'Inactive' }}
+                                        </span>
+                                    </td>
+                                    <td class="date-cell">
+                                        {% if project.start_date %}
+                                            {{ project.start_date.strftime('%Y-%m-%d') }}
+                                            {% if project.end_date %}<br>to {{ project.end_date.strftime('%Y-%m-%d') }}{% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ project.created_by.username }}</td>
+                                    <td class="text-center">{{ project.time_entries|length }}</td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <a href="{{ url_for('projects.edit_project', project_id=project.id) }}" class="btn-action btn-edit" title="Edit">
+                                                <span class="icon">✏️</span>
+                                            </a>
+                                            <a href="{{ url_for('projects.manage_project_tasks', project_id=project.id) }}" class="btn-action btn-tasks" title="Tasks">
+                                                <span class="icon">📋</span>
+                                            </a>
+                                            {% if g.user.role in [Role.ADMIN, Role.SYSTEM_ADMIN] %}
+                                            <form method="POST" action="{{ url_for('projects.delete_project', project_id=project.id) }}" class="inline-form"
+                                                  onsubmit="return confirm('Are you sure you want to delete this project? This will delete all tasks, time entries, and related data!')">
+                                                <button type="submit" class="btn-action btn-delete" title="Delete">
+                                                    <span class="icon">🗑️</span>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- No Results Message -->
+            <div class="no-results" id="noResults" style="display: none;">
+                <div class="empty-icon">🔍</div>
+                <p class="empty-message">No projects found matching your search</p>
+                <p class="empty-hint">Try searching with different keywords</p>
+            </div>
+        {% else %}
+            <!-- Empty State -->
+            <div class="empty-state">
+                <div class="empty-icon">📁</div>
+                <h2 class="empty-title">No Projects Yet</h2>
+                <p class="empty-message">Create your first project to start tracking time</p>
+                <a href="{{ url_for('projects.create_project') }}" class="btn btn-primary btn-lg">
+                    <span class="icon">+</span>
+                    Create First Project
+                </a>
+            </div>
+        {% endif %}
     </div>
-    {% else %}
-    <div class="no-data">
-        <p>No projects found. <a href="{{ url_for('create_project') }}">Create your first project</a>.</p>
+</div>
+
+<!-- Category Management Modal -->
+<div id="category-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title" id="category-modal-title">Create Category</h2>
+            <span class="modal-close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="category-form" class="modern-form">
+                <input type="hidden" id="category-id" name="category_id">
+                
+                <div class="form-group">
+                    <label for="category-name" class="form-label">Category Name</label>
+                    <input type="text" id="category-name" name="name" class="form-control" required maxlength="100">
+                    <span class="form-hint">Choose a descriptive name for the category</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="category-description" class="form-label">Description</label>
+                    <textarea id="category-description" name="description" class="form-control" rows="3" placeholder="Optional description..."></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="category-color" class="form-label">Color</label>
+                        <div class="color-input-wrapper">
+                            <input type="color" id="category-color" name="color" class="color-picker" value="#667eea">
+                            <input type="text" id="category-color-text" name="color_text" class="form-control color-text" value="#667eea" maxlength="7">
+                        </div>
+                        <span class="form-hint">Select a color for the category</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="category-icon" class="form-label">Icon</label>
+                        <input type="text" id="category-icon" name="icon" class="form-control" maxlength="10" placeholder="📁">
+                        <span class="form-hint">Use an emoji or short text</span>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="cancel-category">Cancel</button>
+            <button type="submit" form="category-form" class="btn btn-primary">
+                <span class="icon">✓</span>
+                Save Category
+            </button>
+        </div>
     </div>
-    {% endif %}
 </div>
 
 <style>
-/* Override container width for admin projects page */
-.admin-projects-container {
-    max-width: none !important;
-    width: 100% !important;
-    padding: 1rem !important;
-    margin: 0 !important;
+/* Container */
+.projects-admin-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
 }
 
-.projects-table {
-    overflow-x: auto;
-    width: 100%;
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
-.projects-table table {
-    width: 100%;
-    min-width: 1200px; /* Ensure table is wide enough for all columns */
-    table-layout: auto;
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
 }
 
-/* Optimize column widths */
-.projects-table th:nth-child(1), /* Code */
-.projects-table td:nth-child(1) {
-    width: 8%;
-    min-width: 80px;
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
-.projects-table th:nth-child(2), /* Name */
-.projects-table td:nth-child(2) {
-    width: 20%;
-    min-width: 150px;
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
 }
 
-.projects-table th:nth-child(3), /* Category */
-.projects-table td:nth-child(3) {
-    width: 12%;
-    min-width: 120px;
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
 }
 
-.projects-table th:nth-child(4), /* Team */
-.projects-table td:nth-child(4) {
-    width: 12%;
-    min-width: 100px;
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
 }
 
-.projects-table th:nth-child(5), /* Status */
-.projects-table td:nth-child(5) {
-    width: 8%;
-    min-width: 80px;
-}
-
-.projects-table th:nth-child(6), /* Start Date */
-.projects-table td:nth-child(6) {
-    width: 10%;
-    min-width: 100px;
-}
-
-.projects-table th:nth-child(7), /* End Date */
-.projects-table td:nth-child(7) {
-    width: 10%;
-    min-width: 100px;
-}
-
-.projects-table th:nth-child(8), /* Created By */
-.projects-table td:nth-child(8) {
-    width: 10%;
-    min-width: 100px;
-}
-
-.projects-table th:nth-child(9), /* Time Entries */
-.projects-table td:nth-child(9) {
-    width: 8%;
-    min-width: 80px;
-}
-
-.projects-table th:nth-child(10), /* Actions */
-.projects-table td:nth-child(10) {
-    width: 12%;
-    min-width: 200px;
-}
-
-.inactive-project {
-    opacity: 0.6;
-}
-
-.status-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-.status-badge.active {
-    background-color: #d4edda;
-    color: #155724;
-}
-
-.status-badge.inactive {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-
-.actions {
-    white-space: nowrap;
-    min-width: 180px; /* Ensure enough space for buttons */
-}
-
-.actions .btn {
-    margin-right: 0.5rem;
-    margin-bottom: 0.25rem;
-}
-
-.actions .btn-sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.875rem;
-    min-width: 60px; /* Consistent button widths */
-}
-
-/* Button definitions now in main style.css */
-
-.no-data {
-    text-align: center;
-    padding: 3rem;
-    color: #666;
-}
-
-/* Category Management Styles */
-.admin-actions {
+.header-actions {
     display: flex;
     gap: 1rem;
-    align-items: center;
+    flex-wrap: wrap;
 }
 
+/* Stats Section */
+.stats-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #667eea;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* Categories Section */
 .categories-section {
     background: #f8f9fa;
-    padding: 1.5rem;
+    padding: 2rem;
     margin-bottom: 2rem;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
 }
 
 .section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
 }
 
 .categories-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
 }
 
 .category-card {
     background: white;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
     overflow: hidden;
-    transition: box-shadow 0.2s ease;
+    transition: all 0.3s ease;
 }
 
 .category-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .category-header {
-    padding: 1rem;
+    padding: 1.25rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -289,11 +495,31 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 1.1rem;
 }
 
 .category-icon {
-    font-size: 1.2rem;
+    font-size: 1.5rem;
+}
+
+.stat-badge {
+    background: #e5e7eb;
+    color: #6b7280;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.category-body {
+    padding: 1.25rem;
+}
+
+.category-description {
+    color: #6b7280;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
 }
 
 .category-actions {
@@ -301,191 +527,780 @@
     gap: 0.5rem;
 }
 
-.category-body {
-    padding: 0 1rem 1rem;
+.empty-categories {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 3rem;
 }
 
-.category-description {
-    margin: 0 0 0.5rem 0;
-    color: #666;
-    font-size: 0.9rem;
+/* View Controls */
+.view-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
 }
 
-.category-projects {
-    color: #999;
-    font-size: 0.8rem;
+.search-container {
+    position: relative;
+    flex: 1;
+    max-width: 500px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.25rem;
+    opacity: 0.6;
+}
+
+.search-input {
+    width: 100%;
+    padding: 1rem 1rem 1rem 3rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* View Toggle */
+.view-toggle {
+    display: flex;
+    gap: 0.5rem;
+    background: #f3f4f6;
+    padding: 0.25rem;
+    border-radius: 8px;
+}
+
+.toggle-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.25rem;
+    color: #6b7280;
+    transition: all 0.2s ease;
+}
+
+.toggle-btn:hover {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+}
+
+.toggle-btn.active {
+    background: white;
+    color: #667eea;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* View Containers */
+.view-container {
+    display: none;
+}
+
+.view-container.active {
+    display: block;
+}
+
+/* Grid View */
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.project-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.project-card.inactive {
+    opacity: 0.7;
+}
+
+.project-header {
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8f9fa;
+}
+
+.project-code-badge {
+    background: #667eea;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.project-body {
+    padding: 1.5rem;
+    flex: 1;
+}
+
+.project-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 1rem 0;
+}
+
+.project-category {
+    margin-bottom: 1rem;
 }
 
 .category-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    border: 1px solid currentColor;
-}
-
-.no-categories {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 2rem;
-    color: #666;
-}
-
-.btn.btn-xs {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.8rem;
-    min-width: 50px;
-}
-
-/* Consistent button styling across the interface */
-.btn-info {
-    background-color: #17a2b8;
-    border-color: #17a2b8;
-    color: white;
-}
-
-.btn-info:hover {
-    background-color: #138496;
-    border-color: #117a8b;
-}
-
-.btn-success {
-    background-color: #28a745;
-    border-color: #28a745;
-}
-
-.btn-success:hover {
-    background-color: #218838;
-    border-color: #1e7e34;
-}
-
-.section-header .btn {
-    padding: 0.5rem 1rem;
-    font-size: 0.9rem;
-}
-
-.category-actions .btn {
     padding: 0.25rem 0.75rem;
-    font-size: 0.8rem;
-    min-width: 55px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: 1px solid currentColor;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
 }
 
-/* Make the "Manage Categories" button more prominent */
-#manage-categories-btn {
-    padding: 0.5rem 1.25rem;
-    font-size: 0.95rem;
-    font-weight: 500;
+.project-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
-.color-input-group {
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.info-icon {
+    font-size: 1rem;
+}
+
+.project-actions {
+    padding: 1rem 1.5rem;
+    background: #f8f9fa;
+    border-top: 1px solid #e5e7eb;
     display: flex;
     gap: 0.5rem;
     align-items: center;
 }
 
-.color-input-group input[type="color"] {
-    width: 50px;
-    height: 38px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.color-input-group input[type="text"] {
-    flex: 1;
-}
-
-.modal-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: flex-end;
-    margin-top: 1.5rem;
-}
-
-/* Responsive improvements */
-@media (max-width: 768px) {
-    .admin-actions {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-
-    .admin-actions .btn {
-        width: 100%;
-    }
-
-    .projects-table table {
-        min-width: 800px; /* Smaller minimum on mobile */
-    }
-
-    .categories-grid {
-        grid-template-columns: 1fr; /* Single column on mobile */
-    }
-}
-
-/* Better spacing for action buttons */
-.actions form {
-    display: inline-block;
+.delete-form {
     margin: 0;
 }
 
-.actions .btn + .btn,
-.actions .btn + form {
-    margin-left: 0.25rem;
+/* List View */
+.table-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
 }
-</style>
 
-<!-- Category Management Modal -->
-<div id="category-modal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <span class="close">&times;</span>
-        <h3 id="category-modal-title">Create Category</h3>
-        <form id="category-form">
-            <input type="hidden" id="category-id" name="category_id">
-            <div class="form-group">
-                <label for="category-name">Name:</label>
-                <input type="text" id="category-name" name="name" required maxlength="100">
-            </div>
-            <div class="form-group">
-                <label for="category-description">Description:</label>
-                <textarea id="category-description" name="description" rows="3"></textarea>
-            </div>
-            <div class="form-group">
-                <label for="category-color">Color:</label>
-                <div class="color-input-group">
-                    <input type="color" id="category-color" name="color" value="#007bff">
-                    <input type="text" id="category-color-text" name="color_text" value="#007bff" maxlength="7">
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="category-icon">Icon (emoji or text):</label>
-                <input type="text" id="category-icon" name="icon" maxlength="10" placeholder="📁">
-                <small>Use emojis or short text like 📁, 🎯, 💼, etc.</small>
-            </div>
-            <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Save Category</button>
-                <button type="button" class="btn btn-secondary" id="cancel-category">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
+.projects-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.projects-table thead {
+    background: #f8f9fa;
+}
+
+.projects-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.projects-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.projects-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.project-row.inactive {
+    opacity: 0.6;
+}
+
+.code-badge {
+    background: #ede9fe;
+    color: #5b21b6;
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.project-name-cell {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.date-cell {
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-muted {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.table-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.inline-form {
+    margin: 0;
+}
+
+/* Status Badges */
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-active {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.status-inactive {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #6b7280;
+    border: 2px solid #e5e7eb;
+}
+
+.btn-secondary:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.btn-edit {
+    background: white;
+    color: #667eea;
+    border: 2px solid #e5e7eb;
+    flex: 1;
+    justify-content: center;
+}
+
+.btn-edit:hover {
+    background: #f3f4f6;
+    border-color: #667eea;
+}
+
+.btn-tasks {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.btn-tasks:hover {
+    background: #bfdbfe;
+}
+
+.btn-delete {
+    background: #fee2e2;
+    color: #dc2626;
+    padding: 0.75rem;
+    min-width: auto;
+}
+
+.btn-delete:hover {
+    background: #dc2626;
+    color: white;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.btn-action {
+    padding: 0.5rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: transparent;
+    color: #6b7280;
+}
+
+.btn-action:hover {
+    background: #f3f4f6;
+}
+
+.btn-action.btn-edit:hover {
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.btn-action.btn-tasks:hover {
+    color: #1e40af;
+    background: rgba(30, 64, 175, 0.1);
+}
+
+.btn-action.btn-delete:hover {
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
+}
+
+.btn-lg {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.modal-close {
+    font-size: 2rem;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.modal-close:hover {
+    opacity: 1;
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+.modal-footer {
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 0 0 12px 12px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+/* Modern Form in Modal */
+.modern-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.95rem;
+}
+
+.form-control {
+    padding: 0.75rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    background-color: #f9fafb;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-hint {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.color-input-wrapper {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.color-picker {
+    width: 60px;
+    height: 42px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.color-text {
+    flex: 1;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 12px;
+    border: 2px dashed #e5e7eb;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1.5rem;
+    opacity: 0.3;
+}
+
+.empty-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.empty-message {
+    font-size: 1.1rem;
+    color: #6b7280;
+    margin-bottom: 2rem;
+}
+
+.empty-hint {
+    color: #9ca3af;
+    font-size: 0.875rem;
+}
+
+/* No Results */
+.no-results {
+    text-align: center;
+    padding: 3rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .projects-admin-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .page-title {
+        font-size: 1.75rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .header-actions {
+        width: 100%;
+    }
+    
+    .header-actions .btn {
+        flex: 1;
+    }
+    
+    .view-controls {
+        flex-direction: column;
+    }
+    
+    .search-container {
+        max-width: 100%;
+    }
+    
+    .projects-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .categories-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .project-actions {
+        flex-wrap: wrap;
+    }
+    
+    .btn-edit {
+        width: 100%;
+    }
+}
+
+/* Animations */
+.project-card,
+.project-row,
+.category-card {
+    animation: slideIn 0.4s ease-out;
+    animation-fill-mode: both;
+}
+
+.project-card:nth-child(1),
+.project-row:nth-child(1),
+.category-card:nth-child(1) { animation-delay: 0.05s; }
+
+.project-card:nth-child(2),
+.project-row:nth-child(2),
+.category-card:nth-child(2) { animation-delay: 0.1s; }
+
+.project-card:nth-child(3),
+.project-row:nth-child(3),
+.category-card:nth-child(3) { animation-delay: 0.15s; }
+
+.project-card:nth-child(4),
+.project-row:nth-child(4),
+.category-card:nth-child(4) { animation-delay: 0.2s; }
+
+.project-card:nth-child(5),
+.project-row:nth-child(5),
+.category-card:nth-child(5) { animation-delay: 0.25s; }
+
+.project-card:nth-child(6),
+.project-row:nth-child(6),
+.category-card:nth-child(6) { animation-delay: 0.3s; }
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Toggle categories section
     const manageCategoriesBtn = document.getElementById('manage-categories-btn');
     const categoriesSection = document.getElementById('categories-section');
+    
+    manageCategoriesBtn.addEventListener('click', function() {
+        const isVisible = categoriesSection.style.display !== 'none';
+        categoriesSection.style.display = isVisible ? 'none' : 'block';
+        this.innerHTML = isVisible ? '<span class="icon">🏷️</span> Manage Categories' : '<span class="icon">🏷️</span> Hide Categories';
+    });
+
+    // View Toggle
+    const toggleBtns = document.querySelectorAll('.toggle-btn');
+    const gridView = document.getElementById('gridView');
+    const listView = document.getElementById('listView');
+    
+    toggleBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const view = this.getAttribute('data-view');
+            
+            // Update button states
+            toggleBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Show/hide views
+            if (view === 'grid') {
+                gridView.classList.add('active');
+                listView.classList.remove('active');
+            } else {
+                gridView.classList.remove('active');
+                listView.classList.add('active');
+            }
+        });
+    });
+    
+    // Search functionality
+    const searchInput = document.getElementById('projectSearch');
+    const projectsGrid = document.getElementById('projectsGrid');
+    const projectsTableBody = document.getElementById('projectsTableBody');
+    const noResults = document.getElementById('noResults');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            
+            // Search in grid view
+            if (projectsGrid) {
+                const projectCards = projectsGrid.querySelectorAll('.project-card');
+                let visibleCount = 0;
+                
+                projectCards.forEach(card => {
+                    const projectName = card.getAttribute('data-project-name');
+                    const projectCode = card.getAttribute('data-project-code');
+                    const projectCategory = card.getAttribute('data-project-category');
+                    
+                    if (projectName.includes(searchTerm) || 
+                        projectCode.includes(searchTerm) || 
+                        projectCategory.includes(searchTerm)) {
+                        card.style.display = '';
+                        visibleCount++;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+                
+                // Show/hide no results in grid view
+                if (gridView.classList.contains('active') && noResults) {
+                    noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+                }
+            }
+            
+            // Search in list view
+            if (projectsTableBody) {
+                const projectRows = projectsTableBody.querySelectorAll('.project-row');
+                let visibleCount = 0;
+                
+                projectRows.forEach(row => {
+                    const projectName = row.getAttribute('data-project-name');
+                    const projectCode = row.getAttribute('data-project-code');
+                    const projectCategory = row.getAttribute('data-project-category');
+                    
+                    if (projectName.includes(searchTerm) || 
+                        projectCode.includes(searchTerm) || 
+                        projectCategory.includes(searchTerm)) {
+                        row.style.display = '';
+                        visibleCount++;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+                
+                // Show/hide no results in list view
+                if (listView.classList.contains('active') && noResults) {
+                    noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+                }
+            }
+        });
+    }
+
+    // Category Modal
     const categoryModal = document.getElementById('category-modal');
     const categoryForm = document.getElementById('category-form');
     const createCategoryBtn = document.getElementById('create-category-btn');
     const firstCategoryBtn = document.getElementById('first-category-btn');
     const colorInput = document.getElementById('category-color');
     const colorTextInput = document.getElementById('category-color-text');
-
-    // Toggle categories section
-    manageCategoriesBtn.addEventListener('click', function() {
-        const isVisible = categoriesSection.style.display !== 'none';
-        categoriesSection.style.display = isVisible ? 'none' : 'block';
-        this.textContent = isVisible ? 'Manage Categories' : 'Hide Categories';
-    });
 
     // Sync color inputs
     colorInput.addEventListener('change', function() {
@@ -513,8 +1328,8 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             categoryForm.reset();
             document.getElementById('category-id').value = '';
-            document.getElementById('category-color').value = '#007bff';
-            document.getElementById('category-color-text').value = '#007bff';
+            document.getElementById('category-color').value = '#667eea';
+            document.getElementById('category-color-text').value = '#667eea';
         }
 
         categoryModal.style.display = 'block';
@@ -527,13 +1342,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.edit-category-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const categoryId = this.getAttribute('data-id');
-            // Get category data from the card
             const card = this.closest('.category-card');
             const categoryData = {
                 id: categoryId,
                 name: card.querySelector('.category-name').textContent,
                 description: card.querySelector('.category-description').textContent,
-                color: card.querySelector('.category-header').style.borderLeftColor || '#007bff',
+                color: card.querySelector('.category-header').style.borderLeftColor || '#667eea',
                 icon: card.querySelector('.category-icon').textContent
             };
             openCategoryModal(categoryData);
@@ -565,7 +1379,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Close modal
-    document.querySelector('#category-modal .close').addEventListener('click', function() {
+    document.querySelector('#category-modal .modal-close').addEventListener('click', function() {
         categoryModal.style.display = 'none';
     });
 

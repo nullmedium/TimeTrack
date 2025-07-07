@@ -4,7 +4,7 @@
 <div class="admin-container">
     <div class="admin-header">
         <h1>Company Users - {{ company.name }}</h1>
-        <a href="{{ url_for('create_user') }}" class="btn btn-success">Create New User</a>
+        <a href="{{ url_for('users.create_user') }}" class="btn btn-success">Create New User</a>
     </div>
     
     <!-- User Statistics -->
@@ -84,13 +84,15 @@
                             </td>
                             <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
                             <td>
-                                <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-sm btn-primary">Edit</a>
+                                <a href="{{ url_for('users.edit_user', user_id=user.id) }}" class="btn btn-sm btn-primary">Edit</a>
                                 {% if user.id != g.user.id %}
-                                    {% if user.is_blocked %}
-                                        <a href="{{ url_for('toggle_user_status', user_id=user.id) }}" class="btn btn-sm btn-success">Unblock</a>
-                                    {% else %}
-                                        <a href="{{ url_for('toggle_user_status', user_id=user.id) }}" class="btn btn-sm btn-warning">Block</a>
-                                    {% endif %}
+                                    <form method="POST" action="{{ url_for('users.toggle_user_status', user_id=user.id) }}" style="display: inline;">
+                                        {% if user.is_blocked %}
+                                            <button type="submit" class="btn btn-sm btn-success">Unblock</button>
+                                        {% else %}
+                                            <button type="submit" class="btn btn-sm btn-warning">Block</button>
+                                        {% endif %}
+                                    </form>
                                     <button class="btn btn-sm btn-danger" onclick="confirmDelete({{ user.id }}, '{{ user.username }}')">Delete</button>
                                 {% endif %}
                             </td>
@@ -103,14 +105,14 @@
             <div class="empty-state">
                 <h3>No Users Found</h3>
                 <p>There are no users in this company yet.</p>
-                <a href="{{ url_for('create_user') }}" class="btn btn-primary">Add First User</a>
+                <a href="{{ url_for('users.create_user') }}" class="btn btn-primary">Add First User</a>
             </div>
         {% endif %}
     </div>
 
     <!-- Navigation -->
     <div class="admin-section">
-        <a href="{{ url_for('admin_company') }}" class="btn btn-secondary">← Back to Company Management</a>
+        <a href="{{ url_for('companies.admin_company') }}" class="btn btn-secondary">← Back to Company Management</a>
     </div>
 </div>
 

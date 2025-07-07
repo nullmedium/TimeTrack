@@ -190,7 +190,7 @@ def format_burndown_data(tasks, start_date, end_date):
             # Task is remaining if:
             # 1. It's not completed, OR
             # 2. It was completed after this date
-            if task.status != TaskStatus.COMPLETED:
+            if task.status != TaskStatus.DONE:
                 remaining_count += 1
             elif task.completed_date and task.completed_date > date_obj:
                 remaining_count += 1

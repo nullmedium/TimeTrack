@@ -13,6 +13,9 @@ from datetime import datetime
 from psycopg2.extras import RealDictCursor
 import json
 
+# Add parent directory to path to import app
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -182,6 +185,15 @@ class SQLiteToPostgresMigration:
                     else:
                         data_row.append(value)
                 data_rows.append(tuple(data_row))
+            
+            # Check if we should clear existing data first (for tables with unique constraints)
+            if table_name in ['company', 'team', 'user']:
+                postgres_cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"')
+                existing_count = postgres_cursor.fetchone()[0]
+                if existing_count > 0:
+                    logger.warning(f"Table {table_name} already has {existing_count} rows. Skipping to avoid duplicates.")
+                    self.migration_stats[table_name] = 0
+                    return True
             
             # Insert data in batches
             batch_size = 1000

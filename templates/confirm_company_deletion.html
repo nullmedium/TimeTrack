@@ -5,7 +5,7 @@
     <div class="header-section">
         <h1>⚠️ Confirm Company Deletion</h1>
         <p class="subtitle">Critical Action Required - Review All Data Before Proceeding</p>
-        <a href="{{ url_for('admin_users') if g.user.role != Role.SYSTEM_ADMIN else url_for('system_admin_users') }}" 
+        <a href="{{ url_for('users.admin_users') if g.user.role != Role.SYSTEM_ADMIN else url_for('users.system_admin_users') }}" 
            class="btn btn-md btn-secondary">← Back to User Management</a>
     </div>
     
@@ -231,7 +231,7 @@
             </div>
 
             <div class="form-group">
-                <a href="{{ url_for('admin_users') if g.user.role != Role.SYSTEM_ADMIN else url_for('system_admin_users') }}" 
+                <a href="{{ url_for('users.admin_users') if g.user.role != Role.SYSTEM_ADMIN else url_for('users.system_admin_users') }}" 
                    class="btn btn-secondary">Cancel</a>
                 <button type="submit" class="btn btn-danger">
                     Delete Company and All Data

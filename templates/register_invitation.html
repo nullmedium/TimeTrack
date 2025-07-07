@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accept Invitation - {{ g.branding.app_name if g.branding else 'TimeTrack' }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+    <style>
+        .invitation-info {
+            background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .invitation-company {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+        
+        .invitation-details {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .detail-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #6b7280;
+        }
+        
+        .detail-icon {
+            font-size: 1.25rem;
+        }
+        
+        .welcome-message {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .welcome-message h3 {
+            margin: 0 0 0.5rem 0;
+            color: #1f2937;
+        }
+        
+        .welcome-message p {
+            margin: 0;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body class="auth-page">
+<div class="auth-container">
+    <div class="auth-brand">
+        <h1>Welcome to {{ g.branding.app_name if g.branding else 'TimeTrack' }}</h1>
+        <p>Complete your registration</p>
+    </div>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <!-- Invitation Info -->
+    <div class="invitation-info">
+        <div class="invitation-company">{{ invitation.company.name }}</div>
+        <p>You've been invited to join this company</p>
+        <div class="invitation-details">
+            <div class="detail-item">
+                <span class="detail-icon">👤</span>
+                <span>Role: <strong>{{ invitation.role }}</strong></span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-icon">✉️</span>
+                <span>Email: <strong>{{ invitation.email }}</strong></span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-icon">👥</span>
+                <span>Invited by: <strong>{{ invitation.invited_by.username }}</strong></span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="welcome-message">
+        <h3>Create Your Account</h3>
+        <p>Choose a username and password to complete your registration</p>
+    </div>
+    
+    <form method="POST" action="{{ url_for('register_with_invitation', token=invitation.token) }}" class="auth-form">
+        <div class="form-group input-icon">
+            <i>👤</i>
+            <input type="text" id="username" name="username" class="form-control" 
+                   placeholder="Choose a username" required autofocus>
+            <label for="username">Username</label>
+        </div>
+        
+        <div class="form-group">
+            <div class="input-icon readonly-field">
+                <i>📧</i>
+                <input type="email" value="{{ invitation.email }}" class="form-control" readonly disabled>
+                <label>Email Address</label>
+            </div>
+            <small class="form-text text-muted">This email was used for your invitation</small>
+        </div>
+        
+        <div class="form-group input-icon">
+            <i>🔒</i>
+            <input type="password" id="password" name="password" class="form-control" 
+                   placeholder="Create a strong password" required>
+            <label for="password">Password</label>
+            <div id="password-strength" class="password-strength"></div>
+        </div>
+        
+        <div class="form-group input-icon">
+            <i>🔒</i>
+            <input type="password" id="confirm_password" name="confirm_password" class="form-control" 
+                   placeholder="Confirm your password" required>
+            <label for="confirm_password">Confirm Password</label>
+        </div>
+        
+        <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="terms" required>
+            <label class="form-check-label" for="terms">
+                I agree to the Terms of Service and Privacy Policy
+            </label>
+        </div>
+        
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary">Create Account & Join {{ invitation.company.name }}</button>
+        </div>
+        
+        <div class="auth-links">
+            <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+        </div>
+        
+        <div class="verification-notice">
+            <p>✅ Your email is pre-verified through this invitation</p>
+        </div>
+    </form>
+</div>
+
+<script src="{{ url_for('static', filename='js/password-strength.js') }}"></script>
+<script src="{{ url_for('static', filename='js/auth-animations.js') }}"></script>
+<style>
+    .readonly-field {
+        opacity: 0.7;
+        background-color: #f3f4f6;
+    }
+    
+    .readonly-field input {
+        background-color: #f3f4f6 !important;
+        cursor: not-allowed;
+    }
+</style>
+</body>
+</html>

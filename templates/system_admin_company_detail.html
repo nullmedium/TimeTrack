@@ -6,8 +6,8 @@
         <h1>🏢 {{ company.name }}</h1>
         <p class="subtitle">Company Details - System Administrator View</p>
         <div class="header-actions">
-            <a href="{{ url_for('system_admin_companies') }}" class="btn btn-secondary">← Back to Companies</a>
-            <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">Dashboard</a>
+            <a href="{{ url_for('system_admin.system_admin_companies') }}" class="btn btn-secondary">← Back to Companies</a>
+            <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">Dashboard</a>
         </div>
     </div>
 
@@ -121,7 +121,7 @@
                     {% endfor %}
                     {% if users|length > 10 %}
                     <div class="list-more">
-                        <a href="{{ url_for('system_admin_users', company=company.id) }}" class="btn btn-sm btn-outline">
+                        <a href="{{ url_for('users.system_admin_users', company=company.id) }}" class="btn btn-sm btn-outline">
                             View All {{ users|length }} Users →
                         </a>
                     </div>
@@ -195,20 +195,37 @@
     <div class="actions-section">
         <h3>🛠️ Management Actions</h3>
         <div class="actions-grid">
-            <a href="{{ url_for('system_admin_users', company=company.id) }}" class="action-card">
+            <a href="{{ url_for('users.system_admin_users', company=company.id) }}" class="action-card">
                 <div class="action-icon">👥</div>
                 <div class="action-content">
                     <h4>Manage Users</h4>
                     <p>View and edit all users in this company</p>
                 </div>
             </a>
-            <a href="{{ url_for('system_admin_time_entries', company=company.id) }}" class="action-card">
+            <a href="{{ url_for('system_admin.system_admin_time_entries', company=company.id) }}" class="action-card">
                 <div class="action-icon">⏱️</div>
                 <div class="action-content">
                     <h4>View Time Entries</h4>
                     <p>Browse time tracking data for this company</p>
                 </div>
             </a>
+        </div>
+    </div>
+    
+    <!-- Danger Zone -->
+    <div class="danger-section">
+        <h3>⚠️ Danger Zone</h3>
+        <div class="danger-content">
+            <p><strong>Delete Company</strong></p>
+            <p>Once you delete a company, there is no going back. This will permanently delete:</p>
+            <ul>
+                <li>All users in the company</li>
+                <li>All projects, tasks, and time entries</li>
+                <li>All teams and settings</li>
+            </ul>
+            <form method="POST" action="{{ url_for('system_admin.delete_company', company_id=company.id) }}" onsubmit="return confirm('Are you absolutely sure you want to delete {{ company.name }}? This action cannot be undone!');">
+                <button type="submit" class="btn btn-danger">Delete This Company</button>
+            </form>
         </div>
     </div>
 </div>
@@ -551,6 +568,44 @@
 
 .text-muted {
     color: #6c757d;
+}
+
+/* Danger Zone */
+.danger-section {
+    margin-top: 3rem;
+    padding: 1.5rem;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+}
+
+.danger-section h3 {
+    color: #dc2626;
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.danger-content {
+    color: #7f1d1d;
+}
+
+.danger-content p {
+    margin-bottom: 0.5rem;
+}
+
+.danger-content ul {
+    margin: 1rem 0 1.5rem 2rem;
+}
+
+.danger-content .btn-danger {
+    background-color: #dc2626;
+    color: white;
+    border: none;
+    padding: 0.5rem 1.5rem;
+}
+
+.danger-content .btn-danger:hover {
+    background-color: #b91c1c;
 }
 </style>
 {% endblock %}

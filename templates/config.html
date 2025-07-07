@@ -18,15 +18,15 @@
         
         <div class="policy-info">
             <div class="policy-item">
-                <strong>Region:</strong> {{ company_config.region_name }}
+                <strong>Region:</strong> {{ company_config.work_region.value }}
             </div>
             <div class="policy-item">
-                <strong>Standard Work Day:</strong> {{ company_config.work_hours_per_day }} hours
+                <strong>Standard Work Day:</strong> {{ company_config.standard_hours_per_day }} hours
             </div>
             <div class="policy-item">
                 <strong>Break Policy:</strong> 
                 {% if company_config.mandatory_break_minutes > 0 %}
-                    {{ company_config.mandatory_break_minutes }} minutes after {{ company_config.break_threshold_hours }} hours
+                    {{ company_config.break_duration_minutes }} minutes after {{ company_config.break_after_hours }} hours
                 {% else %}
                     No mandatory breaks
                 {% endif %}

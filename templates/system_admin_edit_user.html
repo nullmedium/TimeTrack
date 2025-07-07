@@ -5,7 +5,7 @@
     <div class="header-section">
         <h1>✏️ Edit User: {{ user.username }}</h1>
         <p class="subtitle">System Administrator - Edit user across companies</p>
-        <a href="{{ url_for('system_admin_users') }}" class="btn btn-secondary">← Back to Users</a>
+        <a href="{{ url_for('users.system_admin_users') }}" class="btn btn-secondary">← Back to Users</a>
     </div>
 
     <div class="form-container">
@@ -142,13 +142,13 @@
             <!-- Form Actions -->
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Save Changes</button>
-                <a href="{{ url_for('system_admin_users') }}" class="btn btn-secondary">Cancel</a>
+                <a href="{{ url_for('users.system_admin_users') }}" class="btn btn-secondary">Cancel</a>
                 
                 {% if user.id != g.user.id and not (user.role == Role.SYSTEM_ADMIN and user.id == g.user.id) %}
                 <div class="danger-zone">
                     <h4>Danger Zone</h4>
                     <p>Permanently delete this user account. This action cannot be undone.</p>
-                    <form method="POST" action="{{ url_for('system_admin_delete_user', user_id=user.id) }}" 
+                    <form method="POST" action="{{ url_for('users.system_admin_delete_user', user_id=user.id) }}" 
                           style="display: inline;" 
                           onsubmit="return confirm('Are you sure you want to delete user \'{{ user.username }}\'? This will also delete all their time entries and cannot be undone.')">
                         <button type="submit" class="btn btn-danger">Delete User</button>
@@ -159,6 +159,36 @@
         </form>
     </div>
 </div>
+
+<script>
+// Dynamic team loading when company changes
+document.getElementById('company_id').addEventListener('change', function() {
+    const companyId = this.value;
+    const teamSelect = document.getElementById('team_id');
+    
+    // Clear current teams
+    teamSelect.innerHTML = '<option value="">No Team</option>';
+    
+    if (companyId) {
+        // Fetch teams for the selected company
+        fetch(`/api/teams?company_id=${companyId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.teams) {
+                    data.teams.forEach(team => {
+                        const option = document.createElement('option');
+                        option.value = team.id;
+                        option.textContent = team.name;
+                        teamSelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching teams:', error);
+            });
+    }
+});
+</script>
 
 <style>
 .header-section {

@@ -5,7 +5,7 @@
     <div class="header-section">
         <h1>⚙️ System Administrator Settings</h1>
         <p class="subtitle">Global system configuration and management</p>
-        <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+        <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
     </div>
 
     <!-- System Statistics -->
@@ -108,7 +108,7 @@
 
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Save Settings</button>
-                <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
+                <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
     </div>
@@ -155,7 +155,7 @@
                     <p>Run diagnostic checks to identify potential issues with the system.</p>
                 </div>
                 <div class="danger-actions">
-                    <a href="{{ url_for('system_admin_health') }}" class="btn btn-warning">
+                    <a href="{{ url_for('system_admin.system_admin_health') }}" class="btn btn-warning">
                         Run Health Check
                     </a>
                 </div>
@@ -167,7 +167,7 @@
     <div class="actions-section">
         <h3>🚀 Quick Actions</h3>
         <div class="actions-grid">
-            <a href="{{ url_for('system_admin_users') }}" class="action-card">
+            <a href="{{ url_for('users.system_admin_users') }}" class="action-card">
                 <div class="action-icon">👥</div>
                 <div class="action-content">
                     <h4>Manage All Users</h4>
@@ -175,7 +175,7 @@
                 </div>
             </a>
             
-            <a href="{{ url_for('system_admin_companies') }}" class="action-card">
+            <a href="{{ url_for('system_admin.system_admin_companies') }}" class="action-card">
                 <div class="action-icon">🏢</div>
                 <div class="action-content">
                     <h4>Manage Companies</h4>
@@ -183,7 +183,7 @@
                 </div>
             </a>
             
-            <a href="{{ url_for('system_admin_time_entries') }}" class="action-card">
+            <a href="{{ url_for('system_admin.system_admin_time_entries') }}" class="action-card">
                 <div class="action-icon">⏱️</div>
                 <div class="action-content">
                     <h4>View Time Entries</h4>

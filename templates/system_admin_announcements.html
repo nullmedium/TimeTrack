@@ -4,7 +4,7 @@
 <div class="content-header">
     <div class="header-row">
         <h1>System Announcements</h1>
-        <a href="{{ url_for('system_admin_announcement_new') }}" class="btn btn-md btn-primary">
+        <a href="{{ url_for('announcements.create') }}" class="btn btn-md btn-primary">
             <i class="icon">➕</i> New Announcement
         </a>
     </div>
@@ -75,11 +75,11 @@
                         <td>{{ announcement.created_at.strftime('%Y-%m-%d') }}</td>
                         <td>
                             <div class="action-buttons">
-                                <a href="{{ url_for('system_admin_announcement_edit', id=announcement.id) }}" 
+                                <a href="{{ url_for('announcements.edit', id=announcement.id) }}" 
                                    class="btn btn-sm btn-outline-primary" title="Edit">
                                     ✏️
                                 </a>
-                                <form method="POST" action="{{ url_for('system_admin_announcement_delete', id=announcement.id) }}" 
+                                <form method="POST" action="{{ url_for('announcements.delete', id=announcement.id) }}" 
                                       style="display: inline-block;" 
                                       onsubmit="return confirm('Are you sure you want to delete this announcement?')">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
@@ -99,13 +99,13 @@
         <div class="pagination-container">
             <div class="pagination">
                 {% if announcements.has_prev %}
-                    <a href="{{ url_for('system_admin_announcements', page=announcements.prev_num) }}" class="page-link">« Previous</a>
+                    <a href="{{ url_for('announcements.index', page=announcements.prev_num) }}" class="page-link">« Previous</a>
                 {% endif %}
                 
                 {% for page_num in announcements.iter_pages() %}
                     {% if page_num %}
                         {% if page_num != announcements.page %}
-                            <a href="{{ url_for('system_admin_announcements', page=page_num) }}" class="page-link">{{ page_num }}</a>
+                            <a href="{{ url_for('announcements.index', page=page_num) }}" class="page-link">{{ page_num }}</a>
                         {% else %}
                             <span class="page-link current">{{ page_num }}</span>
                         {% endif %}
@@ -115,7 +115,7 @@
                 {% endfor %}
                 
                 {% if announcements.has_next %}
-                    <a href="{{ url_for('system_admin_announcements', page=announcements.next_num) }}" class="page-link">Next »</a>
+                    <a href="{{ url_for('announcements.index', page=announcements.next_num) }}" class="page-link">Next »</a>
                 {% endif %}
             </div>
         </div>
@@ -125,7 +125,7 @@
         <div class="empty-state">
             <h3>No announcements found</h3>
             <p>Create your first announcement to communicate with users.</p>
-            <a href="{{ url_for('system_admin_announcement_new') }}" class="btn btn-primary">
+            <a href="{{ url_for('announcements.create') }}" class="btn btn-primary">
                 Create Announcement
             </a>
         </div>

@@ -120,16 +120,16 @@
             </div>
             <div class="chart-stats">
                 <div class="stat-card">
-                    <h4>Total Hours</h4>
                     <span id="total-hours">0</span>
+                    <h4 id="stat-label-1">Total Hours</h4>
                 </div>
                 <div class="stat-card">
-                    <h4>Total Days</h4>
                     <span id="total-days">0</span>
+                    <h4 id="stat-label-2">Total Days</h4>
                 </div>
                 <div class="stat-card">
-                    <h4>Average Hours/Day</h4>
                     <span id="avg-hours">0</span>
+                    <h4 id="stat-label-3">Average Hours/Day</h4>
                 </div>
             </div>
         </div>
@@ -417,9 +417,9 @@ class TimeAnalyticsController {
             document.getElementById('avg-hours').textContent = data.burndown.tasks_completed || '0';
             
             // Update stat labels for burndown
-            document.querySelector('.stat-card:nth-child(1) h4').textContent = 'Total Tasks';
-            document.querySelector('.stat-card:nth-child(2) h4').textContent = 'Timeline Days';
-            document.querySelector('.stat-card:nth-child(3) h4').textContent = 'Completed Tasks';
+            document.getElementById('stat-label-1').textContent = 'Total Tasks';
+            document.getElementById('stat-label-2').textContent = 'Timeline Days';
+            document.getElementById('stat-label-3').textContent = 'Completed Tasks';
         } else {
             document.getElementById('total-hours').textContent = data.totalHours?.toFixed(1) || '0';
             document.getElementById('total-days').textContent = data.totalDays || '0';
@@ -427,9 +427,9 @@ class TimeAnalyticsController {
                 data.totalDays > 0 ? (data.totalHours / data.totalDays).toFixed(1) : '0';
             
             // Restore original stat labels
-            document.querySelector('.stat-card:nth-child(1) h4').textContent = 'Total Hours';
-            document.querySelector('.stat-card:nth-child(2) h4').textContent = 'Total Days';
-            document.querySelector('.stat-card:nth-child(3) h4').textContent = 'Average Hours/Day';
+            document.getElementById('stat-label-1').textContent = 'Total Hours';
+            document.getElementById('stat-label-2').textContent = 'Total Days';
+            document.getElementById('stat-label-3').textContent = 'Average Hours/Day';
         }
 
         this.updateChart();

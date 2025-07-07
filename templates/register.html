@@ -7,12 +7,114 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+    <style>
+        .registration-type {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .type-card {
+            flex: 1;
+            padding: 1.5rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .type-card:hover {
+            border-color: #667eea;
+            background: #f8f9fa;
+        }
+        
+        .type-card.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
+        }
+        
+        .type-card .icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        
+        .type-card h3 {
+            margin: 0 0 0.5rem 0;
+            color: #1f2937;
+        }
+        
+        .type-card p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .form-section {
+            display: none;
+        }
+        
+        .form-section.active {
+            display: block;
+        }
+        
+        .company-code-group {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .optional-badge {
+            background: #667eea;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 0.5rem;
+        }
+        
+        .benefits-list {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 1.5rem;
+        }
+        
+        .benefits-list h4 {
+            margin: 0 0 1rem 0;
+            color: #1f2937;
+        }
+        
+        .benefits-list ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .benefits-list li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .benefits-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body class="auth-page">
 <div class="auth-container">
     <div class="auth-brand">
         <h1>Welcome to {{ g.branding.app_name if g.branding else 'TimeTrack' }}</h1>
-        <p>Join your company team</p>
+        <p>Create your account to start tracking time</p>
     </div>
     
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -23,22 +125,51 @@
         {% endif %}
     {% endwith %}
     
-    <div class="registration-options mb-4">
-        <div class="alert alert-info">
-            <h5>Registration Options:</h5>
-            <p><strong>Company Employee:</strong> You're on the right page! Enter your company code below.</p>
-            <p><strong>Freelancer/Independent:</strong> <a href="{{ url_for('register_freelancer') }}" class="btn btn-outline-primary btn-sm">Register as Freelancer</a></p>
-        </div>
-    </div>
-    
-    <form method="POST" action="{{ url_for('register') }}" class="auth-form">
-        <div class="form-group company-code-group">
-            <label for="company_code">Company Code</label>
-            <input type="text" id="company_code" name="company_code" class="form-control" required autofocus 
-                   placeholder="ENTER-CODE">
-            <small class="form-text text-muted">Get this code from your company administrator</small>
+    <form method="POST" action="{{ url_for('register') }}" class="auth-form" id="registrationForm">
+        <!-- Registration Type Selection -->
+        <div class="registration-type">
+            <div class="type-card active" data-type="company" onclick="selectRegistrationType('company')">
+                <span class="icon">🏢</span>
+                <h3>Company Employee</h3>
+                <p>Join an existing company</p>
+            </div>
+            <div class="type-card" data-type="freelancer" onclick="selectRegistrationType('freelancer')">
+                <span class="icon">💼</span>
+                <h3>Freelancer</h3>
+                <p>Create personal workspace</p>
+            </div>
         </div>
         
+        <input type="hidden" name="registration_type" id="registration_type" value="company">
+        
+        <!-- Company Registration Fields -->
+        <div class="form-section active" id="company-section">
+            <div class="company-code-group">
+                <label for="company_code">
+                    Company Code
+                    <span class="optional-badge">Optional</span>
+                </label>
+                <input type="text" id="company_code" name="company_code" class="form-control" 
+                       placeholder="Enter code or leave blank to create new company">
+                <small class="form-text text-muted">
+                    Have a company code? Enter it here. No code? Leave blank to create your own company.
+                    <br><strong>Tip:</strong> Ask your admin for an email invitation instead.
+                </small>
+            </div>
+        </div>
+        
+        <!-- Freelancer Registration Fields -->
+        <div class="form-section" id="freelancer-section">
+            <div class="form-group input-icon">
+                <i>🏢</i>
+                <input type="text" id="business_name" name="business_name" class="form-control" 
+                       placeholder="Your Business Name (optional)">
+                <label for="business_name">Business Name</label>
+                <small class="form-text text-muted">Leave blank to use your username as workspace name</small>
+            </div>
+        </div>
+        
+        <!-- Common Fields -->
         <div class="form-group input-icon">
             <i>👤</i>
             <input type="text" id="username" name="username" class="form-control" placeholder="Choose a username" required>
@@ -79,13 +210,67 @@
             <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
         </div>
         
+        <!-- Dynamic Benefits Section -->
+        <div class="benefits-list" id="company-benefits">
+            <h4>What you get:</h4>
+            <ul>
+                <li>Join an existing company team or create your own</li>
+                <li>Collaborate with team members</li>
+                <li>Track time on company projects</li>
+                <li>Team management tools (if admin)</li>
+                <li>Shared reports and analytics</li>
+            </ul>
+        </div>
+        
+        <div class="benefits-list" id="freelancer-benefits" style="display: none;">
+            <h4>What you get as a freelancer:</h4>
+            <ul>
+                <li>Your own personal workspace</li>
+                <li>Time tracking for your projects</li>
+                <li>Project management tools</li>
+                <li>Export capabilities for invoicing</li>
+                <li>Complete control over your data</li>
+            </ul>
+        </div>
+        
         <div class="verification-notice">
-            <p>💡 You can register without an email, but we recommend adding one later for account recovery.</p>
+            <p>💡 You can register without an email, but we recommend adding one for account recovery.</p>
         </div>
     </form>
 </div>
 
 <script src="{{ url_for('static', filename='js/password-strength.js') }}"></script>
 <script src="{{ url_for('static', filename='js/auth-animations.js') }}"></script>
+<script>
+function selectRegistrationType(type) {
+    // Update active card
+    document.querySelectorAll('.type-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    document.querySelector(`[data-type="${type}"]`).classList.add('active');
+    
+    // Update hidden field
+    document.getElementById('registration_type').value = type;
+    
+    // Show/hide sections
+    if (type === 'company') {
+        document.getElementById('company-section').classList.add('active');
+        document.getElementById('freelancer-section').classList.remove('active');
+        document.getElementById('company-benefits').style.display = 'block';
+        document.getElementById('freelancer-benefits').style.display = 'none';
+        
+        // Update form action
+        document.getElementById('registrationForm').action = "{{ url_for('register') }}";
+    } else {
+        document.getElementById('company-section').classList.remove('active');
+        document.getElementById('freelancer-section').classList.add('active');
+        document.getElementById('company-benefits').style.display = 'none';
+        document.getElementById('freelancer-benefits').style.display = 'block';
+        
+        // Update form action
+        document.getElementById('registrationForm').action = "{{ url_for('register_freelancer') }}";
+    }
+}
+</script>
 </body>
 </html>

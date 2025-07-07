@@ -11,40 +11,7 @@ while ! pg_isready -h db -p 5432 -U "$POSTGRES_USER" > /dev/null 2>&1; do
 done
 echo "PostgreSQL is ready!"
 
-# Check if SQLite database exists and has data
-SQLITE_PATH="/data/timetrack.db"
-if [ -f "$SQLITE_PATH" ]; then
-    echo "SQLite database found at $SQLITE_PATH"
-    
-    # Check if PostgreSQL database is empty
-    POSTGRES_TABLE_COUNT=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null || echo "0")
-    
-    if [ "$POSTGRES_TABLE_COUNT" -eq 0 ]; then
-        echo "PostgreSQL database is empty, running migration..."
-        
-        # Create a backup of SQLite database
-        cp "$SQLITE_PATH" "${SQLITE_PATH}.backup.$(date +%Y%m%d_%H%M%S)"
-        echo "Created SQLite backup"
-        
-        # Run migration
-        python migrate_sqlite_to_postgres.py
-        
-        if [ $? -eq 0 ]; then
-            echo "Migration completed successfully!"
-            
-            # Rename SQLite database to indicate it's been migrated
-            mv "$SQLITE_PATH" "${SQLITE_PATH}.migrated"
-            echo "SQLite database renamed to indicate migration completion"
-        else
-            echo "Migration failed! Check migration.log for details"
-            exit 1
-        fi
-    else
-        echo "PostgreSQL database already contains tables, skipping migration"
-    fi
-else
-    echo "No SQLite database found, starting with fresh PostgreSQL database"
-fi
+# SQLite to PostgreSQL migration is now handled by the migration system below
 
 # Initialize database tables if they don't exist
 echo "Ensuring database tables exist..."
@@ -55,6 +22,35 @@ with app.app_context():
     print('Database tables created/verified')
 "
 
+# Run all database schema migrations
+echo ""
+echo "=== Running Database Schema Migrations ==="
+if [ -d "migrations" ] && [ -f "migrations/run_all_db_migrations.py" ]; then
+    echo "Checking and applying database schema updates..."
+    python migrations/run_all_db_migrations.py
+    if [ $? -ne 0 ]; then
+        echo "⚠️  Some database migrations had issues, but continuing..."
+    fi
+else
+    echo "No migrations directory found, skipping database migrations..."
+fi
+
+# Run code migrations to update code for model changes
+echo ""
+echo "=== Running Code Migrations ==="
+echo "Code migrations temporarily disabled for debugging"
+# if [ -d "migrations" ] && [ -f "migrations/run_code_migrations.py" ]; then
+#     echo "Checking and applying code updates for model changes..."
+#     python migrations/run_code_migrations.py
+#     if [ $? -ne 0 ]; then
+#         echo "⚠️  Code migrations had issues, but continuing..."
+#     fi
+# else
+#     echo "No migrations directory found, skipping code migrations..."
+# fi
+
 # Start the Flask application with gunicorn
+echo ""
+echo "=== Starting Application ==="
 echo "Starting Flask application with gunicorn..."
 exec gunicorn --bind 0.0.0.0:5000 --workers 4 --threads 2 --timeout 30 app:app

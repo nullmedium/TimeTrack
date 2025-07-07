@@ -7,7 +7,7 @@
     <div class="export-options">
         <div class="export-section">
             <h3>Date Range</h3>
-            <form action="{{ url_for('download_export') }}" method="get">
+            <form action="{{ url_for('export.download_export') }}" method="get">
                 <div class="form-group">
                     <label for="start_date">Start Date:</label>
                     <input type="date" id="start_date" name="start_date" required>
@@ -33,14 +33,14 @@
         <div class="export-section">
             <h3>Quick Export</h3>
             <div class="quick-export-buttons">
-                <a href="{{ url_for('download_export', period='today', format='csv') }}" class="btn">Today (CSV)</a>
-                <a href="{{ url_for('download_export', period='today', format='excel') }}" class="btn">Today (Excel)</a>
-                <a href="{{ url_for('download_export', period='week', format='csv') }}" class="btn">This Week (CSV)</a>
-                <a href="{{ url_for('download_export', period='week', format='excel') }}" class="btn">This Week (Excel)</a>
-                <a href="{{ url_for('download_export', period='month', format='csv') }}" class="btn">This Month (CSV)</a>
-                <a href="{{ url_for('download_export', period='month', format='excel') }}" class="btn">This Month (Excel)</a>
-                <a href="{{ url_for('download_export', period='all', format='csv') }}" class="btn">All Time (CSV)</a>
-                <a href="{{ url_for('download_export', period='all', format='excel') }}" class="btn">All Time (Excel)</a>
+                <a href="{{ url_for('export.download_export', period='today', format='csv') }}" class="btn">Today (CSV)</a>
+                <a href="{{ url_for('export.download_export', period='today', format='excel') }}" class="btn">Today (Excel)</a>
+                <a href="{{ url_for('export.download_export', period='week', format='csv') }}" class="btn">This Week (CSV)</a>
+                <a href="{{ url_for('export.download_export', period='week', format='excel') }}" class="btn">This Week (Excel)</a>
+                <a href="{{ url_for('export.download_export', period='month', format='csv') }}" class="btn">This Month (CSV)</a>
+                <a href="{{ url_for('export.download_export', period='month', format='excel') }}" class="btn">This Month (Excel)</a>
+                <a href="{{ url_for('export.download_export', period='all', format='csv') }}" class="btn">All Time (CSV)</a>
+                <a href="{{ url_for('export.download_export', period='all', format='excel') }}" class="btn">All Time (Excel)</a>
             </div>
         </div>
     </div>

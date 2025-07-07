@@ -5,7 +5,7 @@
     <div class="header-section">
         <h1>{{ "Edit" if announcement else "Create" }} Announcement</h1>
         <p class="subtitle">{{ "Update" if announcement else "Create new" }} system announcement for users</p>
-        <a href="{{ url_for('system_admin_announcements') }}" class="btn btn-secondary">
+        <a href="{{ url_for('announcements.index') }}" class="btn btn-secondary">
             ← Back to Announcements
         </a>
     </div>
@@ -155,7 +155,7 @@
                 <button type="submit" class="btn btn-primary">
                     {{ "Update" if announcement else "Create" }} Announcement
                 </button>
-                <a href="{{ url_for('system_admin_announcements') }}" class="btn btn-secondary">Cancel</a>
+                <a href="{{ url_for('announcements.index') }}" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
     </div>

@@ -73,7 +73,7 @@ function renderSubtasks() {
 function addSubtask() {
     const newSubtask = {
         name: '',
-        status: 'NOT_STARTED',
+        status: 'TODO',
         priority: 'MEDIUM',
         assigned_to_id: null,
         isNew: true
@@ -143,7 +143,7 @@ function updateSubtaskAssignee(index, assigneeId) {
 // Toggle subtask status
 function toggleSubtaskStatus(index) {
     const subtask = currentSubtasks[index];
-    const newStatus = subtask.status === 'COMPLETED' ? 'NOT_STARTED' : 'COMPLETED';
+    const newStatus = subtask.status === 'DONE' ? 'TODO' : 'DONE';
     
     if (subtask.id) {
         // Update in database

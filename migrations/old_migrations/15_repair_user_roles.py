@@ -1,6 +1,22 @@
-from app import app, db
-from models import User, Role
+#!/usr/bin/env python3
+"""
+Repair user roles from string to enum values
+"""
+
+import os
+import sys
 import logging
+
+# Add parent directory to path to import app
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from app import app, db
+    from models import User, Role
+except Exception as e:
+    print(f"Error importing modules: {e}")
+    print("This migration requires Flask app context. Skipping...")
+    sys.exit(0)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,4 +60,8 @@ def repair_user_roles():
         logger.info("Role repair completed")
 
 if __name__ == "__main__":
-    repair_user_roles()
+    try:
+        repair_user_roles()
+    except Exception as e:
+        logger.error(f"Migration failed: {e}")
+        sys.exit(1)

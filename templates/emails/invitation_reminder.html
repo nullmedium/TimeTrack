@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reminder: Invitation to {{ invitation.company.name }}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 40px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .reminder-badge {
+            display: inline-block;
+            background: #f59e0b;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .logo {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        h1 {
+            color: #667eea;
+            font-size: 24px;
+            margin: 0;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 14px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin: 20px 0;
+        }
+        .expiry-warning {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .footer {
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="reminder-badge">REMINDER</div>
+            <div class="logo">📨</div>
+            <h1>Your Invitation is Still Waiting!</h1>
+        </div>
+        
+        <div class="content">
+            <p>Hello,</p>
+            
+            <p>This is a friendly reminder that you still have a pending invitation to join <strong>{{ invitation.company.name }}</strong> on {{ g.branding.app_name }}.</p>
+            
+            <div class="expiry-warning">
+                <strong>⏰ Time is running out!</strong><br>
+                This invitation will expire on <strong>{{ invitation.expires_at.strftime('%B %d, %Y') }}</strong>.
+            </div>
+            
+            <p>Don't miss out on joining your team! Click the button below to accept your invitation and create your account:</p>
+            
+            <div style="text-align: center;">
+                <a href="{{ invitation_url }}" class="cta-button">Accept Invitation Now</a>
+                <p style="font-size: 14px; color: #6b7280;">
+                    Or copy and paste this link:<br>
+                    <code style="background: #f3f4f6; padding: 5px; border-radius: 4px;">{{ invitation_url }}</code>
+                </p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>If you're no longer interested in joining {{ invitation.company.name }}, you can safely ignore this email.</p>
+            <p>&copy; {{ g.branding.app_name }} - Time Tracking Made Simple</p>
+        </div>
+    </div>
+</body>
+</html>
