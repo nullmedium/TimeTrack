@@ -2,350 +2,588 @@
 
 {% block content %}
 <div class="profile-container">
-    <h1>My Profile</h1>
-    
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="profile-header-info">
+                    <img src="{{ user.get_avatar_url(80) }}" alt="{{ user.username }}" class="header-avatar">
+                    <div>
+                        <h1 class="page-title">{{ user.username }}</h1>
+                        <p class="page-subtitle">Manage your profile and account settings</p>
+                    </div>
+                </div>
+            </div>
+            <div class="header-stats">
+                <div class="stat-badge">
+                    <span class="stat-icon">🏢</span>
+                    <span class="stat-text">{{ user.company.name if user.company else 'No Company' }}</span>
+                </div>
+                <div class="stat-badge">
+                    <span class="stat-icon">👥</span>
+                    <span class="stat-text">{{ user.team.name if user.team else 'No Team' }}</span>
+                </div>
+                <div class="stat-badge">
+                    <span class="stat-icon">👤</span>
+                    <span class="stat-text">{{ user.role.value if user.role else 'Team Member' }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        <span class="alert-icon">{% if category == 'success' %}✓{% elif category == 'error' %}✕{% else %}ℹ{% endif %}</span>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
         {% endif %}
     {% endwith %}
-    
-    <div class="profile-grid">
-        <!-- Avatar Card -->
-        <div class="profile-card avatar-card">
-            <h3>Profile Picture</h3>
-            <div class="avatar-section">
-                <img src="{{ user.get_avatar_url(128) }}" alt="{{ user.username }}" class="profile-avatar" id="avatar-preview">
-                <div class="avatar-info">
-                    <p><strong>{{ user.username }}</strong></p>
-                    <p class="text-muted">{{ user.role.value if user.role else 'Team Member' }}</p>
+
+    <!-- Main Content Grid -->
+    <div class="content-grid">
+        <!-- Left Column -->
+        <div class="content-column">
+            <!-- Profile Picture Card -->
+            <div class="card avatar-card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon">🖼️</span>
+                        Profile Picture
+                    </h2>
                 </div>
-            </div>
-            
-            <div class="avatar-controls">
-                <h4>Change Avatar</h4>
-                <div class="avatar-options">
-                    <div class="avatar-option">
-                        <input type="radio" id="avatar-default" name="avatar-type" value="default" checked>
-                        <label for="avatar-default">Default Avatar</label>
+                <div class="card-body">
+                    <div class="avatar-showcase">
+                        <img src="{{ user.get_avatar_url(160) }}" alt="{{ user.username }}" class="profile-avatar" id="avatar-preview">
                     </div>
-                    <div class="avatar-option">
-                        <input type="radio" id="avatar-upload" name="avatar-type" value="upload">
-                        <label for="avatar-upload">Upload Image</label>
-                    </div>
-                    <div class="avatar-option">
-                        <input type="radio" id="avatar-url" name="avatar-type" value="url">
-                        <label for="avatar-url">Custom URL</label>
-                    </div>
-                </div>
-                
-                <!-- Default Avatar Options -->
-                <div id="default-avatar-options" class="avatar-option-panel">
-                    <p class="help-text">Your default avatar is generated based on your username.</p>
-                    <button type="button" class="btn btn-secondary" onclick="resetAvatar()">Use Default Avatar</button>
-                </div>
-                
-                <!-- Upload Avatar Options -->
-                <div id="upload-avatar-options" class="avatar-option-panel" style="display: none;">
-                    <form method="POST" action="{{ url_for('upload_avatar') }}" enctype="multipart/form-data" class="avatar-upload-form">
-                        <div class="form-group">
-                            <label for="avatar_file" class="file-upload-label">
-                                <span class="upload-icon">📁</span>
-                                <span class="upload-text">Choose an image file</span>
-                                <span class="file-name" id="file-name">No file selected</span>
-                            </label>
-                            <input type="file" id="avatar_file" name="avatar_file" class="file-input" 
-                                   accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" required>
-                            <small>Max file size: 5MB. Supported formats: JPG, PNG, GIF, WebP</small>
-                        </div>
-                        <div class="upload-preview" id="upload-preview" style="display: none;">
-                            <img id="upload-preview-img" src="" alt="Preview">
-                        </div>
-                        <button type="submit" class="btn btn-primary" id="upload-btn" disabled>Upload Avatar</button>
-                    </form>
-                </div>
-                
-                <!-- URL Avatar Options -->
-                <div id="url-avatar-options" class="avatar-option-panel" style="display: none;">
-                    <form method="POST" action="{{ url_for('update_avatar') }}" class="avatar-form">
-                        <div class="form-group">
-                            <label for="avatar_url">Avatar URL</label>
-                            <input type="url" id="avatar_url" name="avatar_url" class="form-control" 
-                                   placeholder="https://example.com/avatar.jpg"
-                                   value="{{ user.avatar_url or '' }}">
-                            <small>Enter a direct link to an image (PNG, JPG, GIF)</small>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Update Avatar</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Account Info Card -->
-        <div class="profile-card">
-            <h3>Account Information</h3>
-            <div class="info-grid">
-                <div class="info-item">
-                    <span class="info-label">Username</span>
-                    <span class="info-value">{{ user.username }}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Email</span>
-                    <span class="info-value">
-                        {% if user.email %}
-                            {{ user.email }}
-                            {% if not user.is_verified %}
-                                <span class="badge badge-warning">Unverified</span>
-                            {% endif %}
-                        {% else %}
-                            <span class="text-muted">Not provided</span>
-                        {% endif %}
-                    </span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Role</span>
-                    <span class="info-value">{{ user.role.value if user.role else 'Team Member' }}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Company</span>
-                    <span class="info-value">{{ user.company.name if user.company else 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Team</span>
-                    <span class="info-value">{{ user.team.name if user.team else 'No Team' }}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Member Since</span>
-                    <span class="info-value">{{ user.created_at.strftime('%B %d, %Y') }}</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Email Settings Card -->
-        <div class="profile-card">
-            <h3>Email Settings</h3>
-            <form method="POST" action="{{ url_for('profile') }}" class="profile-form">
-                <div class="form-group">
-                    <label for="email">Email Address</label>
-                    <input type="email" id="email" name="email" class="form-control" value="{{ user.email or '' }}" placeholder="your@email.com">
-                    <small>This email address is used for account recovery and notifications.</small>
-                </div>
-                {% if user.email and not user.is_verified %}
-                <div class="alert alert-warning">
-                    <i>⚠️</i> Your email address is not verified. 
-                    <a href="{{ url_for('profile') }}" class="btn btn-sm btn-warning">Send Verification Email</a>
-                </div>
-                {% elif not user.email %}
-                <div class="alert alert-info">
-                    <i>ℹ️</i> Adding an email address enables account recovery and important notifications.
-                </div>
-                {% endif %}
-                <button type="submit" class="btn btn-primary">{% if user.email %}Update{% else %}Add{% endif %} Email</button>
-            </form>
-        </div>
-        
-        <!-- Password Settings Card -->
-        <div class="profile-card">
-            <h3>Change Password</h3>
-            <form method="POST" action="{{ url_for('profile') }}" class="password-form">
-                <!-- Hidden email field to maintain current email -->
-                <input type="hidden" name="email" value="{{ user.email or '' }}">
-                
-                <div class="form-group">
-                    <label for="current_password">Current Password</label>
-                    <input type="password" id="current_password" name="current_password" class="form-control" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="new_password">New Password</label>
-                    <input type="password" id="new_password" name="new_password" class="form-control" required>
-                    <small>Choose a strong password with at least 8 characters.</small>
-                </div>
-                
-                <div class="form-group">
-                    <label for="confirm_password">Confirm New Password</label>
-                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
-                </div>
-                
-                <button type="submit" class="btn btn-warning">Change Password</button>
-            </form>
-        </div>
-        
-        <!-- Security Settings Card -->
-        <div class="profile-card security-card">
-            <h3>Two-Factor Authentication</h3>
-            <div class="security-status">
-                {% if user.two_factor_enabled %}
-                    <div class="status-badge enabled">
-                        <span class="status-icon">✅</span>
-                        <span>Enabled</span>
-                    </div>
-                    <p>Two-factor authentication adds an extra layer of security to your account.</p>
                     
-                    <form method="POST" action="{{ url_for('disable_2fa') }}" class="disable-2fa-form" 
-                          onsubmit="return confirm('Are you sure you want to disable two-factor authentication?');">
-                        <div class="form-group">
-                            <label for="password_disable">Enter your password to disable 2FA:</label>
-                            <input type="password" id="password_disable" name="password" class="form-control" required>
+                    <div class="avatar-controls">
+                        <div class="control-tabs">
+                            <button class="tab-btn active" data-tab="default">
+                                <span class="tab-icon">👤</span>
+                                Default
+                            </button>
+                            <button class="tab-btn" data-tab="upload">
+                                <span class="tab-icon">📤</span>
+                                Upload
+                            </button>
+                            <button class="tab-btn" data-tab="url">
+                                <span class="tab-icon">🔗</span>
+                                URL
+                            </button>
                         </div>
-                        <button type="submit" class="btn btn-danger">Disable 2FA</button>
-                    </form>
-                {% else %}
-                    <div class="status-badge disabled">
-                        <span class="status-icon">❌</span>
-                        <span>Disabled</span>
+                        
+                        <!-- Default Avatar Tab -->
+                        <div class="tab-content active" id="default-tab">
+                            <div class="info-message">
+                                <span class="info-icon">💡</span>
+                                <p>Your default avatar is automatically generated based on your username.</p>
+                            </div>
+                            <button type="button" class="btn btn-outline" onclick="resetAvatar()">
+                                <span class="icon">↻</span>
+                                Reset to Default
+                            </button>
+                        </div>
+                        
+                        <!-- Upload Avatar Tab -->
+                        <div class="tab-content" id="upload-tab">
+                            <form method="POST" action="{{ url_for('upload_avatar') }}" enctype="multipart/form-data" class="modern-form">
+                                <div class="upload-area">
+                                    <label for="avatar_file" class="upload-label">
+                                        <div class="upload-icon">📁</div>
+                                        <div class="upload-text">Drop image here or click to browse</div>
+                                        <div class="upload-hint">Max 5MB • JPG, PNG, GIF, WebP</div>
+                                        <div class="file-name" id="file-name"></div>
+                                    </label>
+                                    <input type="file" id="avatar_file" name="avatar_file" class="file-input" 
+                                           accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" required>
+                                </div>
+                                <div class="upload-preview" id="upload-preview" style="display: none;">
+                                    <img id="upload-preview-img" src="" alt="Preview">
+                                </div>
+                                <button type="submit" class="btn btn-primary" id="upload-btn" disabled>
+                                    <span class="icon">⬆</span>
+                                    Upload Avatar
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- URL Avatar Tab -->
+                        <div class="tab-content" id="url-tab">
+                            <form method="POST" action="{{ url_for('update_avatar') }}" class="modern-form">
+                                <div class="form-group">
+                                    <label for="avatar_url" class="form-label">Image URL</label>
+                                    <input type="url" id="avatar_url" name="avatar_url" class="form-control" 
+                                           placeholder="https://example.com/avatar.jpg"
+                                           value="{{ user.avatar_url or '' }}">
+                                    <span class="form-hint">Enter a direct link to an image</span>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <span class="icon">✓</span>
+                                    Set Avatar URL
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                    <p>Enable two-factor authentication to add an extra layer of security to your account.</p>
-                    <a href="{{ url_for('setup_2fa') }}" class="btn btn-success">Enable 2FA</a>
-                {% endif %}
+                </div>
+            </div>
+
+            <!-- Account Information Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon">ℹ️</span>
+                        Account Information
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Username</span>
+                            <span class="info-value">{{ user.username }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Email</span>
+                            <span class="info-value">
+                                {{ user.email if user.email else 'Not provided' }}
+                                {% if user.email and not user.is_verified %}
+                                    <span class="badge badge-warning">Unverified</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Member Since</span>
+                            <span class="info-value">{{ user.created_at.strftime('%B %d, %Y') }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Account Type</span>
+                            <span class="info-value">{{ user.account_type.value if user.account_type else 'Standard' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="content-column">
+            <!-- Email Settings Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon">✉️</span>
+                        Email Settings
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('profile') }}" class="modern-form">
+                        <div class="form-group">
+                            <label for="email" class="form-label">Email Address</label>
+                            <input type="email" id="email" name="email" class="form-control" 
+                                   value="{{ user.email or '' }}" placeholder="your@email.com">
+                            <span class="form-hint">Used for notifications and account recovery</span>
+                        </div>
+                        
+                        {% if user.email and not user.is_verified %}
+                        <div class="alert alert-warning">
+                            <span class="alert-icon">⚠️</span>
+                            <div>
+                                <p>Your email address is not verified.</p>
+                                <a href="{{ url_for('profile') }}" class="btn btn-sm btn-warning">Send Verification Email</a>
+                            </div>
+                        </div>
+                        {% elif not user.email %}
+                        <div class="alert alert-info">
+                            <span class="alert-icon">ℹ️</span>
+                            <p>Adding an email enables account recovery and notifications.</p>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <span class="icon">✓</span>
+                                {% if user.email %}Update{% else %}Add{% endif %} Email
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Security Settings Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon">🔒</span>
+                        Security Settings
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <!-- Change Password Section -->
+                    <div class="security-section">
+                        <h3 class="section-title">Change Password</h3>
+                        <form method="POST" action="{{ url_for('profile') }}" class="modern-form">
+                            <input type="hidden" name="email" value="{{ user.email or '' }}">
+                            
+                            <div class="form-group">
+                                <label for="current_password" class="form-label">Current Password</label>
+                                <input type="password" id="current_password" name="current_password" 
+                                       class="form-control" required>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="new_password" class="form-label">New Password</label>
+                                    <input type="password" id="new_password" name="new_password" 
+                                           class="form-control" required>
+                                    <span class="form-hint">Min. 8 characters</span>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="confirm_password" class="form-label">Confirm Password</label>
+                                    <input type="password" id="confirm_password" name="confirm_password" 
+                                           class="form-control" required>
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-warning">
+                                    <span class="icon">🔑</span>
+                                    Change Password
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Two-Factor Authentication Section -->
+                    <div class="security-section">
+                        <h3 class="section-title">Two-Factor Authentication</h3>
+                        <div class="tfa-status">
+                            {% if user.two_factor_enabled %}
+                                <div class="status-indicator enabled">
+                                    <span class="status-icon">🛡️</span>
+                                    <div>
+                                        <div class="status-text">Enabled</div>
+                                        <div class="status-description">Your account is protected with 2FA</div>
+                                    </div>
+                                </div>
+                                
+                                <form method="POST" action="{{ url_for('disable_2fa') }}" class="modern-form"
+                                      onsubmit="return confirm('Are you sure you want to disable two-factor authentication?');">
+                                    <div class="form-group">
+                                        <label for="password_disable" class="form-label">Password</label>
+                                        <input type="password" id="password_disable" name="password" 
+                                               class="form-control" placeholder="Enter your password to disable 2FA" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-danger">
+                                        <span class="icon">✕</span>
+                                        Disable 2FA
+                                    </button>
+                                </form>
+                            {% else %}
+                                <div class="status-indicator disabled">
+                                    <span class="status-icon">⚠️</span>
+                                    <div>
+                                        <div class="status-text">Disabled</div>
+                                        <div class="status-description">Add extra security to your account</div>
+                                    </div>
+                                </div>
+                                
+                                <a href="{{ url_for('setup_2fa') }}" class="btn btn-success">
+                                    <span class="icon">✓</span>
+                                    Enable 2FA
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <style>
+/* Container and Layout */
 .profile-container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 2rem;
 }
 
-.profile-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 1.5rem;
-    margin-top: 2rem;
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
-.profile-card {
-    background: white;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
 }
 
-.profile-card h3 {
-    color: #333;
-    margin-bottom: 1.5rem;
-    font-size: 1.25rem;
-    font-weight: 600;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #e9ecef;
-}
-
-.profile-card h4 {
-    color: #495057;
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 1.5rem 0 1rem;
-}
-
-/* Avatar Section */
-.avatar-card {
-    grid-column: span 2;
-}
-
-.avatar-section {
+.profile-header-info {
     display: flex;
     align-items: center;
-    gap: 2rem;
+    gap: 1.5rem;
+}
+
+.header-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.page-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.25rem 0 0 0;
+}
+
+.header-stats {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.stat-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.stat-icon {
+    font-size: 1.5rem;
+}
+
+.stat-text {
+    font-weight: 500;
+}
+
+/* Flash Messages */
+.flash-messages {
     margin-bottom: 2rem;
 }
 
-.profile-avatar {
-    width: 128px;
-    height: 128px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 4px solid #e9ecef;
-}
-
-.avatar-info {
-    flex: 1;
-}
-
-.avatar-info p {
-    margin: 0.25rem 0;
-}
-
-.text-muted {
-    color: #6c757d;
-    font-size: 0.9rem;
-}
-
-.avatar-controls {
-    border-top: 1px solid #e9ecef;
-    padding-top: 1.5rem;
-}
-
-.avatar-options {
+.alert {
     display: flex;
-    gap: 2rem;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
     margin-bottom: 1rem;
+    animation: slideIn 0.3s ease-out;
 }
 
-.avatar-option {
+.alert-success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.alert-warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.alert-info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.alert-icon {
+    font-size: 1.25rem;
+    font-weight: bold;
+}
+
+/* Content Grid */
+.content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 2rem;
+}
+
+@media (max-width: 1024px) {
+    .content-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Cards */
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
-.avatar-option input[type="radio"] {
-    cursor: pointer;
-}
-
-.avatar-option label {
-    cursor: pointer;
-    margin-bottom: 0;
-}
-
-.avatar-option-panel {
-    margin-top: 1rem;
-    padding: 1rem;
-    background: #f8f9fa;
-    border-radius: 4px;
-}
-
-.help-text {
-    color: #6c757d;
-    font-size: 0.9rem;
-    margin-bottom: 1rem;
-}
-
-/* File Upload Styles */
-.file-upload-label {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem;
-    border: 2px dashed #dee2e6;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    background: #f8f9fa;
-}
-
-.file-upload-label:hover {
-    border-color: #007bff;
-    background: #e7f3ff;
-}
-
-.upload-icon {
+.card-title .icon {
     font-size: 1.5rem;
 }
 
-.upload-text {
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Avatar Card */
+.avatar-showcase {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.profile-avatar {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 6px solid #f3f4f6;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.control-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    background: #f3f4f6;
+    padding: 0.5rem;
+    border-radius: 8px;
+}
+
+.tab-btn {
     flex: 1;
+    padding: 0.75rem 1rem;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
     font-weight: 500;
-    color: #495057;
+    color: #6b7280;
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+}
+
+.tab-btn.active {
+    background: white;
+    color: #667eea;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.tab-icon {
+    font-size: 1.25rem;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Upload Area */
+.upload-area {
+    margin-bottom: 1.5rem;
+}
+
+.upload-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3rem 2rem;
+    border: 2px dashed #e5e7eb;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #f9fafb;
+}
+
+.upload-label:hover {
+    border-color: #667eea;
+    background: #f3f4f6;
+}
+
+.upload-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.upload-text {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.upload-hint {
+    font-size: 0.875rem;
+    color: #6b7280;
 }
 
 .file-name {
+    margin-top: 1rem;
     font-size: 0.875rem;
-    color: #6c757d;
+    color: #667eea;
+    font-weight: 500;
 }
 
 .file-input {
@@ -353,169 +591,348 @@
 }
 
 .upload-preview {
-    margin: 1rem 0;
     text-align: center;
+    margin: 1rem 0;
 }
 
 .upload-preview img {
     max-width: 200px;
     max-height: 200px;
     border-radius: 8px;
-    border: 2px solid #dee2e6;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* Account Info Grid */
+/* Info Grid */
 .info-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
 }
 
 .info-item {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.5rem;
 }
 
 .info-label {
     font-size: 0.875rem;
-    color: #6c757d;
-    font-weight: 500;
+    color: #6b7280;
+    font-weight: 600;
+    text-transform: uppercase;
 }
 
 .info-value {
-    font-size: 1rem;
-    color: #333;
+    font-size: 1.05rem;
+    color: #1f2937;
+    font-weight: 500;
 }
 
-/* Security Status */
-.security-status {
-    text-align: center;
-}
-
-.status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    font-weight: 600;
-    margin-bottom: 1rem;
-}
-
-.status-badge.enabled {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
-
-.status-badge.disabled {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-}
-
-.status-icon {
-    font-size: 1.25rem;
-}
-
-.disable-2fa-form {
-    margin-top: 1rem;
+.info-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
     padding: 1rem;
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    border-radius: 4px;
-}
-
-/* Form Styles */
-.form-group {
+    background: #f3f4f6;
+    border-radius: 8px;
     margin-bottom: 1.5rem;
 }
 
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: #333;
+.info-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+/* Forms */
+.modern-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.95rem;
 }
 
 .form-control {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
     font-size: 1rem;
-    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    transition: all 0.2s ease;
+    background-color: #f9fafb;
 }
 
 .form-control:focus {
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    border-color: #667eea;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-.form-group small {
-    display: block;
-    margin-top: 0.25rem;
-    color: #6c757d;
+.form-hint {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+}
+
+.btn-warning:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+}
+
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-outline {
+    background: white;
+    color: #6b7280;
+    border: 2px solid #e5e7eb;
+}
+
+.btn-outline:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
     font-size: 0.875rem;
 }
 
-/* Mobile Responsiveness */
+/* Security Section */
+.security-section {
+    padding: 1.5rem 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.security-section:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1rem;
+}
+
+.tfa-status {
+    margin-top: 1rem;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.status-indicator.enabled {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+}
+
+.status-indicator.disabled {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+}
+
+.status-icon {
+    font-size: 2rem;
+}
+
+.status-text {
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+}
+
+.status-description {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.badge-warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
-    .profile-grid {
-        grid-template-columns: 1fr;
+    .profile-container {
+        padding: 1rem;
     }
     
-    .avatar-card {
-        grid-column: span 1;
+    .page-header {
+        padding: 1.5rem;
     }
     
-    .avatar-section {
+    .profile-header-info {
         flex-direction: column;
         text-align: center;
     }
     
-    .avatar-options {
+    .header-stats {
         justify-content: center;
     }
+    
+    .page-title {
+        font-size: 2rem;
+    }
+    
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .control-tabs {
+        flex-direction: column;
+    }
+    
+    .tab-btn {
+        justify-content: flex-start;
+    }
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: slideIn 0.3s ease-out;
+}
+
+.card:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.card:nth-child(3) {
+    animation-delay: 0.2s;
 }
 </style>
 
 <script>
-// Avatar type toggle
 document.addEventListener('DOMContentLoaded', function() {
-    const avatarTypeRadios = document.querySelectorAll('input[name="avatar-type"]');
-    const defaultPanel = document.getElementById('default-avatar-options');
-    const uploadPanel = document.getElementById('upload-avatar-options');
-    const urlPanel = document.getElementById('url-avatar-options');
-    const avatarUrlInput = document.getElementById('avatar_url');
-    const avatarPreview = document.getElementById('avatar-preview');
+    // Tab switching
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            
+            // Update active states
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            
+            this.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+        });
+    });
+    
+    // File upload handling
     const fileInput = document.getElementById('avatar_file');
     const fileName = document.getElementById('file-name');
     const uploadPreview = document.getElementById('upload-preview');
     const uploadPreviewImg = document.getElementById('upload-preview-img');
     const uploadBtn = document.getElementById('upload-btn');
     
-    avatarTypeRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
-            // Hide all panels
-            defaultPanel.style.display = 'none';
-            uploadPanel.style.display = 'none';
-            urlPanel.style.display = 'none';
-            
-            // Show selected panel
-            if (this.value === 'default') {
-                defaultPanel.style.display = 'block';
-            } else if (this.value === 'upload') {
-                uploadPanel.style.display = 'block';
-            } else if (this.value === 'url') {
-                urlPanel.style.display = 'block';
-            }
-        });
-    });
-    
-    // File input handling
     fileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
@@ -526,7 +943,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (file.size > 5 * 1024 * 1024) {
                 alert('File size must be less than 5MB');
                 this.value = '';
-                fileName.textContent = 'No file selected';
+                fileName.textContent = '';
                 uploadPreview.style.display = 'none';
                 uploadBtn.disabled = true;
                 return;
@@ -537,7 +954,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!validTypes.includes(file.type)) {
                 alert('Please select a valid image file (JPG, PNG, GIF, or WebP)');
                 this.value = '';
-                fileName.textContent = 'No file selected';
+                fileName.textContent = '';
                 uploadPreview.style.display = 'none';
                 uploadBtn.disabled = true;
                 return;
@@ -552,13 +969,16 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             reader.readAsDataURL(file);
         } else {
-            fileName.textContent = 'No file selected';
+            fileName.textContent = '';
             uploadPreview.style.display = 'none';
             uploadBtn.disabled = true;
         }
     });
     
-    // Preview avatar URL
+    // Avatar URL preview
+    const avatarUrlInput = document.getElementById('avatar_url');
+    const avatarPreview = document.getElementById('avatar-preview');
+    
     avatarUrlInput.addEventListener('input', function() {
         const url = this.value.trim();
         if (url && isValidUrl(url)) {
@@ -569,9 +989,36 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             img.onerror = function() {
                 // Keep current avatar if URL is invalid
-                avatarPreview.src = '{{ user.get_avatar_url(128) }}';
+                avatarPreview.src = '{{ user.get_avatar_url(160) }}';
             };
             img.src = url;
+        }
+    });
+    
+    // Drag and drop for file upload
+    const uploadLabel = document.querySelector('.upload-label');
+    
+    uploadLabel.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.style.borderColor = '#667eea';
+        this.style.background = '#f3f4f6';
+    });
+    
+    uploadLabel.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        this.style.borderColor = '#e5e7eb';
+        this.style.background = '#f9fafb';
+    });
+    
+    uploadLabel.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.style.borderColor = '#e5e7eb';
+        this.style.background = '#f9fafb';
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            fileInput.dispatchEvent(new Event('change'));
         }
     });
 });
@@ -586,7 +1033,7 @@ function isValidUrl(string) {
 }
 
 function resetAvatar() {
-    if (confirm('This will remove your custom avatar and use the default generated avatar. Continue?')) {
+    if (confirm('Reset to your default avatar? This will remove any custom avatar.')) {
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = '{{ url_for("update_avatar") }}';

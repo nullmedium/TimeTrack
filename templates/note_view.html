@@ -1,162 +1,241 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="timetrack-container note-view-container">
-    <div class="note-header">
-        <div class="note-title-section">
-            <h1>{{ note.title }}</h1>
-            <div class="note-meta">
-                <span class="visibility-badge visibility-{{ note.visibility.value.lower() }}">
-                    {% if note.visibility.value == 'Private' %}🔒{% elif note.visibility.value == 'Team' %}👥{% else %}🏢{% endif %}
-                    {{ note.visibility.value }}
-                </span>
-                <span class="author">By {{ note.created_by.username }}</span>
-                <span class="date">Created {{ note.created_at|format_date }}</span>
-                {% if note.updated_at > note.created_at %}
-                <span class="date">· Updated {{ note.updated_at|format_date }}</span>
-                {% endif %}
-                {% if note.is_pinned %}
-                <span class="pin-badge">📌 Pinned</span>
-                {% endif %}
-            </div>
-        </div>
-        
-        <div class="note-actions">
-            <div class="dropdown" style="display: inline-block;">
-                <button class="btn btn-success dropdown-toggle" type="button" id="downloadDropdown" data-toggle="dropdown">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align: -2px; margin-right: 4px;">
-                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                        <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-                    </svg>
-                    Download
-                </button>
-                <div class="dropdown-menu">
-                    <a class="dropdown-item" href="{{ url_for('notes_download.download_note', slug=note.slug, format='md') }}">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 8px;">
-                            <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
-                            <path d="M4.5 12.5A.5.5 0 0 1 5 12h3a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 10h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm1.639-3.708 1.33.886 1.854-1.855a.25.25 0 0 1 .289-.047l1.888.974V8.5a.5.5 0 0 1-.5.5H5a.5.5 0 0 1-.5-.5V7s1.54-1.274 1.639-1.208zM6.25 6a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5z"/>
-                        </svg>
-                        Markdown (.md)
-                    </a>
-                    <a class="dropdown-item" href="{{ url_for('notes_download.download_note', slug=note.slug, format='html') }}">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 8px;">
-                            <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
-                            <path d="M8.5 6.5a.5.5 0 0 0-1 0V8H6a.5.5 0 0 0 0 1h1.5v1.5a.5.5 0 0 0 1 0V9H10a.5.5 0 0 0 0-1H8.5V6.5z"/>
-                        </svg>
-                        HTML (.html)
-                    </a>
-                    <a class="dropdown-item" href="{{ url_for('notes_download.download_note', slug=note.slug, format='txt') }}">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 8px;">
-                            <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
-                            <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z"/>
-                        </svg>
-                        Plain Text (.txt)
-                    </a>
+<div class="note-view-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">{{ note.title }}</h1>
+                <div class="page-meta">
+                    <span class="visibility-badge visibility-{{ note.visibility.value.lower() }}">
+                        {% if note.visibility.value == 'Private' %}🔒{% elif note.visibility.value == 'Team' %}👥{% else %}🏢{% endif %}
+                        {{ note.visibility.value }}
+                    </span>
+                    {% if note.is_pinned %}
+                    <span class="pin-badge">
+                        <span class="icon">📌</span>
+                        Pinned
+                    </span>
+                    {% endif %}
+                    <span class="meta-divider">•</span>
+                    <span class="author">
+                        <span class="icon">👤</span>
+                        {{ note.created_by.username }}
+                    </span>
+                    <span class="meta-divider">•</span>
+                    <span class="date">
+                        <span class="icon">📅</span>
+                        Created {{ note.created_at|format_date }}
+                    </span>
+                    {% if note.updated_at > note.created_at %}
+                    <span class="meta-divider">•</span>
+                    <span class="date">
+                        <span class="icon">🔄</span>
+                        Updated {{ note.updated_at|format_date }}
+                    </span>
+                    {% endif %}
                 </div>
             </div>
-            <a href="{{ url_for('notes.view_note_mindmap', slug=note.slug) }}" class="btn btn-info">
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align: -2px; margin-right: 4px;">
-                    <circle cx="8" cy="8" r="2"/>
-                    <circle cx="3" cy="3" r="1.5"/>
-                    <circle cx="13" cy="3" r="1.5"/>
-                    <circle cx="3" cy="13" r="1.5"/>
-                    <circle cx="13" cy="13" r="1.5"/>
-                    <path d="M6.5 6.5L4 4M9.5 6.5L12 4M6.5 9.5L4 12M9.5 9.5L12 12" stroke="currentColor" fill="none"/>
-                </svg>
-                Mind Map
-            </a>
-            {% if note.can_user_edit(g.user) %}
-            <a href="{{ url_for('notes.edit_note', slug=note.slug) }}" class="btn btn-primary">Edit</a>
-            <form method="POST" action="{{ url_for('notes.delete_note', slug=note.slug) }}" style="display: inline;"
-                  onsubmit="return confirm('Are you sure you want to delete this note?')">
-                <button type="submit" class="btn btn-danger">Delete</button>
-            </form>
+            <div class="header-actions">
+                <div class="dropdown">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="downloadDropdown" data-toggle="dropdown">
+                        <span class="icon">⬇️</span>
+                        Download
+                    </button>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item" href="{{ url_for('notes_download.download_note', slug=note.slug, format='md') }}">
+                            <span class="icon">📄</span>
+                            Markdown (.md)
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('notes_download.download_note', slug=note.slug, format='html') }}">
+                            <span class="icon">🌐</span>
+                            HTML (.html)
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('notes_download.download_note', slug=note.slug, format='txt') }}">
+                            <span class="icon">📃</span>
+                            Plain Text (.txt)
+                        </a>
+                    </div>
+                </div>
+                <a href="{{ url_for('notes.view_note_mindmap', slug=note.slug) }}" class="btn btn-secondary">
+                    <span class="icon">🧠</span>
+                    Mind Map
+                </a>
+                {% if note.can_user_edit(g.user) %}
+                <a href="{{ url_for('notes.edit_note', slug=note.slug) }}" class="btn btn-primary">
+                    <span class="icon">✏️</span>
+                    Edit
+                </a>
+                <form method="POST" action="{{ url_for('notes.delete_note', slug=note.slug) }}" 
+                      style="display: inline;"
+                      onsubmit="return confirm('Are you sure you want to delete this note?')">
+                    <button type="submit" class="btn btn-danger">
+                        <span class="icon">🗑️</span>
+                        Delete
+                    </button>
+                </form>
+                {% endif %}
+                <a href="{{ url_for('notes.notes_list') }}" class="btn btn-secondary">
+                    <span class="icon">←</span>
+                    Back to Notes
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Note Metadata Card -->
+    {% if note.project or note.task or note.tags or note.folder %}
+    <div class="metadata-card">
+        <div class="metadata-grid">
+            {% if note.folder %}
+            <div class="metadata-item">
+                <span class="metadata-label">
+                    <span class="icon">📁</span>
+                    Folder
+                </span>
+                <span class="metadata-value">
+                    <a href="{{ url_for('notes.notes_list', folder=note.folder) }}" class="metadata-link">
+                        {{ note.folder }}
+                    </a>
+                </span>
+            </div>
             {% endif %}
-            <a href="{{ url_for('notes.notes_list') }}" class="btn btn-secondary">Back to Notes</a>
+            
+            {% if note.project %}
+            <div class="metadata-item">
+                <span class="metadata-label">
+                    <span class="icon">📋</span>
+                    Project
+                </span>
+                <span class="metadata-value">
+                    <a href="{{ url_for('manage_project_tasks', project_id=note.project.id) }}" class="metadata-link">
+                        {{ note.project.code }} - {{ note.project.name }}
+                    </a>
+                </span>
+            </div>
+            {% endif %}
+            
+            {% if note.task %}
+            <div class="metadata-item">
+                <span class="metadata-label">
+                    <span class="icon">✅</span>
+                    Task
+                </span>
+                <span class="metadata-value">
+                    <a href="{{ url_for('view_task', task_id=note.task.id) }}" class="metadata-link">
+                        #{{ note.task.id }} - {{ note.task.title }}
+                    </a>
+                </span>
+            </div>
+            {% endif %}
+            
+            {% if note.tags %}
+            <div class="metadata-item">
+                <span class="metadata-label">
+                    <span class="icon">🏷️</span>
+                    Tags
+                </span>
+                <span class="metadata-value">
+                    <div class="tags-list">
+                        {% for tag in note.get_tags_list() %}
+                        <a href="{{ url_for('notes.notes_list', tag=tag) }}" class="tag-chip">
+                            {{ tag }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Note Content -->
+    <div class="content-card">
+        <div class="markdown-content">
+            {{ note.render_html()|safe }}
         </div>
     </div>
 
-    <div class="note-associations">
-        {% if note.project %}
-        <div class="association-item">
-            <span class="association-label">Project:</span>
-            <span class="association-value">
-                <a href="{{ url_for('manage_project_tasks', project_id=note.project.id) }}">
-                    {{ note.project.code }} - {{ note.project.name }}
-                </a>
-            </span>
-        </div>
-        {% endif %}
-        
-        {% if note.task %}
-        <div class="association-item">
-            <span class="association-label">Task:</span>
-            <span class="association-value">
-                <a href="{{ url_for('view_task', task_id=note.task.id) }}">
-                    #{{ note.task.id }} - {{ note.task.title }}
-                </a>
-            </span>
-        </div>
-        {% endif %}
-        
-        {% if note.tags %}
-        <div class="association-item">
-            <span class="association-label">Tags:</span>
-            <span class="association-value">
-                {% for tag in note.get_tags_list() %}
-                <a href="{{ url_for('notes.notes_list', tag=tag) }}" class="tag-badge">{{ tag }}</a>
-                {% endfor %}
-            </span>
-        </div>
-        {% endif %}
-    </div>
-
-    <div class="note-content markdown-content">
-        {{ note.render_html()|safe }}
-    </div>
-
-    {% if note.linked_notes or note.can_user_edit(g.user) %}
-    <div class="linked-notes-section">
-        <div class="section-header">
-            <h3>Linked Notes</h3>
+    <!-- Linked Notes Section -->
+    {% if outgoing_links or incoming_links or note.can_user_edit(g.user) %}
+    <div class="linked-notes-card">
+        <div class="card-header">
+            <h2 class="section-title">
+                <span class="icon">🔗</span>
+                Linked Notes
+            </h2>
             {% if note.can_user_edit(g.user) %}
-            <button id="add-link-btn" class="btn btn-sm btn-success">Add Link</button>
+            <button id="add-link-btn" class="btn btn-sm btn-primary">
+                <span class="icon">+</span>
+                Add Link
+            </button>
             {% endif %}
         </div>
         
         {% if outgoing_links or incoming_links %}
         <div class="linked-notes-grid">
             {% for link in outgoing_links %}
-            <div class="linked-note-card">
-                <div class="linked-note-header">
-                    <h4><a href="{{ url_for('notes.view_note', slug=link.target_note.slug) }}">{{ link.target_note.title }}</a></h4>
-                    <span class="link-type">→ {{ link.link_type }}</span>
+            <div class="linked-note-item">
+                <div class="link-direction outgoing">
+                    <span class="direction-icon">→</span>
+                    <span class="link-type">{{ link.link_type|title }}</span>
                 </div>
-                <div class="linked-note-preview">
-                    {{ link.target_note.get_preview()|safe }}
+                <div class="linked-note-content">
+                    <h4 class="linked-note-title">
+                        <a href="{{ url_for('notes.view_note', slug=link.target_note.slug) }}">
+                            {{ link.target_note.title }}
+                        </a>
+                    </h4>
+                    <p class="linked-note-preview">{{ link.target_note.get_preview(100) }}</p>
+                    <div class="linked-note-meta">
+                        <span class="visibility-badge visibility-{{ link.target_note.visibility.value.lower() }} small">
+                            {{ link.target_note.visibility.value }}
+                        </span>
+                        <span class="date">{{ link.target_note.updated_at.strftime('%b %d, %Y') }}</span>
+                    </div>
                 </div>
                 {% if note.can_user_edit(g.user) %}
-                <button class="remove-link-btn" data-target-id="{{ link.target_note_id }}">Remove Link</button>
+                <button class="remove-link-btn" data-target-id="{{ link.target_note_id }}" title="Remove link">
+                    <span class="icon">×</span>
+                </button>
                 {% endif %}
             </div>
             {% endfor %}
+            
             {% for link in incoming_links %}
-            <div class="linked-note-card">
-                <div class="linked-note-header">
-                    <h4><a href="{{ url_for('notes.view_note', slug=link.source_note.slug) }}">{{ link.source_note.title }}</a></h4>
-                    <span class="link-type">← {{ link.link_type }}</span>
+            <div class="linked-note-item">
+                <div class="link-direction incoming">
+                    <span class="direction-icon">←</span>
+                    <span class="link-type">{{ link.link_type|title }}</span>
                 </div>
-                <div class="linked-note-preview">
-                    {{ link.source_note.get_preview()|safe }}
+                <div class="linked-note-content">
+                    <h4 class="linked-note-title">
+                        <a href="{{ url_for('notes.view_note', slug=link.source_note.slug) }}">
+                            {{ link.source_note.title }}
+                        </a>
+                    </h4>
+                    <p class="linked-note-preview">{{ link.source_note.get_preview(100) }}</p>
+                    <div class="linked-note-meta">
+                        <span class="visibility-badge visibility-{{ link.source_note.visibility.value.lower() }} small">
+                            {{ link.source_note.visibility.value }}
+                        </span>
+                        <span class="date">{{ link.source_note.updated_at.strftime('%b %d, %Y') }}</span>
+                    </div>
                 </div>
                 {% if note.can_user_edit(g.user) %}
-                <button class="remove-link-btn" data-target-id="{{ link.source_note_id }}">Remove Link</button>
+                <button class="remove-link-btn" data-target-id="{{ link.source_note_id }}" title="Remove link">
+                    <span class="icon">×</span>
+                </button>
                 {% endif %}
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <p class="no-links">No linked notes yet.</p>
+        <div class="empty-state small">
+            <p class="empty-message">No linked notes yet.</p>
+        </div>
         {% endif %}
     </div>
     {% endif %}
@@ -164,37 +243,39 @@
 
 <!-- Add Link Modal -->
 {% if note.can_user_edit(g.user) %}
-<div id="link-modal" class="modal" style="display: none;">
+<div id="linkModal" class="modal">
     <div class="modal-content">
-        <span class="close">&times;</span>
-        <h3>Link to Another Note</h3>
-        <form id="link-form">
-            <div class="form-group">
-                <label for="target-note">Select Note:</label>
-                <select id="target-note" name="target_note_id" required>
-                    <option value="">Choose a note...</option>
-                    {% for other_note in linkable_notes %}
-                    {% if other_note.id != note.id %}
-                    <option value="{{ other_note.id }}">
-                        {{ other_note.title }}
-                        ({{ other_note.visibility.value }})
-                    </option>
-                    {% endif %}
-                    {% endfor %}
-                </select>
+        <div class="modal-header">
+            <h3>Link to Another Note</h3>
+            <button class="modal-close" onclick="closeLinkModal()">&times;</button>
+        </div>
+        <form id="linkForm" onsubmit="submitLink(event)">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="targetNote">Select Note:</label>
+                    <select id="targetNote" name="target_note_id" class="form-control" required>
+                        <option value="">Choose a note...</option>
+                        {% for other_note in linkable_notes %}
+                        <option value="{{ other_note.id }}">
+                            {{ other_note.title }}
+                            ({{ other_note.visibility.value }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="linkType">Link Type:</label>
+                    <select id="linkType" name="link_type" class="form-control">
+                        <option value="related">Related</option>
+                        <option value="references">References</option>
+                        <option value="parent">Parent</option>
+                        <option value="child">Child</option>
+                    </select>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="link-type">Link Type:</label>
-                <select id="link-type" name="link_type">
-                    <option value="related">Related</option>
-                    <option value="references">References</option>
-                    <option value="parent">Parent</option>
-                    <option value="child">Child</option>
-                </select>
-            </div>
-            <div class="modal-actions">
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeLinkModal()">Cancel</button>
                 <button type="submit" class="btn btn-primary">Add Link</button>
-                <button type="button" class="btn btn-secondary" id="cancel-link">Cancel</button>
             </div>
         </form>
     </div>
@@ -202,253 +283,348 @@
 {% endif %}
 
 <style>
-/* Note view specific styles */
+/* Note view specific styles following the new design system */
 .note-view-container {
-    max-width: 900px !important;
-    margin: 0 auto !important;
-    padding: 2rem !important;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
-.note-header {
+/* Page Meta */
+.page-meta {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 2px solid #e9ecef;
-}
-
-.note-title-section h1 {
-    margin: 0 0 0.5rem 0;
-    font-size: 2.5rem;
-    line-height: 1.2;
-}
-
-.note-meta {
-    display: flex;
-    gap: 1rem;
     align-items: center;
+    gap: 0.75rem;
     flex-wrap: wrap;
-    font-size: 0.9rem;
-    color: #666;
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-top: 0.5rem;
 }
 
-.visibility-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
+.meta-divider {
+    color: #dee2e6;
+}
+
+.pin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    background: #fff3cd;
+    color: #856404;
+    border-radius: 12px;
     font-weight: 500;
 }
 
-.visibility-private {
-    background: #f8d7da;
-    color: #721c24;
-}
-
-.visibility-team {
-    background: #d1ecf1;
-    color: #0c5460;
-}
-
-.visibility-company {
-    background: #d4edda;
-    color: #155724;
-}
-
-.note-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.note-actions form {
-    margin: 0;
-}
-
-.note-associations {
-    background: #f8f9fa;
-    padding: 1rem;
+/* Metadata Card */
+.metadata-card {
+    background: white;
+    border: 1px solid #dee2e6;
     border-radius: 8px;
+    padding: 1.5rem;
     margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.association-item {
+.metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.metadata-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.metadata-label {
     display: flex;
     align-items: center;
-    margin-bottom: 0.5rem;
-}
-
-.association-item:last-child {
-    margin-bottom: 0;
-}
-
-.association-label {
-    font-weight: 500;
-    margin-right: 1rem;
-    min-width: 80px;
-}
-
-.association-value {
-    display: flex;
     gap: 0.5rem;
-    flex-wrap: wrap;
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
 }
 
-.tag-badge {
+.metadata-value {
+    padding-left: 1.5rem;
+}
+
+.metadata-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.metadata-link:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
     background: #e9ecef;
     color: #495057;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
     text-decoration: none;
-    transition: background 0.2s ease;
+    transition: all 0.2s ease;
 }
 
-.tag-badge:hover {
+.tag-chip:hover {
     background: #dee2e6;
+    color: #333;
+    transform: translateY(-1px);
+}
+
+/* Content Card */
+.content-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    min-height: 400px;
+}
+
+/* Markdown Content Styles */
+.markdown-content {
+    line-height: 1.8;
     color: #333;
 }
 
-.note-content {
-    background: white;
-    padding: 2rem;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    min-height: 300px;
-}
-
-.markdown-content {
-    line-height: 1.6;
-}
-
-.markdown-content h1, .markdown-content h2, .markdown-content h3,
-.markdown-content h4, .markdown-content h5, .markdown-content h6 {
+.markdown-content h1, 
+.markdown-content h2, 
+.markdown-content h3,
+.markdown-content h4, 
+.markdown-content h5, 
+.markdown-content h6 {
     margin-top: 2rem;
     margin-bottom: 1rem;
+    font-weight: 600;
+    line-height: 1.3;
 }
 
 .markdown-content h1:first-child {
     margin-top: 0;
 }
 
+.markdown-content h1 { font-size: 2rem; }
+.markdown-content h2 { font-size: 1.5rem; }
+.markdown-content h3 { font-size: 1.25rem; }
+.markdown-content h4 { font-size: 1.125rem; }
+.markdown-content h5 { font-size: 1rem; }
+.markdown-content h6 { font-size: 0.875rem; }
+
 .markdown-content p {
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
 }
 
 .markdown-content code {
-    background: #e9ecef;
-    padding: 0.2rem 0.4rem;
+    background: #f8f9fa;
+    padding: 0.125rem 0.375rem;
     border-radius: 3px;
-    font-size: 0.9em;
+    font-size: 0.875em;
+    color: #e83e8c;
+    font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
 }
 
 .markdown-content pre {
     background: #f8f9fa;
+    border: 1px solid #e9ecef;
     padding: 1rem;
     border-radius: 6px;
     overflow-x: auto;
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .markdown-content pre code {
     background: none;
     padding: 0;
+    color: inherit;
 }
 
 .markdown-content blockquote {
-    border-left: 4px solid #dee2e6;
-    padding-left: 1rem;
-    margin: 1rem 0;
-    color: #666;
+    border-left: 4px solid var(--primary-color);
+    padding-left: 1.5rem;
+    margin: 1.5rem 0;
+    color: #6c757d;
+    font-style: italic;
 }
 
-.markdown-content ul, .markdown-content ol {
-    margin-bottom: 1rem;
+.markdown-content ul, 
+.markdown-content ol {
+    margin-bottom: 1.25rem;
     padding-left: 2rem;
+}
+
+.markdown-content li {
+    margin-bottom: 0.5rem;
 }
 
 .markdown-content table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    border-radius: 6px;
+    box-shadow: 0 0 0 1px #dee2e6;
 }
 
-.markdown-content th, .markdown-content td {
-    border: 1px solid #dee2e6;
-    padding: 0.5rem;
+.markdown-content th, 
+.markdown-content td {
+    padding: 0.75rem;
+    text-align: left;
 }
 
 .markdown-content th {
     background: #f8f9fa;
     font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
 }
 
-.linked-notes-section {
-    margin-top: 3rem;
-    padding: 2rem;
-    background: #f8f9fa;
+.markdown-content tr:not(:last-child) td {
+    border-bottom: 1px solid #e9ecef;
+}
+
+.markdown-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 1.5rem 0;
+}
+
+.markdown-content a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.markdown-content a:hover {
+    text-decoration: underline;
+}
+
+/* Linked Notes Card */
+.linked-notes-card {
+    background: white;
+    border: 1px solid #dee2e6;
     border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.section-header {
+.card-header {
+    background: #f8f9fa;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e9ecef;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
 }
 
-.section-header h3 {
+.section-title {
+    font-size: 1.25rem;
     margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .linked-notes-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1rem;
+    padding: 1.5rem;
 }
 
-.linked-note-card {
-    background: white;
-    padding: 1rem;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    position: relative;
-}
-
-.linked-note-header {
+.linked-note-item {
     display: flex;
-    justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 0.5rem;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    position: relative;
+    transition: all 0.2s ease;
 }
 
-.linked-note-header h4 {
-    margin: 0;
-    font-size: 1.1rem;
+.linked-note-item:hover {
+    border-color: #dee2e6;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
-.linked-note-header a {
+.link-direction {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 60px;
+}
+
+.direction-icon {
+    font-size: 1.5rem;
+    color: #6c757d;
+}
+
+.link-type {
+    font-size: 0.75rem;
+    color: #6c757d;
+    text-transform: capitalize;
+}
+
+.link-direction.outgoing .direction-icon {
+    color: #28a745;
+}
+
+.link-direction.incoming .direction-icon {
+    color: #17a2b8;
+}
+
+.linked-note-content {
+    flex: 1;
+}
+
+.linked-note-title {
+    font-size: 1.125rem;
+    margin: 0 0 0.5rem 0;
+}
+
+.linked-note-title a {
     color: #333;
     text-decoration: none;
 }
 
-.linked-note-header a:hover {
+.linked-note-title a:hover {
     color: var(--primary-color);
 }
 
-.link-type {
-    font-size: 0.8rem;
-    color: #666;
-    font-style: italic;
+.linked-note-preview {
+    color: #6c757d;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin: 0 0 0.5rem 0;
 }
 
-.linked-note-preview {
-    color: #666;
-    font-size: 0.9rem;
-    line-height: 1.4;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+.linked-note-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.visibility-badge.small {
+    font-size: 0.7rem;
+    padding: 0.125rem 0.375rem;
 }
 
 .remove-link-btn {
@@ -458,46 +634,41 @@
     background: #dc3545;
     color: white;
     border: none;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
+    width: 24px;
+    height: 24px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     opacity: 0;
     transition: opacity 0.2s ease;
 }
 
-.linked-note-card:hover .remove-link-btn {
+.linked-note-item:hover .remove-link-btn {
     opacity: 1;
 }
 
-.no-links {
-    color: #999;
+.remove-link-btn:hover {
+    background: #c82333;
+}
+
+/* Empty State */
+.empty-state.small {
+    padding: 2rem;
+    text-align: center;
+}
+
+.empty-message {
+    color: #6c757d;
     font-style: italic;
+    margin: 0;
 }
 
-.pin-badge {
-    background: #fff3cd;
-    color: #856404;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    font-weight: 500;
-}
-
-/* Dropdown styles */
+/* Dropdown Enhancements */
 .dropdown {
     position: relative;
-}
-
-.dropdown-toggle::after {
-    content: "";
     display: inline-block;
-    margin-left: 0.255em;
-    vertical-align: 0.255em;
-    border-top: 0.3em solid;
-    border-right: 0.3em solid transparent;
-    border-bottom: 0;
-    border-left: 0.3em solid transparent;
 }
 
 .dropdown-menu {
@@ -511,8 +682,8 @@
     margin: 0.125rem 0 0;
     background-color: white;
     border: 1px solid #dee2e6;
-    border-radius: 0.375rem;
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .dropdown-menu.show {
@@ -522,55 +693,57 @@
 .dropdown-item {
     display: flex;
     align-items: center;
+    gap: 0.5rem;
     width: 100%;
     padding: 0.5rem 1rem;
-    color: #212529;
-    text-align: inherit;
+    color: #333;
     text-decoration: none;
-    white-space: nowrap;
-    background-color: transparent;
-    border: 0;
+    transition: background 0.2s ease;
 }
 
 .dropdown-item:hover {
     background-color: #f8f9fa;
-    color: #212529;
-    text-decoration: none;
 }
 
-.dropdown-item svg {
-    flex-shrink: 0;
-}
-
-/* Modal styles */
-.modal-content {
-    max-width: 500px;
-}
-
-.modal-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: flex-end;
-    margin-top: 1.5rem;
-}
-
-/* Responsive design */
+/* Responsive Design */
 @media (max-width: 768px) {
-    .note-header {
+    .note-view-container {
+        padding: 1rem;
+    }
+    
+    .page-header .header-content {
         flex-direction: column;
         gap: 1rem;
     }
     
-    .note-title-section h1 {
-        font-size: 2rem;
+    .header-actions {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
     }
     
-    .note-meta {
-        font-size: 0.85rem;
+    .header-actions .btn {
+        flex: 1;
+        min-width: 120px;
     }
     
-    .linked-notes-grid {
+    .content-card {
+        padding: 1.5rem;
+    }
+    
+    .metadata-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .linked-note-item {
+        flex-direction: column;
+    }
+    
+    .link-direction {
+        flex-direction: row;
+        width: 100%;
+        justify-content: center;
     }
 }
 </style>
@@ -592,71 +765,16 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     {% if note.can_user_edit(g.user) %}
-    const modal = document.getElementById('link-modal');
+    // Link modal functionality
     const addLinkBtn = document.getElementById('add-link-btn');
-    const closeBtn = modal.querySelector('.close');
-    const cancelBtn = document.getElementById('cancel-link');
-    const linkForm = document.getElementById('link-form');
     
-    // Open modal
-    addLinkBtn.addEventListener('click', function() {
-        modal.style.display = 'block';
-    });
-    
-    // Close modal
-    closeBtn.addEventListener('click', function() {
-        modal.style.display = 'none';
-    });
-    
-    cancelBtn.addEventListener('click', function() {
-        modal.style.display = 'none';
-    });
-    
-    window.addEventListener('click', function(event) {
-        if (event.target === modal) {
-            modal.style.display = 'none';
-        }
-    });
-    
-    // Submit link form
-    linkForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const targetNoteId = document.getElementById('target-note').value;
-        const linkType = document.getElementById('link-type').value;
-        
-        fetch(`/api/notes/{{ note.id }}/link`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                target_note_id: parseInt(targetNoteId),
-                link_type: linkType
-            })
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.message || 'Server error');
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error: ' + error.message);
+    if (addLinkBtn) {
+        addLinkBtn.addEventListener('click', function() {
+            document.getElementById('linkModal').style.display = 'block';
         });
-    });
+    }
     
-    // Remove link buttons
+    // Remove link functionality
     document.querySelectorAll('.remove-link-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const targetId = this.getAttribute('data-target-id');
@@ -688,6 +806,60 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     {% endif %}
 });
+
+{% if note.can_user_edit(g.user) %}
+// Modal functions
+function closeLinkModal() {
+    document.getElementById('linkModal').style.display = 'none';
+    document.getElementById('linkForm').reset();
+}
+
+function submitLink(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const targetNoteId = formData.get('target_note_id');
+    const linkType = formData.get('link_type');
+    
+    fetch(`/api/notes/{{ note.id }}/link`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            target_note_id: parseInt(targetNoteId),
+            link_type: linkType
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.message || 'Server error');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error: ' + error.message);
+    });
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('linkModal');
+    if (event.target == modal) {
+        closeLinkModal();
+    }
+}
+{% endif %}
 </script>
 
 {% endblock %}

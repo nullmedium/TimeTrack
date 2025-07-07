@@ -4,7 +4,7 @@
 <div class="timetrack-container">
     <h2>Edit Project: {{ project.name }}</h2>
     
-    <form method="POST" action="{{ url_for('edit_project', project_id=project.id) }}" class="project-form">
+    <form method="POST" action="{{ url_for('projects.edit_project', project_id=project.id) }}" class="project-form">
         <div class="form-row">
             <div class="form-group">
                 <label for="name">Project Name *</label>
@@ -96,9 +96,29 @@
         
         <div class="form-actions">
             <button type="submit" class="btn">Update Project</button>
-            <a href="{{ url_for('admin_projects') }}" class="btn btn-secondary">Cancel</a>
+            <a href="{{ url_for('projects.admin_projects') }}" class="btn btn-secondary">Cancel</a>
         </div>
     </form>
+    
+    <!-- Danger Zone (only for admins) -->
+    {% if g.user.role in [Role.ADMIN, Role.SYSTEM_ADMIN] %}
+    <div class="danger-zone">
+        <h3>⚠️ Danger Zone</h3>
+        <div class="danger-content">
+            <p><strong>Delete Project</strong></p>
+            <p>Once you delete a project, there is no going back. This will permanently delete:</p>
+            <ul>
+                <li>All tasks and subtasks in this project</li>
+                <li>All time entries logged to this project</li>
+                <li>All sprints associated with this project</li>
+                <li>All comments and activity history</li>
+            </ul>
+            <form method="POST" action="{{ url_for('projects.delete_project', project_id=project.id) }}" onsubmit="return confirm('Are you absolutely sure you want to delete {{ project.name }}? This action cannot be undone!');">
+                <button type="submit" class="btn btn-danger">Delete This Project</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <style>
@@ -193,6 +213,47 @@
 
 #code {
     text-transform: uppercase;
+}
+
+/* Danger Zone */
+.danger-zone {
+    margin-top: 3rem;
+    padding: 1.5rem;
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.danger-zone h3 {
+    color: #dc2626;
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.danger-content {
+    color: #7f1d1d;
+}
+
+.danger-content p {
+    margin-bottom: 0.5rem;
+}
+
+.danger-content ul {
+    margin: 1rem 0 1.5rem 2rem;
+}
+
+.danger-content .btn-danger {
+    background-color: #dc2626;
+    color: white;
+    border: none;
+    padding: 0.5rem 1.5rem;
+}
+
+.danger-content .btn-danger:hover {
+    background-color: #b91c1c;
 }
 </style>
 

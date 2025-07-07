@@ -44,11 +44,11 @@ RUN mkdir -p /app/static/uploads/avatars && chmod -R 777 /app/static/uploads
 VOLUME /data
 RUN mkdir /data && chmod 777 /data
 
-# Make startup script executable
-RUN chmod +x startup.sh
+# Make startup scripts executable
+RUN chmod +x startup.sh startup_postgres.sh || true
 
 # Expose the port the app runs on (though we'll use unix socket)
 EXPOSE 5000
 
-# Use startup script for automatic migration
-CMD ["./startup.sh"]
+# Use PostgreSQL-only startup script
+CMD ["./startup_postgres.sh"]

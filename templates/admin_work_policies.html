@@ -45,9 +45,9 @@
             <div class="form-group">
                 <label for="work_hours_per_day">Standard Work Hours Per Day:</label>
                 <input type="number" 
-                       id="work_hours_per_day" 
-                       name="work_hours_per_day" 
-                       value="{{ work_config.work_hours_per_day }}" 
+                       id="standard_hours_per_day" 
+                       name="standard_hours_per_day" 
+                       value="{{ work_config.standard_hours_per_day }}" 
                        min="1" 
                        max="24" 
                        step="0.5" 
@@ -61,9 +61,9 @@
                 <div class="form-group">
                     <label for="mandatory_break_minutes">Mandatory Break Duration (minutes):</label>
                     <input type="number" 
-                           id="mandatory_break_minutes" 
-                           name="mandatory_break_minutes" 
-                           value="{{ work_config.mandatory_break_minutes }}" 
+                           id="break_duration_minutes" 
+                           name="break_duration_minutes" 
+                           value="{{ work_config.break_duration_minutes }}" 
                            min="0" 
                            max="240" 
                            required>
@@ -73,9 +73,9 @@
                 <div class="form-group">
                     <label for="break_threshold_hours">Break Threshold (hours):</label>
                     <input type="number" 
-                           id="break_threshold_hours" 
-                           name="break_threshold_hours" 
-                           value="{{ work_config.break_threshold_hours }}" 
+                           id="break_after_hours" 
+                           name="break_after_hours" 
+                           value="{{ work_config.break_after_hours }}" 
                            min="0" 
                            max="24" 
                            step="0.5" 
@@ -116,11 +116,11 @@
             <div class="current-config">
                 <h4>Current Configuration Summary</h4>
                 <div class="config-summary">
-                    <strong>Region:</strong> {{ work_config.region_name }}<br>
-                    <strong>Work Day:</strong> {{ work_config.work_hours_per_day }} hours<br>
+                    <strong>Region:</strong> {{ work_config.work_region.value }}<br>
+                    <strong>Work Day:</strong> {{ work_config.standard_hours_per_day }} hours<br>
                     <strong>Break Policy:</strong> 
                     {% if work_config.mandatory_break_minutes > 0 %}
-                        {{ work_config.mandatory_break_minutes }} minutes after {{ work_config.break_threshold_hours }} hours
+                        {{ work_config.break_duration_minutes }} minutes after {{ work_config.break_after_hours }} hours
                     {% else %}
                         No mandatory breaks
                     {% endif %}
@@ -135,7 +135,7 @@
             </div>
             
             <button type="submit" class="btn btn-primary">Save Custom Configuration</button>
-            <a href="{{ url_for('admin_company') }}" class="btn btn-secondary">Back to Company Settings</a>
+            <a href="{{ url_for('companies.admin_company') }}" class="btn btn-secondary">Back to Company Settings</a>
         </form>
     </div>
 </div>

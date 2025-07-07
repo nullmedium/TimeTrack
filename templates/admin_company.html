@@ -1,213 +1,897 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="admin-container">
-    <div class="admin-header">
-        <h1>Company Management</h1>
-        <div class="admin-actions">
-            <a href="{{ url_for('setup_company') }}" class="btn btn-md btn-success">Create New Company</a>
-            <a href="{{ url_for('edit_company') }}" class="btn btn-md btn-primary">Edit Company</a>
-        </div>
-    </div>
-    
-    <!-- Company Information Section -->
-    <div class="admin-section">
-        <h2>Company Information</h2>
-        <div class="company-info-grid">
-            <div class="info-card">
-                <div class="info-header">
-                    <h3>{{ company.name }}</h3>
-                    <span class="status-badge {% if company.is_active %}status-active{% else %}status-blocked{% endif %}">
-                        {{ 'Active' if company.is_active else 'Inactive' }}
-                    </span>
-                </div>
-                <div class="info-details">
-                    <div class="detail-row">
-                        <span class="detail-label">Company Code:</span>
-                        <span class="detail-value">{{ company.slug }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Created:</span>
-                        <span class="detail-value">{{ company.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Max Users:</span>
-                        <span class="detail-value">{{ company.max_users or 'Unlimited' }}</span>
-                    </div>
-                    {% if company.description %}
-                    <div class="detail-row">
-                        <span class="detail-label">Description:</span>
-                        <span class="detail-value">{{ company.description }}</span>
-                    </div>
-                    {% endif %}
-                </div>
+<div class="company-admin-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon">🏢</span>
+                    Company Management
+                </h1>
+                <p class="page-subtitle">Configure your company settings and policies</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('setup_company') }}" class="btn btn-primary">
+                    <span class="icon">+</span>
+                    Create New Company
+                </a>
             </div>
         </div>
     </div>
 
-    <!-- Statistics Section -->
+    <!-- Company Statistics -->
     <div class="stats-section">
-        <h2>Company Statistics</h2>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>{{ stats.total_users }}</h3>
-                <p>Total Users</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ stats.total_teams }}</h3>
-                <p>Teams</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ stats.total_projects }}</h3>
-                <p>Total Projects</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ stats.active_projects }}</h3>
-                <p>Active Projects</p>
-            </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.total_users }}</div>
+            <div class="stat-label">Total Users</div>
+            <a href="{{ url_for('companies.company_users') }}" class="stat-link">View all →</a>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.total_teams }}</div>
+            <div class="stat-label">Teams</div>
+            <a href="{{ url_for('teams.admin_teams') }}" class="stat-link">Manage →</a>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.total_projects }}</div>
+            <div class="stat-label">Total Projects</div>
+            <a href="{{ url_for('projects.admin_projects') }}" class="stat-link">View all →</a>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.active_projects }}</div>
+            <div class="stat-label">Active Projects</div>
+            <a href="{{ url_for('projects.admin_projects') }}" class="stat-link">Manage →</a>
         </div>
     </div>
 
-    <!-- Management Actions -->
-    <div class="admin-section">
-        <h2>Management</h2>
-        <div class="admin-panel">
-            <div class="admin-card">
-                <h3>Users</h3>
-                <p>Manage user accounts, roles, and permissions within your company.</p>
-                <a href="{{ url_for('company_users') }}" class="btn btn-secondary">Manage Users</a>
+    <!-- Main Content Grid -->
+    <div class="content-grid">
+        <!-- Left Column -->
+        <div class="content-column">
+            <!-- Company Information Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon">ℹ️</span>
+                        Company Information
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST" class="modern-form">
+                        <input type="hidden" name="action" value="update_company_details">
+                        
+                        <div class="form-group">
+                            <label for="name" class="form-label">Company Name</label>
+                            <input type="text" id="name" name="name" class="form-control" 
+                                   value="{{ company.name }}" required>
+                            <span class="form-hint">The official name of your company</span>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="max_users" class="form-label">Maximum Users</label>
+                                <input type="number" id="max_users" name="max_users" class="form-control" 
+                                       value="{{ company.max_users or '' }}" min="1" placeholder="Unlimited">
+                                <span class="form-hint">Leave empty for unlimited</span>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Status</label>
+                                <div class="toggle-container">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="is_active" name="is_active" 
+                                               {{ 'checked' if company.is_active else '' }}>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <span class="toggle-label">Company is {{ 'active' if company.is_active else 'inactive' }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea id="description" name="description" class="form-control" 
+                                      rows="3" placeholder="Brief description of your company...">{{ company.description or '' }}</textarea>
+                            <span class="form-hint">Optional: Describe your company's mission or purpose</span>
+                        </div>
+
+                        <div class="info-panel">
+                            <div class="info-item">
+                                <span class="info-icon">🔑</span>
+                                <div class="info-content">
+                                    <label class="info-label">Company Code</label>
+                                    <div class="code-display">
+                                        <input type="text" value="{{ company.slug }}" readonly id="companyCode" class="code-input">
+                                        <button type="button" class="btn btn-copy" onclick="copyCompanyCode()">
+                                            <span id="copyIcon">📋</span>
+                                            <span id="copyText">Copy</span>
+                                        </button>
+                                    </div>
+                                    <span class="info-hint">Legacy: Use email invitations instead</span>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-icon">📅</span>
+                                <div class="info-content">
+                                    <label class="info-label">Created</label>
+                                    <span class="info-value">{{ company.created_at.strftime('%B %d, %Y at %I:%M %p') }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <span class="icon">✓</span>
+                                Save Company Details
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            
-            <div class="admin-card">
-                <h3>Teams</h3>
-                <p>Create and manage teams to organize your company structure.</p>
-                <a href="{{ url_for('admin_teams') }}" class="btn btn-secondary">Manage Teams</a>
-            </div>
-            
-            <div class="admin-card">
-                <h3>Projects</h3>
-                <p>Set up and manage projects for time tracking and organization.</p>
-                <a href="{{ url_for('admin_projects') }}" class="btn btn-secondary">Manage Projects</a>
-            </div>
-            
-            <div class="admin-card">
-                <h3>Settings</h3>
-                <p>Configure system-wide settings and preferences.</p>
-                <a href="{{ url_for('admin_settings') }}" class="btn btn-secondary">System Settings</a>
+
+            <!-- Quick Actions Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon">⚡</span>
+                        Quick Actions
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <div class="action-grid">
+                        <a href="{{ url_for('users.admin_users') }}" class="action-item">
+                            <div class="action-icon">👥</div>
+                            <div class="action-content">
+                                <h3>Manage Users</h3>
+                                <p>User accounts & permissions</p>
+                            </div>
+                        </a>
+                        
+                        <a href="{{ url_for('teams.admin_teams') }}" class="action-item">
+                            <div class="action-icon">👨‍👩‍👧‍👦</div>
+                            <div class="action-content">
+                                <h3>Manage Teams</h3>
+                                <p>Organize company structure</p>
+                            </div>
+                        </a>
+                        
+                        <a href="{{ url_for('projects.admin_projects') }}" class="action-item">
+                            <div class="action-icon">📁</div>
+                            <div class="action-content">
+                                <h3>Manage Projects</h3>
+                                <p>Time tracking projects</p>
+                            </div>
+                        </a>
+
+                        <a href="{{ url_for('invitations.send_invitation') }}" class="action-item">
+                            <div class="action-icon">📨</div>
+                            <div class="action-content">
+                                <h3>Send Invitation</h3>
+                                <p>Invite team members</p>
+                            </div>
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Company Code Section -->
-    <div class="admin-section">
-        <h2>User Registration</h2>
-        <div class="registration-info">
-            <p>Share this company code with new users for registration:</p>
-            <div class="code-display">
-                <input type="text" value="{{ company.slug }}" readonly id="companyCode" class="code-input">
-                <button class="btn btn-primary" onclick="copyToClipboard()">Copy Code</button>
+        <!-- Right Column -->
+        <div class="content-column">
+            <!-- Work Policies Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon">📋</span>
+                        Work Policies
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <!-- Regional Presets -->
+                    <div class="preset-section">
+                        <h3 class="section-title">Regional Preset</h3>
+                        <form method="POST" action="{{ url_for('companies.admin_company') }}" class="preset-form">
+                            <input type="hidden" name="action" value="update_work_policies">
+                            <input type="hidden" name="apply_preset" value="true">
+                            <select name="region_preset" class="form-control form-select" onchange="this.form.submit()">
+                                <option value="">Select a regional preset...</option>
+                                {% for preset in regional_presets %}
+                                    <option value="{{ preset.code }}" {% if work_config.work_region.value == preset.code %}selected{% endif %}>
+                                        {{ preset.name }} - {{ preset.description }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </div>
+
+                    <!-- Current Configuration -->
+                    <div class="config-section">
+                        <h3 class="section-title">
+                            Current Configuration
+                            <span class="config-badge">{{ work_config.work_region.value if work_config.work_region else 'Custom' }}</span>
+                        </h3>
+                        <form method="POST" action="{{ url_for('companies.admin_company') }}" class="modern-form">
+                            <input type="hidden" name="action" value="update_work_policies">
+                            
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="standard_hours_per_day" class="form-label">Hours per Day</label>
+                                    <input type="number" id="standard_hours_per_day" name="standard_hours_per_day" 
+                                           class="form-control" value="{{ work_config.standard_hours_per_day }}" 
+                                           step="0.5" min="1" max="24" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="standard_hours_per_week" class="form-label">Hours per Week</label>
+                                    <input type="number" id="standard_hours_per_week" name="standard_hours_per_week" 
+                                           class="form-control" value="{{ work_config.standard_hours_per_week }}" 
+                                           step="0.5" min="1" max="168" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="break_duration_minutes" class="form-label">Break Duration (min)</label>
+                                    <input type="number" id="break_duration_minutes" name="break_duration_minutes" 
+                                           class="form-control" value="{{ work_config.break_duration_minutes }}" 
+                                           min="0" max="120" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="break_after_hours" class="form-label">Break After (hours)</label>
+                                    <input type="number" id="break_after_hours" name="break_after_hours" 
+                                           class="form-control" value="{{ work_config.break_after_hours }}" 
+                                           step="0.5" min="0" max="24" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="overtime_rate" class="form-label">Overtime Rate</label>
+                                    <input type="number" id="overtime_rate" name="overtime_rate" 
+                                           class="form-control" value="{{ work_config.overtime_rate }}" 
+                                           step="0.1" min="1" max="3" required>
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <span class="icon">✓</span>
+                                    Update Policies
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
-            <p class="help-text">New users will need this code when registering for your company.</p>
+
+            <!-- User Registration Settings Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon">👤</span>
+                        User Registration
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('companies.admin_company') }}" class="modern-form">
+                        <input type="hidden" name="action" value="update_system_settings">
+                        
+                        <div class="settings-list">
+                            <div class="setting-item">
+                                <div class="setting-toggle">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="registration_enabled" name="registration_enabled" 
+                                               {% if settings.registration_enabled %}checked{% endif %}>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="setting-content">
+                                    <h4 class="setting-title">Enable User Registration</h4>
+                                    <p class="setting-description">Allow new users to register accounts using the company code</p>
+                                </div>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <div class="setting-toggle">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="email_verification_required" name="email_verification_required" 
+                                               {% if settings.email_verification_required %}checked{% endif %}>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="setting-content">
+                                    <h4 class="setting-title">Require Email Verification</h4>
+                                    <p class="setting-description">New users must verify their email address before accessing the system</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <span class="icon">✓</span>
+                                Update Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<script>
-function copyToClipboard() {
-    const codeInput = document.getElementById('companyCode');
-    codeInput.select();
-    codeInput.setSelectionRange(0, 99999);
-    document.execCommand('copy');
-    
-    // Show feedback
-    const button = event.target;
-    const originalText = button.textContent;
-    button.textContent = 'Copied!';
-    button.classList.add('btn-success');
-    button.classList.remove('btn-primary');
-    
-    setTimeout(() => {
-        button.textContent = originalText;
-        button.classList.remove('btn-success');
-        button.classList.add('btn-primary');
-    }, 2000);
-}
-</script>
-
 <style>
-.company-info-grid {
-    display: grid;
-    gap: 20px;
-    margin-bottom: 20px;
+/* Container */
+.company-admin-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
 }
 
-.info-card {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 20px;
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
-.info-header {
+.header-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
-    border-bottom: 1px solid #dee2e6;
-    padding-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 2rem;
 }
 
-.info-header h3 {
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
     margin: 0;
-    color: #333;
-}
-
-.info-details {
-    display: grid;
-    gap: 8px;
-}
-
-.detail-row {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
 }
 
-.detail-label {
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+/* Stats Section */
+.stats-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #667eea;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     font-weight: 600;
-    color: #666;
 }
 
-.detail-value {
-    color: #333;
+.stat-link {
+    position: absolute;
+    bottom: 0.75rem;
+    right: 1rem;
+    font-size: 0.875rem;
+    color: #667eea;
+    text-decoration: none;
+    opacity: 0.7;
+    transition: opacity 0.2s;
 }
 
-.registration-info {
+.stat-link:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+/* Content Grid */
+.content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+@media (max-width: 1024px) {
+    .content-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Cards */
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.card-header {
     background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-title .icon {
+    font-size: 1.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Forms */
+.modern-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.95rem;
+}
+
+.form-control {
+    padding: 0.75rem 1rem;
+    border: 2px solid #e5e7eb;
     border-radius: 8px;
-    padding: 20px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    background-color: #f9fafb;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-select {
+    cursor: pointer;
+}
+
+.form-hint {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+/* Toggle Switch */
+.toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 32px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #cbd5e1;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 24px;
+    width: 24px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+    background-color: #667eea;
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(28px);
+}
+
+.toggle-label {
+    font-weight: 500;
+    color: #374151;
+}
+
+/* Info Panel */
+.info-panel {
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.info-item {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.info-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.info-content {
+    flex: 1;
+}
+
+.info-label {
+    font-weight: 600;
+    color: #374151;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.info-value {
+    color: #667eea;
+    font-weight: 500;
+}
+
+.info-hint {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
 }
 
 .code-display {
     display: flex;
-    gap: 10px;
-    margin: 15px 0;
+    gap: 0.5rem;
+    align-items: center;
 }
 
 .code-input {
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-weight: 600;
+    color: #667eea;
+    background: white;
+    border: 2px solid #e5e7eb;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
     flex: 1;
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background: #fff;
-    font-family: monospace;
-    font-size: 14px;
+    max-width: 300px;
 }
 
-.help-text {
-    margin: 0;
-    color: #666;
-    font-size: 14px;
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
 }
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-copy {
+    background: white;
+    color: #6b7280;
+    border: 2px solid #e5e7eb;
+    padding: 0.5rem 1rem;
+}
+
+.btn-copy:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.btn-copy.success {
+    background: #d1fae5;
+    color: #059669;
+    border-color: #10b981;
+}
+
+/* Quick Actions */
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.action-item {
+    display: flex;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+}
+
+.action-item:hover {
+    background: white;
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.action-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+}
+
+.action-content h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+}
+
+.action-content p {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+/* Work Policies */
+.preset-section,
+.config-section {
+    margin-bottom: 2rem;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.config-badge {
+    background: #ede9fe;
+    color: #5b21b6;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+/* Settings List */
+.settings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.setting-item {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    align-items: flex-start;
+}
+
+.setting-toggle {
+    flex-shrink: 0;
+}
+
+.setting-content {
+    flex: 1;
+}
+
+.setting-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+}
+
+.setting-description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .company-admin-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .page-title {
+        font-size: 1.75rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .form-row,
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .code-input {
+        max-width: 100%;
+    }
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: slideIn 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+.card:nth-child(1) { animation-delay: 0.1s; }
+.card:nth-child(2) { animation-delay: 0.2s; }
+.card:nth-child(3) { animation-delay: 0.3s; }
 </style>
+
+<script>
+function copyCompanyCode() {
+    const codeInput = document.getElementById('companyCode');
+    codeInput.select();
+    codeInput.setSelectionRange(0, 99999);
+    
+    try {
+        document.execCommand('copy');
+        
+        // Show feedback
+        const button = event.currentTarget;
+        const copyIcon = document.getElementById('copyIcon');
+        const copyText = document.getElementById('copyText');
+        
+        // Store original values
+        const originalIcon = copyIcon.textContent;
+        const originalText = copyText.textContent;
+        
+        // Update to success state
+        copyIcon.textContent = '✓';
+        copyText.textContent = 'Copied!';
+        button.classList.add('success');
+        
+        // Reset after 2 seconds
+        setTimeout(() => {
+            copyIcon.textContent = originalIcon;
+            copyText.textContent = originalText;
+            button.classList.remove('success');
+        }, 2000);
+    } catch (err) {
+        alert('Failed to copy code. Please select and copy manually.');
+    }
+}
+</script>
+
 {% endblock %}

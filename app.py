@@ -1,48 +1,54 @@
-# Standard library imports
-import base64
-import io
-import json
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file, abort
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings, CompanyInvitation
+from data_formatting import (
+    format_duration, prepare_export_data, prepare_team_hours_export_data,
+    format_table_data, format_graph_data, format_team_data, format_burndown_data
+)
+# Data export functions moved to routes/export.py and routes/export_api.py
+from time_utils import apply_time_rounding, round_duration_to_interval, get_user_rounding_settings
 import logging
-import os
-import re
-import uuid
 from datetime import datetime, time, timedelta
+import os
+import csv
+import io
+import pandas as pd
+from sqlalchemy import func
 from functools import wraps
-
-# Third-party imports
-import markdown
-import qrcode
-from dotenv import load_dotenv
-from flask import (Flask, Response, abort, flash, g, jsonify, redirect,
-                   render_template, request, send_file, session, url_for)
 from flask_mail import Mail, Message
-from sqlalchemy import and_, func, or_
-from werkzeug.utils import secure_filename
-
-# Local application imports
-from data_export import (export_analytics_csv, export_analytics_excel,
-                         export_to_csv, export_to_excel)
-from data_formatting import (format_burndown_data, format_graph_data,
-                            format_table_data, format_team_data,
-                            prepare_export_data)
-from migrate_db import (get_db_path, migrate_data as migrate_data_from_db,
-                       migrate_postgresql_schema, migrate_task_system,
-                       migrate_to_company_model, migrate_work_config_data,
-                       run_all_migrations)
-from models import (AccountType, Announcement, BrandingSettings, Comment,
-                   CommentVisibility, Company, CompanySettings,
-                   CompanyWorkConfig, DashboardWidget, Project, ProjectCategory,
-                   Role, Sprint, SprintStatus, SubTask, SystemEvent,
-                   SystemSettings, Task, TaskDependency, TaskPriority,
-                   TaskStatus, Team, TimeEntry, User, UserDashboard,
-                   UserPreferences, WidgetType, WorkConfig, WorkRegion, db)
+from dotenv import load_dotenv
 from password_utils import PasswordValidator
-from time_utils import (apply_time_rounding, format_date_by_preference,
-                       format_datetime_by_preference, format_duration_readable,
-                       format_time_by_preference, format_time_short_by_preference,
-                       get_available_date_formats, get_available_rounding_options,
-                       get_user_format_settings, get_user_rounding_settings,
-                       round_duration_to_interval)
+from werkzeug.security import check_password_hash
+
+# Import blueprints
+from routes.notes import notes_bp
+from routes.notes_download import notes_download_bp
+from routes.notes_api import notes_api_bp
+from routes.tasks import tasks_bp, get_filtered_tasks_for_burndown
+from routes.tasks_api import tasks_api_bp
+from routes.sprints import sprints_bp
+from routes.sprints_api import sprints_api_bp
+from routes.teams import teams_bp
+from routes.teams_api import teams_api_bp
+from routes.projects import projects_bp
+from routes.projects_api import projects_api_bp
+from routes.company import companies_bp, setup_company as company_setup
+from routes.company_api import company_api_bp
+from routes.users import users_bp
+from routes.users_api import users_api_bp
+from routes.system_admin import system_admin_bp
+from routes.announcements import announcements_bp
+from routes.export import export_bp
+from routes.export_api import export_api_bp
+
+# Import auth decorators from routes.auth
+from routes.auth import login_required, admin_required, system_admin_required, role_required, company_required
+
+# Import utility functions
+from utils.auth import is_system_admin, can_access_system_settings
+from utils.settings import get_system_setting
+
+# Import analytics data function from export module
+from routes.export_api import get_filtered_analytics_data
 
 # Load environment variables from .env file
 load_dotenv()
@@ -77,67 +83,32 @@ mail = Mail(app)
 # Initialize the database with the app
 db.init_app(app)
 
-# Import and register blueprints
-from routes.notes import notes_bp
-from routes.notes_download import notes_download_bp
-from routes.notes_api import notes_api_bp
-
+# Register blueprints
 app.register_blueprint(notes_bp)
 app.register_blueprint(notes_download_bp)
 app.register_blueprint(notes_api_bp)
+app.register_blueprint(tasks_bp)
+app.register_blueprint(tasks_api_bp)
+app.register_blueprint(sprints_bp)
+app.register_blueprint(sprints_api_bp)
+app.register_blueprint(teams_bp)
+app.register_blueprint(teams_api_bp)
+app.register_blueprint(projects_bp)
+app.register_blueprint(projects_api_bp)
+app.register_blueprint(companies_bp)
+app.register_blueprint(company_api_bp)
+app.register_blueprint(users_bp)
+app.register_blueprint(users_api_bp)
+app.register_blueprint(system_admin_bp)
+app.register_blueprint(announcements_bp)
+app.register_blueprint(export_bp)
+app.register_blueprint(export_api_bp)
 
-# Consolidated migration using migrate_db module
-def run_migrations():
-    """Run all database migrations using the consolidated migrate_db module."""
-    # Check if we're using PostgreSQL or SQLite
-    database_url = app.config['SQLALCHEMY_DATABASE_URI']
-    print(f"DEBUG: Database URL: {database_url}")
+# Import and register invitations blueprint
+from routes.invitations import invitations_bp
+app.register_blueprint(invitations_bp)
 
-    is_postgresql = 'postgresql://' in database_url or 'postgres://' in database_url
-    print(f"DEBUG: Is PostgreSQL: {is_postgresql}")
-
-    if is_postgresql:
-        print("Using PostgreSQL - skipping SQLite migrations, ensuring tables exist...")
-        with app.app_context():
-            db.create_all()
-            init_system_settings()
-            
-            # Run PostgreSQL-specific migrations
-            try:
-                migrate_postgresql_schema()
-            except ImportError:
-                print("PostgreSQL migration function not available")
-            except Exception as e:
-                print(f"Warning: PostgreSQL migration failed: {e}")
-        print("PostgreSQL setup completed successfully!")
-    else:
-        print("Using SQLite - running SQLite migrations...")
-        try:
-            run_all_migrations()
-            print("SQLite database migrations completed successfully!")
-        except ImportError as e:
-            print(f"Error importing migrate_db: {e}")
-            print("Falling back to basic table creation...")
-            with app.app_context():
-                db.create_all()
-                init_system_settings()
-        except Exception as e:
-            print(f"Error during SQLite migration: {e}")
-            print("Falling back to basic table creation...")
-            with app.app_context():
-                db.create_all()
-                init_system_settings()
-
-def migrate_to_company_model_wrapper():
-    """Migrate existing data to support company model (stub - handled by migrate_db)"""
-    try:
-        db_path = get_db_path()
-        migrate_to_company_model(db_path)
-    except ImportError:
-        print("migrate_db module not available - skipping company model migration")
-    except Exception as e:
-        print(f"Error during company migration: {e}")
-        raise
+# Migration functions removed - migrations are now handled by startup.sh
 
 def init_system_settings():
     """Initialize system settings with default values if they don't exist"""
@@ -149,7 +120,6 @@ def init_system_settings():
             description='Controls whether new user registration is allowed'
         )
         db.session.add(reg_setting)
-        db.session.commit()
 
     if not SystemSettings.query.filter_by(key='email_verification_required').first():
         print("Adding email_verification_required system setting...")
@@ -159,44 +129,15 @@ def init_system_settings():
             description='Controls whether email verification is required for new user accounts'
         )
         db.session.add(email_setting)
-        db.session.commit()
 
-def migrate_data():
-    """Handle data migrations and setup (stub - handled by migrate_db)"""
-    try:
-        migrate_data_from_db()
-    except ImportError:
-        print("migrate_db module not available - skipping data migration")
-    except Exception as e:
-        print(f"Error during data migration: {e}")
-        raise
-
-def migrate_work_config_data_wrapper():
-    """Migrate existing WorkConfig data to new architecture (stub - handled by migrate_db)"""
-    try:
-        db_path = get_db_path()
-        migrate_work_config_data(db_path)
-    except ImportError:
-        print("migrate_db module not available - skipping work config data migration")
-    except Exception as e:
-        print(f"Error during work config migration: {e}")
-        raise
-
-def migrate_task_system_wrapper():
-    """Create tables for the task management system (stub - handled by migrate_db)"""
-    try:
-        db_path = get_db_path()
-        migrate_task_system(db_path)
-    except ImportError:
-        print("migrate_db module not available - skipping task system migration")
-    except Exception as e:
-        print(f"Error during task system migration: {e}")
-        raise
+# Data migration functions removed - migrations are now handled by startup.sh
 
 # Call this function during app initialization
 @app.before_first_request
 def initialize_app():
-    run_migrations()  # This handles all migrations including work config data
+    # Initialize system settings only
+    with app.app_context():
+        init_system_settings()
 
 # Add this after initializing the app but before defining routes
 @app.context_processor
@@ -205,7 +146,13 @@ def inject_globals():
     # Get active announcements for current user
     active_announcements = []
     if g.user:
-        active_announcements = Announcement.get_active_announcements_for_user(g.user)
+        try:
+            active_announcements = Announcement.get_active_announcements_for_user(g.user)
+        except Exception as e:
+            # If there's a database error, rollback and continue
+            db.session.rollback()
+            logger.error(f"Error fetching announcements: {e}")
+            active_announcements = []
 
     # Get tracking script settings
     tracking_script_enabled = False
@@ -219,12 +166,18 @@ def inject_globals():
         tracking_code_setting = SystemSettings.query.filter_by(key='tracking_script_code').first()
         if tracking_code_setting:
             tracking_script_code = tracking_code_setting.value
+    except Exception as e:
+        # Rollback on any database error
+        db.session.rollback()
+        logger.error(f"Error fetching system settings: {e}")
     except Exception:
         pass  # In case database isn't available yet
     return {
         'Role': Role,
         'AccountType': AccountType,
         'current_year': datetime.now().year,
+        'today': datetime.now().date(),
+        'now': datetime.now,
         'active_announcements': active_announcements,
         'tracking_script_enabled': tracking_script_enabled,
         'tracking_script_code': tracking_script_code
@@ -237,6 +190,7 @@ def from_json_filter(json_str):
     if not json_str:
         return []
     try:
+        import json
         return json.loads(json_str)
     except (json.JSONDecodeError, TypeError):
         return []
@@ -246,6 +200,8 @@ def format_date_filter(dt):
     """Format date according to user preferences."""
     if not dt or not g.user:
         return dt.strftime('%Y-%m-%d') if dt else ''
+
+    from time_utils import format_date_by_preference, get_user_format_settings
     date_format, _ = get_user_format_settings(g.user)
     return format_date_by_preference(dt, date_format)
 
@@ -254,6 +210,8 @@ def format_time_filter(dt):
     """Format time according to user preferences."""
     if not dt or not g.user:
         return dt.strftime('%H:%M:%S') if dt else ''
+
+    from time_utils import format_time_by_preference, get_user_format_settings
     _, time_format_24h = get_user_format_settings(g.user)
     return format_time_by_preference(dt, time_format_24h)
 
@@ -262,6 +220,8 @@ def format_time_short_filter(dt):
     """Format time without seconds according to user preferences."""
     if not dt or not g.user:
         return dt.strftime('%H:%M') if dt else ''
+
+    from time_utils import format_time_short_by_preference, get_user_format_settings
     _, time_format_24h = get_user_format_settings(g.user)
     return format_time_short_by_preference(dt, time_format_24h)
 
@@ -270,6 +230,8 @@ def format_datetime_filter(dt):
     """Format datetime according to user preferences."""
     if not dt or not g.user:
         return dt.strftime('%Y-%m-%d %H:%M:%S') if dt else ''
+
+    from time_utils import format_datetime_by_preference, get_user_format_settings
     date_format, time_format_24h = get_user_format_settings(g.user)
     return format_datetime_by_preference(dt, date_format, time_format_24h)
 
@@ -278,123 +240,13 @@ def format_duration_filter(duration_seconds):
     """Format duration in readable format."""
     if duration_seconds is None:
         return '00:00:00'
+
+    from time_utils import format_duration_readable
     return format_duration_readable(duration_seconds)
 
 # Authentication decorator
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if g.user is None:
-            return redirect(url_for('login', next=request.url))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Admin-only decorator
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if g.user is None or (g.user.role != Role.ADMIN and g.user.role != Role.SYSTEM_ADMIN):
-            flash('You need administrator privileges to access this page.', 'error')
-            return redirect(url_for('home'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# System Admin-only decorator
-def system_admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if g.user is None or g.user.role != Role.SYSTEM_ADMIN:
-            flash('You need system administrator privileges to access this page.', 'error')
-            return redirect(url_for('home'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-def get_system_setting(key, default='false'):
-    """Helper function to get system setting value"""
-    setting = SystemSettings.query.filter_by(key=key).first()
-    return setting.value if setting else default
-
-def is_system_admin(user=None):
-    """Helper function to check if user is system admin"""
-    if user is None:
-        user = g.user
-    return user and user.role == Role.SYSTEM_ADMIN
-
-def can_access_system_settings(user=None):
-    """Helper function to check if user can access system-wide settings"""
-    return is_system_admin(user)
-
-def get_available_roles():
-    """Get roles available for assignment, excluding SYSTEM_ADMIN unless one already exists"""
-    roles = list(Role)
-
-    # Only show SYSTEM_ADMIN role if at least one system admin already exists
-    # This prevents accidental creation of system admins
-    system_admin_exists = User.query.filter_by(role=Role.SYSTEM_ADMIN).count() > 0
-
-    if not system_admin_exists:
-        roles = [role for role in roles if role != Role.SYSTEM_ADMIN]
-
-    return roles
-
-# Add this decorator function after your existing decorators
-def role_required(min_role):
-    """
-    Decorator to restrict access based on user role.
-    min_role should be a Role enum value (e.g., Role.TEAM_LEADER)
-    """
-    def role_decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if g.user is None:
-                return redirect(url_for('login', next=request.url))
-
-            # Admin and System Admin always have access
-            if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN:
-                return f(*args, **kwargs)
-
-            # Check role hierarchy
-            role_hierarchy = {
-                Role.TEAM_MEMBER: 1,
-                Role.TEAM_LEADER: 2,
-                Role.SUPERVISOR: 3,
-                Role.ADMIN: 4,
-                Role.SYSTEM_ADMIN: 5
-            }
-
-            if role_hierarchy.get(g.user.role, 0) < role_hierarchy.get(min_role, 0):
-                flash('You do not have sufficient permissions to access this page.', 'error')
-                return redirect(url_for('home'))
-
-            return f(*args, **kwargs)
-        return decorated_function
-    return role_decorator
-
-def company_required(f):
-    """
-    Decorator to ensure user has a valid company association and set company context.
-    """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if g.user is None:
-            return redirect(url_for('login', next=request.url))
-
-        # System admins can access without company association
-        if g.user.role == Role.SYSTEM_ADMIN:
-            return f(*args, **kwargs)
-
-        if g.user.company_id is None:
-            flash('You must be associated with a company to access this page.', 'error')
-            return redirect(url_for('setup_company'))
-
-        # Set company context
-        g.company = Company.query.get(g.user.company_id)
-        if not g.company or not g.company.is_active:
-            flash('Your company is not active. Please contact support.', 'error')
-            return redirect(url_for('login'))
-
-        return f(*args, **kwargs)
-    return decorated_function
+# Auth decorators have been moved to routes.auth
+# Utility functions have been moved to utils modules
 
 @app.before_request
 def load_logged_in_user():
@@ -417,7 +269,7 @@ def load_logged_in_user():
                 g.show_email_verification_nag = True
             else:
                 g.show_email_verification_nag = False
-                
+
             # Check if user has no email at all
             if g.user and not g.user.email:
                 g.show_email_nag = True
@@ -425,43 +277,91 @@ def load_logged_in_user():
                 g.show_email_nag = False
         else:
             g.company = None
-    
+
     # Load branding settings
     g.branding = BrandingSettings.get_current()
+
+@app.route('/setup', methods=['GET', 'POST'])
+def setup():
+    """Company setup route - delegates to imported function"""
+    return company_setup()
 
 @app.route('/')
 def home():
     if g.user:
-        # Get active entry (no departure time)
+        # Get active time entry
         active_entry = TimeEntry.query.filter_by(
             user_id=g.user.id,
             departure_time=None
         ).first()
 
-        # Get today's completed entries for history
-        today = datetime.now().date()
-        history = TimeEntry.query.filter(
-            TimeEntry.user_id == g.user.id,
-            TimeEntry.departure_time.isnot(None),
-            TimeEntry.arrival_time >= datetime.combine(today, time.min),
-            TimeEntry.arrival_time <= datetime.combine(today, time.max)
-        ).order_by(TimeEntry.arrival_time.desc()).all()
+        # Get recent time entries (limit to 50 like the time_tracking route)
+        history = TimeEntry.query.filter_by(user_id=g.user.id).order_by(
+            TimeEntry.arrival_time.desc()
+        ).limit(50).all()
 
-        # Get available projects for this user (company-scoped)
+        # Get available projects
         available_projects = []
         if g.user.company_id:
-            all_projects = Project.query.filter_by(
-                company_id=g.user.company_id,
-                is_active=True
-            ).all()
-            for project in all_projects:
-                if project.is_user_allowed(g.user):
-                    available_projects.append(project)
+            if g.user.role == Role.ADMIN:
+                # Admin can see all company projects
+                available_projects = Project.query.filter_by(
+                    company_id=g.user.company_id,
+                    is_active=True
+                ).order_by(Project.code).all()
+            else:
+                # Regular users see only their assigned projects
+                all_projects = Project.query.filter_by(
+                    company_id=g.user.company_id,
+                    is_active=True
+                ).all()
+                for project in all_projects:
+                    if project.is_user_allowed(g.user):
+                        available_projects.append(project)
+
+        # Calculate statistics (if we want the stats section to show)
+        from datetime import date, timedelta
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+        month_start = today.replace(day=1)
+
+        # Today's hours
+        today_entries = TimeEntry.query.filter(
+            TimeEntry.user_id == g.user.id,
+            func.date(TimeEntry.arrival_time) == today
+        ).all()
+        today_hours = sum(entry.duration or 0 for entry in today_entries)
+
+        # This week's hours
+        week_entries = TimeEntry.query.filter(
+            TimeEntry.user_id == g.user.id,
+            func.date(TimeEntry.arrival_time) >= week_start
+        ).all()
+        week_hours = sum(entry.duration or 0 for entry in week_entries)
+
+        # This month's hours
+        month_entries = TimeEntry.query.filter(
+            TimeEntry.user_id == g.user.id,
+            func.date(TimeEntry.arrival_time) >= month_start
+        ).all()
+        month_hours = sum(entry.duration or 0 for entry in month_entries)
+
+        # Active projects (projects with recent entries)
+        active_project_ids = db.session.query(TimeEntry.project_id).filter(
+            TimeEntry.user_id == g.user.id,
+            TimeEntry.project_id.isnot(None),
+            TimeEntry.arrival_time >= datetime.now() - timedelta(days=30)
+        ).distinct().all()
+        active_projects = [p for p in available_projects if p.id in [pid[0] for pid in active_project_ids]]
 
         return render_template('index.html', title='Home',
                              active_entry=active_entry,
                              history=history,
-                             available_projects=available_projects)
+                             available_projects=available_projects,
+                             today_hours=today_hours,
+                             week_hours=week_hours,
+                             month_hours=month_hours,
+                             active_projects=active_projects)
     else:
         return render_template('index.html', title='Home')
 
@@ -572,10 +472,7 @@ def register():
         flash('Registration is currently disabled by the administrator.', 'error')
         return redirect(url_for('login'))
 
-    # Check if companies exist, if not redirect to company setup
-    if Company.query.count() == 0:
-        flash('No companies exist yet. Please set up your company first.', 'info')
-        return redirect(url_for('setup_company'))
+    # No longer redirect to company setup - users can now create companies during registration
 
     if request.method == 'POST':
         username = request.form.get('username')
@@ -583,6 +480,7 @@ def register():
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
         company_code = request.form.get('company_code', '').strip()
+        registration_type = request.form.get('registration_type', 'company')
 
         # Validate input
         error = None
@@ -592,9 +490,7 @@ def register():
             error = 'Password is required'
         elif password != confirm_password:
             error = 'Passwords do not match'
-        elif not company_code:
-            error = 'Company code is required'
-        
+
         # Validate password strength
         if not error:
             validator = PasswordValidator()
@@ -602,12 +498,56 @@ def register():
             if not is_valid:
                 error = password_errors[0]  # Show first error
 
-        # Find company by code
+        # Find company by code or create new one if no code provided
         company = None
         if company_code:
+            # User provided a code - try to join existing company
             company = Company.query.filter_by(slug=company_code.lower()).first()
             if not company:
                 error = 'Invalid company code'
+        else:
+            # No code provided - create a new company (only for company registration type)
+            if registration_type == 'company' and not error:
+                # Generate company name from username
+                company_name = f"{username}'s Company"
+                company_slug = f"{username.lower()}-company"
+
+                # Ensure unique slug
+                base_slug = company_slug
+                counter = 1
+                while Company.query.filter_by(slug=company_slug).first():
+                    company_slug = f"{base_slug}-{counter}"
+                    counter += 1
+
+                # Create new company
+                company = Company(
+                    name=company_name,
+                    slug=company_slug,
+                    max_users=None,  # Unlimited users
+                    is_personal=False  # This is a regular company, not a freelancer workspace
+                )
+                db.session.add(company)
+                db.session.flush()  # Get the company ID without committing
+
+                # Create default work configuration for the company
+                preset = CompanyWorkConfig.get_regional_preset(WorkRegion.GERMANY)
+                work_config = CompanyWorkConfig(
+                    company_id=company.id,
+                    standard_hours_per_day=preset['standard_hours_per_day'],
+                    standard_hours_per_week=preset['standard_hours_per_week'],
+                    work_region=WorkRegion.GERMANY,
+                    overtime_enabled=preset['overtime_enabled'],
+                    overtime_rate=preset['overtime_rate'],
+                    double_time_enabled=preset['double_time_enabled'],
+                    double_time_threshold=preset['double_time_threshold'],
+                    double_time_rate=preset['double_time_rate'],
+                    require_breaks=preset['require_breaks'],
+                    break_duration_minutes=preset['break_duration_minutes'],
+                    break_after_hours=preset['break_after_hours'],
+                    weekly_overtime_threshold=preset['weekly_overtime_threshold'],
+                    weekly_overtime_rate=preset['weekly_overtime_rate']
+                )
+                db.session.add(work_config)
 
         # Check for existing users within the company
         if company and not error:
@@ -711,7 +651,7 @@ def register_freelancer():
             error = 'Password is required'
         elif password != confirm_password:
             error = 'Passwords do not match'
-        
+
         # Validate password strength
         if not error:
             validator = PasswordValidator()
@@ -732,6 +672,7 @@ def register_freelancer():
                 company_name = business_name if business_name else f"{username}'s Workspace"
 
                 # Generate unique company slug
+                import re
                 slug = re.sub(r'[^\w\s-]', '', company_name.lower())
                 slug = re.sub(r'[-\s]+', '-', slug).strip('-')
 
@@ -784,124 +725,90 @@ def register_freelancer():
 
     return render_template('register_freelancer.html', title='Register as Freelancer')
 
-@app.route('/setup_company', methods=['GET', 'POST'])
-def setup_company():
-    """Company setup route for creating new companies with admin users"""
-    existing_companies = Company.query.count()
+@app.route('/register/invitation/<token>', methods=['GET', 'POST'])
+def register_with_invitation(token):
+    """Registration route for users with an invitation"""
+    # Find the invitation
+    invitation = CompanyInvitation.query.filter_by(token=token).first()
 
-    # Determine access level
-    is_initial_setup = existing_companies == 0
-    is_super_admin = g.user and g.user.role == Role.ADMIN and existing_companies > 0
-    is_authorized = is_initial_setup or is_super_admin
+    if not invitation:
+        flash('Invalid invitation link', 'error')
+        return redirect(url_for('register'))
 
-    # Check authorization for non-initial setups
-    if not is_initial_setup and not is_super_admin:
-        flash('You do not have permission to create new companies.', 'error')
-        return redirect(url_for('home') if g.user else url_for('login'))
+    if not invitation.is_valid():
+        if invitation.accepted:
+            flash('This invitation has already been used', 'error')
+        else:
+            flash('This invitation has expired', 'error')
+        return redirect(url_for('register'))
 
     if request.method == 'POST':
-        company_name = request.form.get('company_name')
-        company_description = request.form.get('company_description', '')
-        admin_username = request.form.get('admin_username')
-        admin_email = request.form.get('admin_email')
-        admin_password = request.form.get('admin_password')
+        username = request.form.get('username')
+        password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
 
         # Validate input
         error = None
-        if not company_name:
-            error = 'Company name is required'
-        elif not admin_username:
-            error = 'Admin username is required'
-        elif not admin_email:
-            error = 'Admin email is required'
-        elif not admin_password:
-            error = 'Admin password is required'
-        elif admin_password != confirm_password:
+        if not username:
+            error = 'Username is required'
+        elif not password:
+            error = 'Password is required'
+        elif password != confirm_password:
             error = 'Passwords do not match'
-        elif len(admin_password) < 6:
-            error = 'Password must be at least 6 characters long'
+
+        # Validate password strength
+        if not error:
+            validator = PasswordValidator()
+            is_valid, password_errors = validator.validate(password)
+            if not is_valid:
+                error = password_errors[0]
+
+        # Check if username already exists in the company
+        if not error:
+            if User.query.filter_by(username=username, company_id=invitation.company_id).first():
+                error = 'Username already exists in this company'
 
         if error is None:
             try:
-                # Generate company slug
-                slug = re.sub(r'[^\w\s-]', '', company_name.lower())
-                slug = re.sub(r'[-\s]+', '-', slug).strip('-')
-
-                # Ensure slug uniqueness
-                base_slug = slug
-                counter = 1
-                while Company.query.filter_by(slug=slug).first():
-                    slug = f"{base_slug}-{counter}"
-                    counter += 1
-
-                # Create company
-                company = Company(
-                    name=company_name,
-                    slug=slug,
-                    description=company_description,
-                    is_active=True
+                # Create the user
+                new_user = User(
+                    username=username,
+                    email=invitation.email,
+                    company_id=invitation.company_id,
+                    role=Role[invitation.role.upper().replace(' ', '_')],
+                    is_verified=True  # Pre-verified through invitation
                 )
-                db.session.add(company)
-                db.session.flush()  # Get company.id without committing
+                new_user.set_password(password)
 
-                # Check if username/email already exists in this company context
-                existing_user_by_username = User.query.filter_by(
-                    username=admin_username,
-                    company_id=company.id
-                ).first()
-                existing_user_by_email = User.query.filter_by(
-                    email=admin_email,
-                    company_id=company.id
-                ).first()
+                db.session.add(new_user)
 
-                if existing_user_by_username:
-                    error = 'Username already exists in this company'
-                elif existing_user_by_email:
-                    error = 'Email already registered in this company'
+                # Mark invitation as accepted
+                invitation.accepted = True
+                invitation.accepted_at = datetime.now()
+                invitation.accepted_by_user_id = new_user.id
 
-                if error is None:
-                    # Create admin user
-                    admin_user = User(
-                        username=admin_username,
-                        email=admin_email,
-                        company_id=company.id,
-                        role=Role.ADMIN,
-                        is_verified=True  # Auto-verify company admin
-                    )
-                    admin_user.set_password(admin_password)
-                    db.session.add(admin_user)
-                    db.session.commit()
+                db.session.commit()
 
-                    if is_initial_setup:
-                        # Auto-login the admin user for initial setup
-                        session['user_id'] = admin_user.id
-                        session['username'] = admin_user.username
-                        session['role'] = admin_user.role.value
+                logger.info(f"User {username} created through invitation for company {invitation.company.name}")
+                flash(f'Welcome to {invitation.company.name}! Your account has been created. Please log in.', 'success')
 
-                        flash(f'Company "{company_name}" created successfully! You are now logged in as the administrator.', 'success')
-                        return redirect(url_for('home'))
-                    else:
-                        # For super admin creating additional companies, don't auto-login
-                        flash(f'Company "{company_name}" created successfully! Admin user "{admin_username}" has been created with the company code "{slug}".', 'success')
-                        return redirect(url_for('admin_company') if g.user else url_for('login'))
-                else:
-                    db.session.rollback()
+                return redirect(url_for('login'))
 
             except Exception as e:
                 db.session.rollback()
-                logger.error(f"Error during company setup: {str(e)}")
-                error = f"An error occurred during setup: {str(e)}"
+                logger.error(f"Error during invitation registration: {str(e)}")
+                error = 'An error occurred during registration. Please try again.'
 
         if error:
             flash(error, 'error')
 
-    return render_template('setup_company.html',
-                         title='Company Setup',
-                         existing_companies=existing_companies,
-                         is_initial_setup=is_initial_setup,
-                         is_super_admin=is_super_admin)
+    # GET request - show the registration form
+    return render_template('register_invitation.html',
+                         invitation=invitation,
+                         title='Accept Invitation')
 
+# Setup company route is now imported from company module
+app.add_url_rule('/setup_company', 'setup_company', company_setup, methods=['GET', 'POST'])
 @app.route('/verify_email/<token>')
 def verify_email(token):
     user = User.query.filter_by(verification_token=token).first()
@@ -925,371 +832,6 @@ def dashboard():
     """User dashboard with configurable widgets."""
     return render_template('dashboard.html', title='Dashboard')
 
-# Redirect old admin dashboard URL to new dashboard
-
-@app.route('/admin/users')
-@admin_required
-@company_required
-def admin_users():
-    users = User.query.filter_by(company_id=g.user.company_id).all()
-    return render_template('admin_users.html', title='User Management', users=users)
-
-@app.route('/admin/users/create', methods=['GET', 'POST'])
-@admin_required
-@company_required
-def create_user():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        auto_verify = 'auto_verify' in request.form
-
-        # Get role and team
-        role_name = request.form.get('role')
-        team_id = request.form.get('team_id')
-
-        # Validate input
-        error = None
-        if not username:
-            error = 'Username is required'
-        elif not email:
-            error = 'Email is required'
-        elif not password:
-            error = 'Password is required'
-        elif User.query.filter_by(username=username, company_id=g.user.company_id).first():
-            error = 'Username already exists in your company'
-        elif User.query.filter_by(email=email, company_id=g.user.company_id).first():
-            error = 'Email already registered in your company'
-
-        if error is None:
-            # Convert role string to enum
-            try:
-                role = Role[role_name] if role_name else Role.TEAM_MEMBER
-            except KeyError:
-                role = Role.TEAM_MEMBER
-
-            # Create new user with role and team
-            new_user = User(
-                username=username,
-                email=email,
-                company_id=g.user.company_id,
-                is_verified=auto_verify,
-                role=role,
-                team_id=team_id if team_id else None
-            )
-            new_user.set_password(password)
-
-            if not auto_verify:
-                # Generate verification token and send email
-                token = new_user.generate_verification_token()
-                verification_url = url_for('verify_email', token=token, _external=True)
-                msg = Message(f'Verify your {g.branding.app_name} account', recipients=[email])
-                msg.body = f'''Hello {username},
-
-An administrator has created an account for you on {g.branding.app_name}. To activate your account, please click on the link below:
-
-{verification_url}
-
-This link will expire in 24 hours.
-
-Best regards,
-The {g.branding.app_name} Team
-'''
-                mail.send(msg)
-
-            db.session.add(new_user)
-            db.session.commit()
-
-            if auto_verify:
-                flash(f'User {username} created and automatically verified!', 'success')
-            else:
-                flash(f'User {username} created! Verification email sent.', 'success')
-            return redirect(url_for('admin_users'))
-
-        flash(error, 'error')
-
-    # Get all teams for the form (company-scoped)
-    teams = Team.query.filter_by(company_id=g.user.company_id).all()
-    roles = get_available_roles()
-
-    return render_template('create_user.html', title='Create User', teams=teams, roles=roles)
-
-@app.route('/admin/users/edit/<int:user_id>', methods=['GET', 'POST'])
-@admin_required
-@company_required
-def edit_user(user_id):
-    user = User.query.filter_by(id=user_id, company_id=g.user.company_id).first_or_404()
-
-    if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-
-        # Get role and team
-        role_name = request.form.get('role')
-        team_id = request.form.get('team_id')
-
-        # Validate input
-        error = None
-        if not username:
-            error = 'Username is required'
-        elif not email:
-            error = 'Email is required'
-        elif username != user.username and User.query.filter_by(username=username, company_id=g.user.company_id).first():
-            error = 'Username already exists in your company'
-        elif email != user.email and User.query.filter_by(email=email, company_id=g.user.company_id).first():
-            error = 'Email already registered in your company'
-        if error is None:
-            user.username = username
-            user.email = email
-
-            # Convert role string to enum
-            try:
-                user.role = Role[role_name] if role_name else Role.TEAM_MEMBER
-            except KeyError:
-                user.role = Role.TEAM_MEMBER
-
-            user.team_id = team_id if team_id else None
-
-            if password:
-                user.set_password(password)
-
-            db.session.commit()
-
-            flash(f'User {username} updated successfully!', 'success')
-            return redirect(url_for('admin_users'))
-
-        flash(error, 'error')
-
-    # Get all teams for the form (company-scoped)
-    teams = Team.query.filter_by(company_id=g.user.company_id).all()
-    roles = get_available_roles()
-
-    return render_template('edit_user.html', title='Edit User', user=user, teams=teams, roles=roles)
-
-@app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
-@admin_required
-@company_required
-def delete_user(user_id):
-    user = User.query.filter_by(id=user_id, company_id=g.user.company_id).first_or_404()
-
-    # Prevent deleting yourself
-    if user.id == session.get('user_id'):
-        flash('You cannot delete your own account', 'error')
-        return redirect(url_for('admin_users'))
-
-    username = user.username
-    
-    try:
-        # Handle dependent records before deleting user
-        # Find an alternative admin/supervisor to transfer ownership to
-        alternative_admin = User.query.filter(
-            User.company_id == g.user.company_id,
-            User.role.in_([Role.ADMIN, Role.SUPERVISOR]),
-            User.id != user_id
-        ).first()
-        
-        if alternative_admin:
-            # Transfer ownership of projects to alternative admin
-            Project.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-            
-            # Transfer ownership of tasks to alternative admin
-            Task.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-            
-            # Transfer ownership of subtasks to alternative admin
-            SubTask.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-            
-            # Transfer ownership of project categories to alternative admin
-            ProjectCategory.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-        else:
-            # No alternative admin found - redirect to company deletion confirmation
-            flash('No other administrator or supervisor found. Company deletion required.', 'warning')
-            return redirect(url_for('confirm_company_deletion', user_id=user_id))
-        
-        # Delete user-specific records that can be safely removed
-        TimeEntry.query.filter_by(user_id=user_id).delete()
-        WorkConfig.query.filter_by(user_id=user_id).delete()
-        UserPreferences.query.filter_by(user_id=user_id).delete()
-        
-        # Delete user dashboards (cascades to widgets)
-        UserDashboard.query.filter_by(user_id=user_id).delete()
-        
-        # Clear task and subtask assignments
-        Task.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
-        SubTask.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
-        
-        # Now safe to delete the user
-        db.session.delete(user)
-        db.session.commit()
-        
-        flash(f'User {username} deleted successfully. Projects and tasks transferred to {alternative_admin.username}', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error deleting user {user_id}: {str(e)}")
-        flash(f'Error deleting user: {str(e)}', 'error')
-    
-    return redirect(url_for('admin_users'))
-
-@app.route('/confirm-company-deletion/<int:user_id>', methods=['GET', 'POST'])
-@login_required
-def confirm_company_deletion(user_id):
-    """Show confirmation page for company deletion when no alternative admin exists"""
-    
-    # Only allow admin or system admin access
-    if g.user.role not in [Role.ADMIN, Role.SYSTEM_ADMIN]:
-        flash('Access denied: Admin privileges required', 'error')
-        return redirect(url_for('index'))
-    
-    user = User.query.get_or_404(user_id)
-    
-    # For admin users, ensure they're in the same company
-    if g.user.role == Role.ADMIN and user.company_id != g.user.company_id:
-        flash('Access denied: You can only delete users in your company', 'error')
-        return redirect(url_for('admin_users'))
-    
-    # Prevent deleting yourself
-    if user.id == g.user.id:
-        flash('You cannot delete your own account', 'error')
-        return redirect(url_for('admin_users') if g.user.role != Role.SYSTEM_ADMIN else url_for('system_admin_users'))
-    
-    company = user.company
-    
-    # Verify no alternative admin exists
-    alternative_admin = User.query.filter(
-        User.company_id == company.id,
-        User.role.in_([Role.ADMIN, Role.SUPERVISOR]),
-        User.id != user_id
-    ).first()
-    
-    if alternative_admin:
-        flash('Alternative admin found. Regular user deletion should be used instead.', 'error')
-        return redirect(url_for('admin_users') if g.user.role != Role.SYSTEM_ADMIN else url_for('system_admin_users'))
-    
-    if request.method == 'POST':
-        # Verify company name confirmation
-        company_name_confirm = request.form.get('company_name_confirm', '').strip()
-        understand_deletion = request.form.get('understand_deletion')
-        
-        if company_name_confirm != company.name:
-            flash('Company name confirmation does not match', 'error')
-            return redirect(url_for('confirm_company_deletion', user_id=user_id))
-        
-        if not understand_deletion:
-            flash('You must confirm that you understand the consequences', 'error')
-            return redirect(url_for('confirm_company_deletion', user_id=user_id))
-        
-        try:
-            # Perform cascade deletion
-            company_name = company.name
-            
-            # Delete all company-related data in the correct order
-            # First, clear foreign key references that could cause constraint violations
-            
-            # 1. Delete time entries (they reference tasks and users)
-            TimeEntry.query.filter(TimeEntry.user_id.in_(
-                db.session.query(User.id).filter(User.company_id == company.id)
-            )).delete(synchronize_session=False)
-            
-            # 2. Delete user preferences and dashboards
-            UserPreferences.query.filter(UserPreferences.user_id.in_(
-                db.session.query(User.id).filter(User.company_id == company.id)
-            )).delete(synchronize_session=False)
-            
-            UserDashboard.query.filter(UserDashboard.user_id.in_(
-                db.session.query(User.id).filter(User.company_id == company.id)
-            )).delete(synchronize_session=False)
-            
-            # 3. Delete work configs
-            WorkConfig.query.filter(WorkConfig.user_id.in_(
-                db.session.query(User.id).filter(User.company_id == company.id)
-            )).delete(synchronize_session=False)
-            
-            # 4. Delete subtasks (they depend on tasks)
-            SubTask.query.filter(SubTask.task_id.in_(
-                db.session.query(Task.id).filter(Task.project_id.in_(
-                    db.session.query(Project.id).filter(Project.company_id == company.id)
-                ))
-            )).delete(synchronize_session=False)
-            
-            # 5. Delete tasks (now safe since subtasks are deleted)
-            Task.query.filter(Task.project_id.in_(
-                db.session.query(Project.id).filter(Project.company_id == company.id)
-            )).delete(synchronize_session=False)
-            
-            # 6. Delete projects
-            Project.query.filter_by(company_id=company.id).delete()
-            
-            # 7. Delete project categories
-            ProjectCategory.query.filter_by(company_id=company.id).delete()
-            
-            # 8. Delete company work config
-            CompanyWorkConfig.query.filter_by(company_id=company.id).delete()
-            
-            # 9. Delete teams
-            Team.query.filter_by(company_id=company.id).delete()
-            
-            # 10. Delete users
-            User.query.filter_by(company_id=company.id).delete()
-            
-            # 11. Delete system events for this company
-            SystemEvent.query.filter_by(company_id=company.id).delete()
-            
-            # 12. Finally, delete the company itself
-            db.session.delete(company)
-            
-            db.session.commit()
-            
-            flash(f'Company "{company_name}" and all associated data has been permanently deleted', 'success')
-            
-            # Log the deletion
-            SystemEvent.log_event(
-                event_type='company_deleted',
-                description=f'Company "{company_name}" was deleted by {g.user.username} due to no alternative admin for user deletion',
-                event_category='admin_action',
-                severity='warning',
-                user_id=g.user.id
-            )
-            
-            return redirect(url_for('system_admin_companies') if g.user.role == Role.SYSTEM_ADMIN else url_for('index'))
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error deleting company {company.id}: {str(e)}")
-            flash(f'Error deleting company: {str(e)}', 'error')
-            return redirect(url_for('confirm_company_deletion', user_id=user_id))
-    
-    # GET request - show confirmation page
-    # Gather all data that will be deleted
-    users = User.query.filter_by(company_id=company.id).all()
-    teams = Team.query.filter_by(company_id=company.id).all()
-    projects = Project.query.filter_by(company_id=company.id).all()
-    categories = ProjectCategory.query.filter_by(company_id=company.id).all()
-    
-    # Get tasks for all projects in the company
-    project_ids = [p.id for p in projects]
-    tasks = Task.query.filter(Task.project_id.in_(project_ids)).all() if project_ids else []
-    
-    # Count time entries
-    user_ids = [u.id for u in users]
-    time_entries_count = TimeEntry.query.filter(TimeEntry.user_id.in_(user_ids)).count() if user_ids else 0
-    
-    # Calculate total hours
-    total_duration = db.session.query(func.sum(TimeEntry.duration)).filter(
-        TimeEntry.user_id.in_(user_ids)
-    ).scalar() or 0
-    total_hours_tracked = round(total_duration / 3600, 2) if total_duration else 0
-    
-    return render_template('confirm_company_deletion.html',
-                         user=user,
-                         company=company,
-                         users=users,
-                         teams=teams,
-                         projects=projects,
-                         categories=categories,
-                         tasks=tasks,
-                         time_entries_count=time_entries_count,
-                         total_hours_tracked=total_hours_tracked)
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
@@ -1344,10 +886,11 @@ def update_avatar():
     """Update user avatar URL"""
     user = User.query.get(session['user_id'])
     avatar_url = request.form.get('avatar_url', '').strip()
-    
+
     # Validate URL if provided
     if avatar_url:
         # Basic URL validation
+        import re
         url_pattern = re.compile(
             r'^https?://'  # http:// or https://
             r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...
@@ -1355,11 +898,11 @@ def update_avatar():
             r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
             r'(?::\d+)?'  # optional port
             r'(?:/?|[/?]\S+)$', re.IGNORECASE)
-        
+
         if not url_pattern.match(avatar_url):
             flash('Please provide a valid URL for your avatar.', 'error')
             return redirect(url_for('profile'))
-        
+
         # Additional validation for image URLs
         allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']
         if not any(avatar_url.lower().endswith(ext) for ext in allowed_extensions):
@@ -1368,16 +911,16 @@ def update_avatar():
             if not any(service in avatar_url.lower() for service in allowed_services):
                 flash('Avatar URL should point to an image file (JPG, PNG, GIF, WebP, or SVG).', 'error')
                 return redirect(url_for('profile'))
-    
+
     # Update avatar URL (empty string removes custom avatar)
     user.avatar_url = avatar_url if avatar_url else None
     db.session.commit()
-    
+
     if avatar_url:
         flash('Avatar updated successfully!', 'success')
     else:
         flash('Avatar reset to default.', 'success')
-    
+
     # Log the avatar change
     SystemEvent.log_event(
         event_type='profile_avatar_updated',
@@ -1386,56 +929,59 @@ def update_avatar():
         user_id=user.id,
         company_id=user.company_id
     )
-    
+
     return redirect(url_for('profile'))
 
 @app.route('/upload-avatar', methods=['POST'])
 @login_required
 def upload_avatar():
     """Handle avatar file upload"""
-    
+    import os
+    from werkzeug.utils import secure_filename
+    import uuid
+
     user = User.query.get(session['user_id'])
-    
+
     # Check if file was uploaded
     if 'avatar_file' not in request.files:
         flash('No file selected.', 'error')
         return redirect(url_for('profile'))
-    
+
     file = request.files['avatar_file']
-    
+
     # Check if file is empty
     if file.filename == '':
         flash('No file selected.', 'error')
         return redirect(url_for('profile'))
-    
+
     # Validate file extension
     allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-    
+
     if file_ext not in allowed_extensions:
         flash('Invalid file type. Please upload a PNG, JPG, GIF, or WebP image.', 'error')
         return redirect(url_for('profile'))
-    
+
     # Validate file size (5MB max)
     file.seek(0, os.SEEK_END)
     file_size = file.tell()
     file.seek(0)  # Reset file pointer
-    
+
     if file_size > 5 * 1024 * 1024:  # 5MB
         flash('File size must be less than 5MB.', 'error')
         return redirect(url_for('profile'))
-    
+
     # Generate unique filename
     unique_filename = f"{user.id}_{uuid.uuid4().hex}.{file_ext}"
-    
+
     # Create user avatar directory if it doesn't exist
     avatar_dir = os.path.join(app.static_folder, 'uploads', 'avatars')
     os.makedirs(avatar_dir, exist_ok=True)
-    
+
     # Save the file
     file_path = os.path.join(avatar_dir, unique_filename)
     file.save(file_path)
-    
+
     # Delete old avatar file if it exists and is a local upload
     if user.avatar_url and user.avatar_url.startswith('/static/uploads/avatars/'):
         old_file_path = os.path.join(app.root_path, user.avatar_url.lstrip('/'))
@@ -1444,13 +990,13 @@ def upload_avatar():
                 os.remove(old_file_path)
             except Exception as e:
                 logger.warning(f"Failed to delete old avatar: {e}")
-    
+
     # Update user's avatar URL
     user.avatar_url = f"/static/uploads/avatars/{unique_filename}"
     db.session.commit()
-    
+
     flash('Avatar uploaded successfully!', 'success')
-    
+
     # Log the avatar upload
     SystemEvent.log_event(
         event_type='profile_avatar_uploaded',
@@ -1459,7 +1005,7 @@ def upload_avatar():
         user_id=user.id,
         company_id=user.company_id
     )
-    
+
     return redirect(url_for('profile'))
 
 @app.route('/2fa/setup', methods=['GET', 'POST'])
@@ -1498,6 +1044,9 @@ def setup_2fa():
         db.session.commit()
 
     # Generate QR code
+    import qrcode
+    import io
+    import base64
 
     qr_uri = g.user.get_2fa_uri(issuer_name=g.branding.app_name)
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
@@ -1593,15 +1142,15 @@ def about():
 def imprint():
     """Display the imprint/legal page if enabled"""
     branding = BrandingSettings.get_current()
-    
+
     # Check if imprint is enabled
     if not branding or not branding.imprint_enabled:
         abort(404)
-    
+
     title = branding.imprint_title or 'Imprint'
     content = branding.imprint_content or ''
-    
-    return render_template('imprint.html', 
+
+    return render_template('imprint.html',
                          title=title,
                          content=content)
 
@@ -1611,10 +1160,7 @@ def contact():
     # redacted
     return render_template('contact.html', title='Contact')
 
-
-# Notes Management Routes
-
-
+# We can keep this route as a redirect to home for backward compatibility
 @app.route('/timetrack')
 @login_required
 def timetrack():
@@ -1623,8 +1169,9 @@ def timetrack():
 @app.route('/api/arrive', methods=['POST'])
 @login_required
 def arrive():
-    # Get project and notes from request
+    # Get project, task and notes from request
     project_id = request.json.get('project_id') if request.json else None
+    task_id = request.json.get('task_id') if request.json else None
     notes = request.json.get('notes') if request.json else None
 
     # Validate project access if project is specified
@@ -1633,17 +1180,28 @@ def arrive():
         if not project or not project.is_user_allowed(g.user):
             return jsonify({'error': 'Invalid or unauthorized project'}), 403
 
+    # Validate task if specified
+    if task_id:
+        task = Task.query.get(task_id)
+        if not task:
+            return jsonify({'error': 'Invalid task'}), 400
+        # Ensure task belongs to the specified project
+        if project_id and task.project_id != int(project_id):
+            return jsonify({'error': 'Task does not belong to the specified project'}), 400
+
     # Create a new time entry with arrival time for the current user
     new_entry = TimeEntry(
         user_id=g.user.id,
         arrival_time=datetime.now(),
         project_id=int(project_id) if project_id else None,
+        task_id=int(task_id) if task_id else None,
         notes=notes
     )
     db.session.add(new_entry)
     db.session.commit()
 
     # Format response with user preferences
+    from time_utils import format_datetime_by_preference, get_user_format_settings
     date_format, time_format_24h = get_user_format_settings(g.user)
 
     return jsonify({
@@ -1765,6 +1323,7 @@ def config():
     company_config = CompanyWorkConfig.query.filter_by(company_id=g.user.company_id).first()
 
     # Import time utils for display options
+    from time_utils import get_available_rounding_options, get_available_date_formats
     rounding_options = get_available_rounding_options()
     date_format_options = get_available_date_formats()
 
@@ -1781,6 +1340,136 @@ def delete_entry(entry_id):
     db.session.delete(entry)
     db.session.commit()
     return jsonify({'success': True, 'message': 'Entry deleted successfully'})
+
+@app.route('/api/time-entry/<int:entry_id>', methods=['GET'])
+@login_required
+def get_time_entry(entry_id):
+    """Get details of a specific time entry"""
+    entry = TimeEntry.query.filter_by(id=entry_id, user_id=g.user.id).first_or_404()
+
+    return jsonify({
+        'success': True,
+        'entry': {
+            'id': entry.id,
+            'arrival_time': entry.arrival_time.isoformat(),
+            'departure_time': entry.departure_time.isoformat() if entry.departure_time else None,
+            'project_id': entry.project_id,
+            'task_id': entry.task_id,
+            'notes': entry.notes,
+            'total_break_duration': entry.total_break_duration
+        }
+    })
+
+@app.route('/time-tracking')
+@login_required
+@company_required
+def time_tracking():
+    """Modern time tracking interface"""
+    # Get active time entry
+    active_entry = TimeEntry.query.filter_by(
+        user_id=g.user.id,
+        departure_time=None
+    ).first()
+
+    # Get recent time entries
+    history = TimeEntry.query.filter_by(user_id=g.user.id).order_by(
+        TimeEntry.arrival_time.desc()
+    ).limit(50).all()
+
+    # Get available projects
+    available_projects = []
+    if g.user.role == Role.ADMIN:
+        # Admin can see all company projects
+        available_projects = Project.query.filter_by(
+            company_id=g.user.company_id,
+            is_active=True
+        ).order_by(Project.code).all()
+    else:
+        # Regular users see only their assigned projects
+        all_projects = Project.query.filter_by(
+            company_id=g.user.company_id,
+            is_active=True
+        ).all()
+        for project in all_projects:
+            if project.is_user_allowed(g.user):
+                available_projects.append(project)
+
+    # Calculate statistics
+    from datetime import date, timedelta
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    month_start = today.replace(day=1)
+
+    # Today's hours
+    today_entries = TimeEntry.query.filter(
+        TimeEntry.user_id == g.user.id,
+        func.date(TimeEntry.arrival_time) == today
+    ).all()
+    today_hours = sum(entry.duration or 0 for entry in today_entries)
+
+    # This week's hours
+    week_entries = TimeEntry.query.filter(
+        TimeEntry.user_id == g.user.id,
+        func.date(TimeEntry.arrival_time) >= week_start
+    ).all()
+    week_hours = sum(entry.duration or 0 for entry in week_entries)
+
+    # This month's hours
+    month_entries = TimeEntry.query.filter(
+        TimeEntry.user_id == g.user.id,
+        func.date(TimeEntry.arrival_time) >= month_start
+    ).all()
+    month_hours = sum(entry.duration or 0 for entry in month_entries)
+
+    # Active projects (projects with recent entries)
+    active_project_ids = db.session.query(TimeEntry.project_id).filter(
+        TimeEntry.user_id == g.user.id,
+        TimeEntry.project_id.isnot(None),
+        TimeEntry.arrival_time >= datetime.now() - timedelta(days=30)
+    ).distinct().all()
+    active_projects = [p for p in available_projects if p.id in [pid[0] for pid in active_project_ids]]
+
+    return render_template('time_tracking.html',
+                         title='Time Tracking',
+                         active_entry=active_entry,
+                         history=history,
+                         available_projects=available_projects,
+                         today_hours=today_hours,
+                         week_hours=week_hours,
+                         month_hours=month_hours,
+                         active_projects=active_projects)
+
+@app.route('/api/projects/<int:project_id>/tasks', methods=['GET'])
+@login_required
+def get_project_tasks(project_id):
+    """Get tasks for a specific project"""
+    try:
+        project = Project.query.get(project_id)
+        if not project:
+            return jsonify({'error': 'Project not found', 'success': False}), 404
+
+        # Check if user has access to this project
+        if not project.is_user_allowed(g.user):
+            return jsonify({'error': 'Unauthorized access to project', 'success': False}), 403
+
+        # Get active tasks for the project
+        tasks = Task.query.filter(
+            Task.project_id == project_id,
+            Task.status != TaskStatus.ARCHIVED
+        ).order_by(Task.created_at.desc()).all()
+
+        return jsonify({
+            'success': True,
+            'tasks': [{
+                'id': task.id,
+                'title': task.name,  # Task model uses 'name' not 'title'
+                'status': task.status.value,
+                'priority': task.priority.value if task.priority else 'medium'
+            } for task in tasks]
+        })
+    except Exception as e:
+        logger.error(f"Error fetching tasks for project {project_id}: {str(e)}")
+        return jsonify({'error': f'Server error: {str(e)}', 'success': False}), 500
 
 @app.route('/api/update/<int:entry_id>', methods=['PUT'])
 @login_required
@@ -1851,16 +1540,16 @@ def calculate_work_duration(arrival_time, departure_time, total_break_duration, 
     company_config = CompanyWorkConfig.query.filter_by(company_id=user.company_id).first()
     if not company_config:
         # Use Germany defaults if no company config exists
-        preset = CompanyWorkConfig.get_regional_preset(WorkRegion.GERMANY)
-        break_threshold_hours = preset['break_threshold_hours']
-        mandatory_break_minutes = preset['mandatory_break_minutes']
-        additional_break_threshold_hours = preset['additional_break_threshold_hours']
-        additional_break_minutes = preset['additional_break_minutes']
+        preset = CompanyWorkConfig.get_regional_preset(WorkRegion.GERMANY)  # Note: Germany has specific labor laws
+        break_threshold_hours = preset['break_after_hours']
+        mandatory_break_minutes = preset['break_duration_minutes']
+        # REMOVED: additional_break_threshold_hours = preset['additional_break_threshold_hours']  # This field no longer exists in the model
+        # REMOVED: additional_break_minutes = preset['additional_break_minutes']  # This field no longer exists in the model
     else:
-        break_threshold_hours = company_config.break_threshold_hours
-        mandatory_break_minutes = company_config.mandatory_break_minutes
-        additional_break_threshold_hours = company_config.additional_break_threshold_hours
-        additional_break_minutes = company_config.additional_break_minutes
+        break_threshold_hours = company_config.break_after_hours
+        mandatory_break_minutes = company_config.break_duration_minutes
+        # REMOVED: additional_break_threshold_hours = company_config.additional_break_threshold_hours  # This field no longer exists in the model
+        # REMOVED: additional_break_minutes = company_config.additional_break_minutes  # This field no longer exists in the model
 
     # Calculate mandatory breaks based on work duration
     work_hours = raw_duration / 3600  # Convert seconds to hours
@@ -1871,8 +1560,8 @@ def calculate_work_duration(arrival_time, departure_time, total_break_duration, 
         configured_break_seconds += mandatory_break_minutes * 60
 
     # Apply additional break if work duration exceeds additional threshold
-    if work_hours > additional_break_threshold_hours:
-        configured_break_seconds += additional_break_minutes * 60
+    # REMOVED: if work_hours > additional_break_threshold_hours:  # This field no longer exists in the model
+        # REMOVED: configured_break_seconds += additional_break_minutes * 60  # This field no longer exists in the model
 
     # Use the greater of configured breaks or actual logged breaks
     effective_break_duration = max(configured_break_seconds, total_break_duration)
@@ -1887,6 +1576,14 @@ def calculate_work_duration(arrival_time, departure_time, total_break_duration, 
 def resume_entry(entry_id):
     # Find the entry to resume for the current user
     entry_to_resume = TimeEntry.query.filter_by(id=entry_id, user_id=session['user_id']).first_or_404()
+
+    # Check if the entry is from today
+    today = datetime.now().date()
+    if entry_to_resume.arrival_time.date() < today:
+        return jsonify({
+            'success': False,
+            'message': 'Cannot resume entries from previous days.'
+        }), 400
 
     # Check if there's already an active entry
     active_entry = TimeEntry.query.filter_by(user_id=session['user_id'], departure_time=None).first()
@@ -2027,386 +1724,7 @@ def internal_server_error(e):
 def test():
     return "App is working!"
 
-@app.route('/admin/users/toggle-status/<int:user_id>')
-@admin_required
-@company_required
-def toggle_user_status(user_id):
-    user = User.query.filter_by(id=user_id, company_id=g.user.company_id).first_or_404()
-
-    # Prevent blocking yourself
-    if user.id == session.get('user_id'):
-        flash('You cannot block your own account', 'error')
-        return redirect(url_for('admin_users'))
-
-    # Toggle the blocked status
-    user.is_blocked = not user.is_blocked
-    db.session.commit()
-
-    if user.is_blocked:
-        flash(f'User {user.username} has been blocked', 'success')
-    else:
-        flash(f'User {user.username} has been unblocked', 'success')
-
-    return redirect(url_for('admin_users'))
-
-# Add this route to manage system settings
-@app.route('/admin/settings', methods=['GET', 'POST'])
-@admin_required
-def admin_settings():
-    if request.method == 'POST':
-        # Update registration setting
-        registration_enabled = 'registration_enabled' in request.form
-        reg_setting = SystemSettings.query.filter_by(key='registration_enabled').first()
-        if reg_setting:
-            reg_setting.value = 'true' if registration_enabled else 'false'
-
-        # Update email verification setting
-        email_verification_required = 'email_verification_required' in request.form
-        email_setting = SystemSettings.query.filter_by(key='email_verification_required').first()
-        if email_setting:
-            email_setting.value = 'true' if email_verification_required else 'false'
-
-        db.session.commit()
-        flash('System settings updated successfully!', 'success')
-
-    # Get current settings
-    settings = {}
-    for setting in SystemSettings.query.all():
-        if setting.key == 'registration_enabled':
-            settings['registration_enabled'] = setting.value == 'true'
-        elif setting.key == 'email_verification_required':
-            settings['email_verification_required'] = setting.value == 'true'
-
-    return render_template('admin_settings.html', title='System Settings', settings=settings)
-
-@app.route('/system-admin/dashboard')
-@system_admin_required
-def system_admin_dashboard():
-    """System Administrator Dashboard - view all data across companies"""
-
-    # Global statistics
-    total_companies = Company.query.count()
-    total_users = User.query.count()
-    total_teams = Team.query.count()
-    total_projects = Project.query.count()
-    total_time_entries = TimeEntry.query.count()
-
-    # System admin count
-    system_admins = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
-    regular_admins = User.query.filter_by(role=Role.ADMIN).count()
-
-    # Recent activity (last 7 days)
-    week_ago = datetime.now() - timedelta(days=7)
-
-    recent_users = User.query.filter(User.created_at >= week_ago).count()
-    recent_companies = Company.query.filter(Company.created_at >= week_ago).count()
-    recent_time_entries = TimeEntry.query.filter(TimeEntry.arrival_time >= week_ago).count()
-
-    # Top companies by user count
-    top_companies = db.session.query(
-        Company.name,
-        Company.id,
-        db.func.count(User.id).label('user_count')
-    ).join(User).group_by(Company.id).order_by(db.func.count(User.id).desc()).limit(5).all()
-
-    # Recent companies
-    recent_companies_list = Company.query.order_by(Company.created_at.desc()).limit(5).all()
-
-    # System health checks
-    orphaned_users = User.query.filter_by(company_id=None).count()
-    orphaned_time_entries = TimeEntry.query.filter_by(user_id=None).count()
-    blocked_users = User.query.filter_by(is_blocked=True).count()
-
-    return render_template('system_admin_dashboard.html',
-                         title='System Administrator Dashboard',
-                         total_companies=total_companies,
-                         total_users=total_users,
-                         total_teams=total_teams,
-                         total_projects=total_projects,
-                         total_time_entries=total_time_entries,
-                         system_admins=system_admins,
-                         regular_admins=regular_admins,
-                         recent_users=recent_users,
-                         recent_companies=recent_companies,
-                         recent_time_entries=recent_time_entries,
-                         top_companies=top_companies,
-                         recent_companies_list=recent_companies_list,
-                         orphaned_users=orphaned_users,
-                         orphaned_time_entries=orphaned_time_entries,
-                         blocked_users=blocked_users)
-
-@app.route('/system-admin/users')
-@system_admin_required
-def system_admin_users():
-    """System Admin: View all users across all companies"""
-    filter_type = request.args.get('filter', '')
-    page = request.args.get('page', 1, type=int)
-    per_page = 50
-
-    # Build query based on filter
-    query = User.query
-
-    if filter_type == 'blocked':
-        query = query.filter_by(is_blocked=True)
-    elif filter_type == 'system_admins':
-        query = query.filter_by(role=Role.SYSTEM_ADMIN)
-    elif filter_type == 'admins':
-        query = query.filter_by(role=Role.ADMIN)
-    elif filter_type == 'unverified':
-        query = query.filter_by(is_verified=False)
-    elif filter_type == 'freelancers':
-        query = query.filter_by(account_type=AccountType.FREELANCER)
-
-    # Add company join for display
-    query = query.join(Company).add_columns(Company.name.label('company_name'))
-
-    # Order by creation date (newest first)
-    query = query.order_by(User.created_at.desc())
-
-    # Paginate results
-    users = query.paginate(page=page, per_page=per_page, error_out=False)
-
-    return render_template('system_admin_users.html',
-                         title='System Admin - All Users',
-                         users=users,
-                         current_filter=filter_type)
-
-@app.route('/system-admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
-@system_admin_required
-def system_admin_edit_user(user_id):
-    """System Admin: Edit any user across companies"""
-    user = User.query.get_or_404(user_id)
-
-    if request.method == 'POST':
-        # Get form data
-        username = request.form.get('username')
-        email = request.form.get('email')
-        role = request.form.get('role')
-        is_blocked = request.form.get('is_blocked') == 'on'
-        is_verified = request.form.get('is_verified') == 'on'
-        company_id = request.form.get('company_id')
-        team_id = request.form.get('team_id') or None
-
-        # Validation
-        error = None
-
-        # Check if username is unique within the company
-        existing_user = User.query.filter(
-            User.username == username,
-            User.company_id == company_id,
-            User.id != user_id
-        ).first()
-
-        if existing_user:
-            error = f'Username "{username}" is already taken in this company.'
-
-        # Check if email is unique within the company
-        existing_email = User.query.filter(
-            User.email == email,
-            User.company_id == company_id,
-            User.id != user_id
-        ).first()
-
-        if existing_email:
-            error = f'Email "{email}" is already registered in this company.'
-
-        if not error:
-            # Update user
-            user.username = username
-            user.email = email
-            user.role = Role(role)
-            user.is_blocked = is_blocked
-            user.is_verified = is_verified
-            user.company_id = company_id
-            user.team_id = team_id
-
-            db.session.commit()
-            flash(f'User {username} updated successfully.', 'success')
-            return redirect(url_for('system_admin_users'))
-
-        flash(error, 'error')
-
-    # Get all companies and teams for form dropdowns
-    companies = Company.query.order_by(Company.name).all()
-    teams = Team.query.filter_by(company_id=user.company_id).order_by(Team.name).all()
-    roles = get_available_roles()
-
-    return render_template('system_admin_edit_user.html',
-                         title=f'Edit User: {user.username}',
-                         user=user,
-                         companies=companies,
-                         teams=teams,
-                         roles=roles)
-
-@app.route('/system-admin/users/<int:user_id>/delete', methods=['POST'])
-@system_admin_required
-def system_admin_delete_user(user_id):
-    """System Admin: Delete any user (with safety checks)"""
-    user = User.query.get_or_404(user_id)
-
-    # Safety check: prevent deleting the last system admin
-    if user.role == Role.SYSTEM_ADMIN:
-        system_admin_count = User.query.filter_by(role=Role.SYSTEM_ADMIN).count()
-        if system_admin_count <= 1:
-            flash('Cannot delete the last system administrator.', 'error')
-            return redirect(url_for('system_admin_users'))
-
-    # Safety check: prevent deleting yourself
-    if user.id == g.user.id:
-        flash('Cannot delete your own account.', 'error')
-        return redirect(url_for('system_admin_users'))
-
-    username = user.username
-    company_name = user.company.name if user.company else 'Unknown'
-
-    try:
-        # Handle dependent records before deleting user
-        # Find an alternative admin/supervisor in the same company to transfer ownership to
-        alternative_admin = User.query.filter(
-            User.company_id == user.company_id,
-            User.role.in_([Role.ADMIN, Role.SUPERVISOR]),
-            User.id != user_id
-        ).first()
-        
-        if alternative_admin:
-            # Transfer ownership of projects to alternative admin
-            Project.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-            
-            # Transfer ownership of tasks to alternative admin
-            Task.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-            
-            # Transfer ownership of subtasks to alternative admin
-            SubTask.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-            
-            # Transfer ownership of project categories to alternative admin
-            ProjectCategory.query.filter_by(created_by_id=user_id).update({'created_by_id': alternative_admin.id})
-        else:
-            # No alternative admin found - redirect to company deletion confirmation
-            flash('No other administrator or supervisor found in the same company. Company deletion required.', 'warning')
-            return redirect(url_for('confirm_company_deletion', user_id=user_id))
-        
-        # Delete user-specific records that can be safely removed
-        TimeEntry.query.filter_by(user_id=user_id).delete()
-        WorkConfig.query.filter_by(user_id=user_id).delete()
-        UserPreferences.query.filter_by(user_id=user_id).delete()
-        
-        # Delete user dashboards (cascades to widgets)
-        UserDashboard.query.filter_by(user_id=user_id).delete()
-        
-        # Clear task and subtask assignments
-        Task.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
-        SubTask.query.filter_by(assigned_to_id=user_id).update({'assigned_to_id': None})
-        
-        # Now safe to delete the user
-        db.session.delete(user)
-        db.session.commit()
-        
-        flash(f'User "{username}" from company "{company_name}" has been deleted. Projects and tasks transferred to {alternative_admin.username}', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error deleting user {user_id}: {str(e)}")
-        flash(f'Error deleting user: {str(e)}', 'error')
-    
-    return redirect(url_for('system_admin_users'))
-
-@app.route('/system-admin/companies')
-@system_admin_required
-def system_admin_companies():
-    """System Admin: View all companies"""
-    page = request.args.get('page', 1, type=int)
-    per_page = 20
-
-    companies = Company.query.order_by(Company.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False)
-
-    # Get user counts for each company
-    company_stats = {}
-    for company in companies.items:
-        user_count = User.query.filter_by(company_id=company.id).count()
-        admin_count = User.query.filter(
-            User.company_id == company.id,
-            User.role.in_([Role.ADMIN, Role.SYSTEM_ADMIN])
-        ).count()
-        company_stats[company.id] = {
-            'user_count': user_count,
-            'admin_count': admin_count
-        }
-
-    return render_template('system_admin_companies.html',
-                         title='System Admin - All Companies',
-                         companies=companies,
-                         company_stats=company_stats)
-
-@app.route('/system-admin/companies/<int:company_id>')
-@system_admin_required
-def system_admin_company_detail(company_id):
-    """System Admin: View detailed company information"""
-    company = Company.query.get_or_404(company_id)
-
-    # Get company statistics
-    users = User.query.filter_by(company_id=company.id).all()
-    teams = Team.query.filter_by(company_id=company.id).all()
-    projects = Project.query.filter_by(company_id=company.id).all()
-
-    # Recent activity
-    week_ago = datetime.now() - timedelta(days=7)
-    recent_time_entries = TimeEntry.query.join(User).filter(
-        User.company_id == company.id,
-        TimeEntry.arrival_time >= week_ago
-    ).count()
-
-    # Role distribution
-    role_counts = {}
-    for role in Role:
-        count = User.query.filter_by(company_id=company.id, role=role).count()
-        if count > 0:
-            role_counts[role.value] = count
-
-    return render_template('system_admin_company_detail.html',
-                         title=f'Company: {company.name}',
-                         company=company,
-                         users=users,
-                         teams=teams,
-                         projects=projects,
-                         recent_time_entries=recent_time_entries,
-                         role_counts=role_counts)
-
-@app.route('/system-admin/time-entries')
-@system_admin_required
-def system_admin_time_entries():
-    """System Admin: View time entries across all companies"""
-    page = request.args.get('page', 1, type=int)
-    company_filter = request.args.get('company', '')
-    per_page = 50
-
-    # Build query
-    query = TimeEntry.query.join(User).join(Company)
-
-    if company_filter:
-        query = query.filter(Company.id == company_filter)
-
-    # Add columns for display
-    query = query.add_columns(
-        User.username,
-        Company.name.label('company_name'),
-        Project.name.label('project_name')
-    ).outerjoin(Project)
-
-    # Order by arrival time (newest first)
-    query = query.order_by(TimeEntry.arrival_time.desc())
-
-    # Paginate
-    entries = query.paginate(page=page, per_page=per_page, error_out=False)
-
-    # Get companies for filter dropdown
-    companies = Company.query.order_by(Company.name).all()
-
-    return render_template('system_admin_time_entries.html',
-                         title='System Admin - Time Entries',
-                         entries=entries,
-                         companies=companies,
-                         current_company=company_filter)
+# system_admin routes moved to system_admin blueprint
 
 @app.route('/system-admin/settings', methods=['GET', 'POST'])
 @system_admin_required
@@ -2493,63 +1811,7 @@ def system_admin_settings():
                          total_users=total_users,
                          total_system_admins=total_system_admins)
 
-@app.route('/system-admin/branding', methods=['GET', 'POST'])
-@system_admin_required
-def system_admin_branding():
-    """System Admin: Branding settings"""
-    if request.method == 'POST':
-        branding = BrandingSettings.get_current()
-        
-        # Handle form data
-        branding.app_name = request.form.get('app_name', g.branding.app_name).strip()
-        branding.logo_alt_text = request.form.get('logo_alt_text', '').strip()
-        branding.primary_color = request.form.get('primary_color', '#007bff').strip()
-        
-        # Handle imprint settings
-        branding.imprint_enabled = 'imprint_enabled' in request.form
-        branding.imprint_title = request.form.get('imprint_title', 'Imprint').strip()
-        branding.imprint_content = request.form.get('imprint_content', '').strip()
-        
-        branding.updated_by_id = g.user.id
-        
-        # Handle logo upload
-        if 'logo_file' in request.files:
-            logo_file = request.files['logo_file']
-            if logo_file and logo_file.filename:
-                # Create uploads directory if it doesn't exist
-                upload_dir = os.path.join(app.static_folder, 'uploads', 'branding')
-                os.makedirs(upload_dir, exist_ok=True)
-                
-                # Save the file with a timestamp to avoid conflicts
-                filename = f"logo_{int(time.time())}_{logo_file.filename}"
-                logo_path = os.path.join(upload_dir, filename)
-                logo_file.save(logo_path)
-                branding.logo_filename = filename
-        
-        # Handle favicon upload
-        if 'favicon_file' in request.files:
-            favicon_file = request.files['favicon_file']
-            if favicon_file and favicon_file.filename:
-                # Create uploads directory if it doesn't exist
-                upload_dir = os.path.join(app.static_folder, 'uploads', 'branding')
-                os.makedirs(upload_dir, exist_ok=True)
-                
-                # Save the file with a timestamp to avoid conflicts
-                filename = f"favicon_{int(time.time())}_{favicon_file.filename}"
-                favicon_path = os.path.join(upload_dir, filename)
-                favicon_file.save(favicon_path)
-                branding.favicon_filename = filename
-        
-        db.session.commit()
-        flash('Branding settings updated successfully.', 'success')
-        return redirect(url_for('system_admin_branding'))
-    
-    # Get current branding settings
-    branding = BrandingSettings.get_current()
-    
-    return render_template('system_admin_branding.html',
-                         title='System Administrator - Branding Settings',
-                         branding=branding)
+# system_admin_branding moved to system_admin blueprint
 
 @app.route('/system-admin/health')
 @system_admin_required
@@ -2566,6 +1828,7 @@ def system_admin_health():
     warnings = SystemEvent.get_events_by_severity('warning', days=7, limit=20)
 
     # System metrics
+    from datetime import datetime, timedelta
     now = datetime.now()
 
     # Database connection test
@@ -2616,837 +1879,8 @@ def system_admin_health():
                          uptime_duration=uptime_duration,
                          today_events=today_events)
 
-@app.route('/system-admin/announcements')
-@system_admin_required
-def system_admin_announcements():
-    """System Admin: Manage announcements"""
-    page = request.args.get('page', 1, type=int)
-    per_page = 20
-
-    announcements = Announcement.query.order_by(Announcement.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False)
-
-    return render_template('system_admin_announcements.html',
-                         title='System Admin - Announcements',
-                         announcements=announcements)
-
-@app.route('/system-admin/announcements/new', methods=['GET', 'POST'])
-@system_admin_required
-def system_admin_announcement_new():
-    """System Admin: Create new announcement"""
-    if request.method == 'POST':
-        title = request.form.get('title')
-        content = request.form.get('content')
-        announcement_type = request.form.get('announcement_type', 'info')
-        is_urgent = request.form.get('is_urgent') == 'on'
-        is_active = request.form.get('is_active') == 'on'
-
-        # Handle date fields
-        start_date = request.form.get('start_date')
-        end_date = request.form.get('end_date')
-
-        start_datetime = None
-        end_datetime = None
-
-        if start_date:
-            try:
-                start_datetime = datetime.strptime(start_date, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-
-        if end_date:
-            try:
-                end_datetime = datetime.strptime(end_date, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-
-        # Handle targeting
-        target_all_users = request.form.get('target_all_users') == 'on'
-        target_roles = None
-        target_companies = None
-
-        if not target_all_users:
-            selected_roles = request.form.getlist('target_roles')
-            selected_companies = request.form.getlist('target_companies')
-
-            if selected_roles:
-                target_roles = json.dumps(selected_roles)
-
-            if selected_companies:
-                target_companies = json.dumps([int(c) for c in selected_companies])
-
-        announcement = Announcement(
-            title=title,
-            content=content,
-            announcement_type=announcement_type,
-            is_urgent=is_urgent,
-            is_active=is_active,
-            start_date=start_datetime,
-            end_date=end_datetime,
-            target_all_users=target_all_users,
-            target_roles=target_roles,
-            target_companies=target_companies,
-            created_by_id=g.user.id
-        )
-
-        db.session.add(announcement)
-        db.session.commit()
-
-        flash('Announcement created successfully.', 'success')
-        return redirect(url_for('system_admin_announcements'))
-
-    # Get roles and companies for targeting options
-    roles = [role.value for role in Role]
-    companies = Company.query.order_by(Company.name).all()
-
-    return render_template('system_admin_announcement_form.html',
-                         title='Create Announcement',
-                         announcement=None,
-                         roles=roles,
-                         companies=companies)
-
-@app.route('/system-admin/announcements/<int:id>/edit', methods=['GET', 'POST'])
-@system_admin_required
-def system_admin_announcement_edit(id):
-    """System Admin: Edit announcement"""
-    announcement = Announcement.query.get_or_404(id)
-
-    if request.method == 'POST':
-        announcement.title = request.form.get('title')
-        announcement.content = request.form.get('content')
-        announcement.announcement_type = request.form.get('announcement_type', 'info')
-        announcement.is_urgent = request.form.get('is_urgent') == 'on'
-        announcement.is_active = request.form.get('is_active') == 'on'
-
-        # Handle date fields
-        start_date = request.form.get('start_date')
-        end_date = request.form.get('end_date')
-
-        if start_date:
-            try:
-                announcement.start_date = datetime.strptime(start_date, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                announcement.start_date = None
-        else:
-            announcement.start_date = None
-
-        if end_date:
-            try:
-                announcement.end_date = datetime.strptime(end_date, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                announcement.end_date = None
-        else:
-            announcement.end_date = None
-
-        # Handle targeting
-        announcement.target_all_users = request.form.get('target_all_users') == 'on'
-
-        if not announcement.target_all_users:
-            selected_roles = request.form.getlist('target_roles')
-            selected_companies = request.form.getlist('target_companies')
-
-            if selected_roles:
-                announcement.target_roles = json.dumps(selected_roles)
-            else:
-                announcement.target_roles = None
-
-            if selected_companies:
-                announcement.target_companies = json.dumps([int(c) for c in selected_companies])
-            else:
-                announcement.target_companies = None
-        else:
-            announcement.target_roles = None
-            announcement.target_companies = None
-
-        announcement.updated_at = datetime.now()
-
-        db.session.commit()
-
-        flash('Announcement updated successfully.', 'success')
-        return redirect(url_for('system_admin_announcements'))
-
-    # Get roles and companies for targeting options
-    roles = [role.value for role in Role]
-    companies = Company.query.order_by(Company.name).all()
-
-    return render_template('system_admin_announcement_form.html',
-                         title='Edit Announcement',
-                         announcement=announcement,
-                         roles=roles,
-                         companies=companies)
-
-@app.route('/system-admin/announcements/<int:id>/delete', methods=['POST'])
-@system_admin_required
-def system_admin_announcement_delete(id):
-    """System Admin: Delete announcement"""
-    announcement = Announcement.query.get_or_404(id)
-
-    db.session.delete(announcement)
-    db.session.commit()
-
-    flash('Announcement deleted successfully.', 'success')
-    return redirect(url_for('system_admin_announcements'))
-
-@app.route('/admin/work-policies', methods=['GET', 'POST'])
-@admin_required
-@company_required
-def admin_work_policies():
-    # Get or create company work config
-    work_config = CompanyWorkConfig.query.filter_by(company_id=g.user.company_id).first()
-    if not work_config:
-        # Create default config for the company
-        preset = CompanyWorkConfig.get_regional_preset(WorkRegion.GERMANY)
-        work_config = CompanyWorkConfig(
-            company_id=g.user.company_id,
-            work_hours_per_day=preset['work_hours_per_day'],
-            mandatory_break_minutes=preset['mandatory_break_minutes'],
-            break_threshold_hours=preset['break_threshold_hours'],
-            additional_break_minutes=preset['additional_break_minutes'],
-            additional_break_threshold_hours=preset['additional_break_threshold_hours'],
-            region=WorkRegion.GERMANY,
-            region_name=preset['region_name'],
-            created_by_id=g.user.id
-        )
-        db.session.add(work_config)
-        db.session.commit()
-
-    if request.method == 'POST':
-        try:
-            # Handle regional preset selection
-            if request.form.get('action') == 'apply_preset':
-                region_code = request.form.get('region_preset')
-                if region_code:
-                    region = WorkRegion(region_code)
-                    preset = CompanyWorkConfig.get_regional_preset(region)
-
-                    work_config.work_hours_per_day = preset['work_hours_per_day']
-                    work_config.mandatory_break_minutes = preset['mandatory_break_minutes']
-                    work_config.break_threshold_hours = preset['break_threshold_hours']
-                    work_config.additional_break_minutes = preset['additional_break_minutes']
-                    work_config.additional_break_threshold_hours = preset['additional_break_threshold_hours']
-                    work_config.region = region
-                    work_config.region_name = preset['region_name']
-
-                    db.session.commit()
-                    flash(f'Applied {preset["region_name"]} work policy preset', 'success')
-                    return redirect(url_for('admin_work_policies'))
-
-            # Handle manual configuration update
-            else:
-                work_config.work_hours_per_day = float(request.form.get('work_hours_per_day', 8.0))
-                work_config.mandatory_break_minutes = int(request.form.get('mandatory_break_minutes', 30))
-                work_config.break_threshold_hours = float(request.form.get('break_threshold_hours', 6.0))
-                work_config.additional_break_minutes = int(request.form.get('additional_break_minutes', 15))
-                work_config.additional_break_threshold_hours = float(request.form.get('additional_break_threshold_hours', 9.0))
-                work_config.region = WorkRegion.CUSTOM
-                work_config.region_name = 'Custom Configuration'
-
-                db.session.commit()
-                flash('Work policies updated successfully!', 'success')
-                return redirect(url_for('admin_work_policies'))
-
-        except ValueError:
-            flash('Please enter valid numbers for all fields', 'error')
-
-    # Get available regional presets
-    regional_presets = []
-    for region in WorkRegion:
-        preset = CompanyWorkConfig.get_regional_preset(region)
-        regional_presets.append({
-            'code': region.value,
-            'name': preset['region_name'],
-            'description': f"{preset['work_hours_per_day']}h/day, {preset['mandatory_break_minutes']}min break after {preset['break_threshold_hours']}h"
-        })
-
-    return render_template('admin_work_policies.html',
-                         title='Work Policies',
-                         work_config=work_config,
-                         regional_presets=regional_presets,
-                         WorkRegion=WorkRegion)
-
 # Company Management Routes
-@app.route('/admin/company')
-@admin_required
-@company_required
-def admin_company():
-    """View and manage company settings"""
-    company = g.company
-
-    # Get company statistics
-    stats = {
-        'total_users': User.query.filter_by(company_id=company.id).count(),
-        'total_teams': Team.query.filter_by(company_id=company.id).count(),
-        'total_projects': Project.query.filter_by(company_id=company.id).count(),
-        'active_projects': Project.query.filter_by(company_id=company.id, is_active=True).count(),
-    }
-
-    return render_template('admin_company.html', title='Company Management', company=company, stats=stats)
-
-@app.route('/admin/company/edit', methods=['GET', 'POST'])
-@admin_required
-@company_required
-def edit_company():
-    """Edit company details"""
-    company = g.company
-
-    if request.method == 'POST':
-        name = request.form.get('name')
-        description = request.form.get('description', '')
-        max_users = request.form.get('max_users')
-        is_active = 'is_active' in request.form
-
-        # Validate input
-        error = None
-        if not name:
-            error = 'Company name is required'
-        elif name != company.name and Company.query.filter_by(name=name).first():
-            error = 'Company name already exists'
-
-        if max_users:
-            try:
-                max_users = int(max_users)
-                if max_users < 1:
-                    error = 'Maximum users must be at least 1'
-            except ValueError:
-                error = 'Maximum users must be a valid number'
-        else:
-            max_users = None
-
-        if error is None:
-            company.name = name
-            company.description = description
-            company.max_users = max_users
-            company.is_active = is_active
-            db.session.commit()
-
-            flash('Company details updated successfully!', 'success')
-            return redirect(url_for('admin_company'))
-        else:
-            flash(error, 'error')
-
-    return render_template('edit_company.html', title='Edit Company', company=company)
-
-@app.route('/admin/company/users')
-@admin_required
-@company_required
-def company_users():
-    """List all users in the company with detailed information"""
-    users = User.query.filter_by(company_id=g.company.id).order_by(User.created_at.desc()).all()
-
-    # Calculate user statistics
-    user_stats = {
-        'total': len(users),
-        'verified': len([u for u in users if u.is_verified]),
-        'unverified': len([u for u in users if not u.is_verified]),
-        'blocked': len([u for u in users if u.is_blocked]),
-        'active': len([u for u in users if not u.is_blocked and u.is_verified]),
-        'admins': len([u for u in users if u.role == Role.ADMIN]),
-        'supervisors': len([u for u in users if u.role == Role.SUPERVISOR]),
-        'team_leaders': len([u for u in users if u.role == Role.TEAM_LEADER]),
-        'team_members': len([u for u in users if u.role == Role.TEAM_MEMBER]),
-    }
-
-    return render_template('company_users.html', title='Company Users',
-                         users=users, stats=user_stats, company=g.company)
-
-# Add these routes for team management
-@app.route('/admin/teams')
-@admin_required
-@company_required
-def admin_teams():
-    teams = Team.query.filter_by(company_id=g.user.company_id).all()
-    return render_template('admin_teams.html', title='Team Management', teams=teams)
-
-@app.route('/admin/teams/create', methods=['GET', 'POST'])
-@admin_required
-@company_required
-def create_team():
-    if request.method == 'POST':
-        name = request.form.get('name')
-        description = request.form.get('description')
-
-        # Validate input
-        error = None
-        if not name:
-            error = 'Team name is required'
-        elif Team.query.filter_by(name=name, company_id=g.user.company_id).first():
-            error = 'Team name already exists in your company'
-
-        if error is None:
-            new_team = Team(name=name, description=description, company_id=g.user.company_id)
-            db.session.add(new_team)
-            db.session.commit()
-
-            flash(f'Team "{name}" created successfully!', 'success')
-            return redirect(url_for('admin_teams'))
-
-        flash(error, 'error')
-
-    return render_template('create_team.html', title='Create Team')
-
-@app.route('/admin/teams/edit/<int:team_id>', methods=['GET', 'POST'])
-@admin_required
-@company_required
-def edit_team(team_id):
-    team = Team.query.filter_by(id=team_id, company_id=g.user.company_id).first_or_404()
-
-    if request.method == 'POST':
-        name = request.form.get('name')
-        description = request.form.get('description')
-
-        # Validate input
-        error = None
-        if not name:
-            error = 'Team name is required'
-        elif name != team.name and Team.query.filter_by(name=name, company_id=g.user.company_id).first():
-            error = 'Team name already exists in your company'
-
-        if error is None:
-            team.name = name
-            team.description = description
-            db.session.commit()
-
-            flash(f'Team "{name}" updated successfully!', 'success')
-            return redirect(url_for('admin_teams'))
-
-        flash(error, 'error')
-
-    return render_template('edit_team.html', title='Edit Team', team=team)
-
-@app.route('/admin/teams/delete/<int:team_id>', methods=['POST'])
-@admin_required
-@company_required
-def delete_team(team_id):
-    team = Team.query.filter_by(id=team_id, company_id=g.user.company_id).first_or_404()
-
-    # Check if team has members
-    if team.users:
-        flash('Cannot delete team with members. Remove all members first.', 'error')
-        return redirect(url_for('admin_teams'))
-
-    team_name = team.name
-    db.session.delete(team)
-    db.session.commit()
-
-    flash(f'Team "{team_name}" deleted successfully!', 'success')
-    return redirect(url_for('admin_teams'))
-
-@app.route('/admin/teams/<int:team_id>', methods=['GET', 'POST'])
-@admin_required
-@company_required
-def manage_team(team_id):
-    team = Team.query.filter_by(id=team_id, company_id=g.user.company_id).first_or_404()
-
-    if request.method == 'POST':
-        action = request.form.get('action')
-
-        if action == 'update_team':
-            # Update team details
-            name = request.form.get('name')
-            description = request.form.get('description')
-
-            # Validate input
-            error = None
-            if not name:
-                error = 'Team name is required'
-            elif name != team.name and Team.query.filter_by(name=name, company_id=g.user.company_id).first():
-                error = 'Team name already exists in your company'
-
-            if error is None:
-                team.name = name
-                team.description = description
-                db.session.commit()
-                flash(f'Team "{name}" updated successfully!', 'success')
-            else:
-                flash(error, 'error')
-
-        elif action == 'add_member':
-            # Add user to team
-            user_id = request.form.get('user_id')
-            if user_id:
-                user = User.query.get(user_id)
-                if user:
-                    user.team_id = team.id
-                    db.session.commit()
-                    flash(f'User {user.username} added to team!', 'success')
-                else:
-                    flash('User not found', 'error')
-            else:
-                flash('No user selected', 'error')
-
-        elif action == 'remove_member':
-            # Remove user from team
-            user_id = request.form.get('user_id')
-            if user_id:
-                user = User.query.get(user_id)
-                if user and user.team_id == team.id:
-                    user.team_id = None
-                    db.session.commit()
-                    flash(f'User {user.username} removed from team!', 'success')
-                else:
-                    flash('User not found or not in this team', 'error')
-            else:
-                flash('No user selected', 'error')
-
-    # Get team members
-    team_members = User.query.filter_by(team_id=team.id).all()
-
-    # Get users not in this team for the add member form (company-scoped)
-
-    available_users = User.query.filter(
-        User.company_id == g.user.company_id,
-        (User.team_id != team.id) | (User.team_id == None)
-    ).all()
-
-    return render_template(
-        'manage_team.html',
-        title=f'Manage Team: {team.name}',
-        team=team,
-        team_members=team_members,
-        available_users=available_users
-    )
-
-# Project Management Routes
-@app.route('/admin/projects')
-@role_required(Role.SUPERVISOR)  # Supervisors and Admins can manage projects
-@company_required
-def admin_projects():
-    projects = Project.query.filter_by(company_id=g.user.company_id).order_by(Project.created_at.desc()).all()
-    categories = ProjectCategory.query.filter_by(company_id=g.user.company_id).order_by(ProjectCategory.name).all()
-    return render_template('admin_projects.html', title='Project Management', projects=projects, categories=categories)
-
-@app.route('/admin/projects/create', methods=['GET', 'POST'])
-@role_required(Role.SUPERVISOR)
-@company_required
-def create_project():
-    if request.method == 'POST':
-        name = request.form.get('name')
-        description = request.form.get('description')
-        code = request.form.get('code')
-        team_id = request.form.get('team_id') or None
-        category_id = request.form.get('category_id') or None
-        start_date_str = request.form.get('start_date')
-        end_date_str = request.form.get('end_date')
-
-        # Validate input
-        error = None
-        if not name:
-            error = 'Project name is required'
-        elif not code:
-            error = 'Project code is required'
-        elif Project.query.filter_by(code=code, company_id=g.user.company_id).first():
-            error = 'Project code already exists in your company'
-
-        # Parse dates
-        start_date = None
-        end_date = None
-        if start_date_str:
-            try:
-                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            except ValueError:
-                error = 'Invalid start date format'
-
-        if end_date_str:
-            try:
-                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            except ValueError:
-                error = 'Invalid end date format'
-
-        if start_date and end_date and start_date > end_date:
-            error = 'Start date cannot be after end date'
-
-        if error is None:
-            project = Project(
-                name=name,
-                description=description,
-                code=code.upper(),
-                company_id=g.user.company_id,
-                team_id=int(team_id) if team_id else None,
-                category_id=int(category_id) if category_id else None,
-                start_date=start_date,
-                end_date=end_date,
-                created_by_id=g.user.id
-            )
-            db.session.add(project)
-            db.session.commit()
-            flash(f'Project "{name}" created successfully!', 'success')
-            return redirect(url_for('admin_projects'))
-        else:
-            flash(error, 'error')
-
-    # Get available teams and categories for the form (company-scoped)
-    teams = Team.query.filter_by(company_id=g.user.company_id).order_by(Team.name).all()
-    categories = ProjectCategory.query.filter_by(company_id=g.user.company_id).order_by(ProjectCategory.name).all()
-    return render_template('create_project.html', title='Create Project', teams=teams, categories=categories)
-
-@app.route('/admin/projects/edit/<int:project_id>', methods=['GET', 'POST'])
-@role_required(Role.SUPERVISOR)
-@company_required
-def edit_project(project_id):
-    project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first_or_404()
-
-    if request.method == 'POST':
-        name = request.form.get('name')
-        description = request.form.get('description')
-        code = request.form.get('code')
-        team_id = request.form.get('team_id') or None
-        category_id = request.form.get('category_id') or None
-        is_active = request.form.get('is_active') == 'on'
-        start_date_str = request.form.get('start_date')
-        end_date_str = request.form.get('end_date')
-
-        # Validate input
-        error = None
-        if not name:
-            error = 'Project name is required'
-        elif not code:
-            error = 'Project code is required'
-        elif code != project.code and Project.query.filter_by(code=code, company_id=g.user.company_id).first():
-            error = 'Project code already exists in your company'
-
-        # Parse dates
-        start_date = None
-        end_date = None
-        if start_date_str:
-            try:
-                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            except ValueError:
-                error = 'Invalid start date format'
-
-        if end_date_str:
-            try:
-                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            except ValueError:
-                error = 'Invalid end date format'
-
-        if start_date and end_date and start_date > end_date:
-            error = 'Start date cannot be after end date'
-
-        if error is None:
-            project.name = name
-            project.description = description
-            project.code = code.upper()
-            project.team_id = int(team_id) if team_id else None
-            project.category_id = int(category_id) if category_id else None
-            project.is_active = is_active
-            project.start_date = start_date
-            project.end_date = end_date
-            db.session.commit()
-            flash(f'Project "{name}" updated successfully!', 'success')
-            return redirect(url_for('admin_projects'))
-        else:
-            flash(error, 'error')
-
-    # Get available teams and categories for the form (company-scoped)
-    teams = Team.query.filter_by(company_id=g.user.company_id).order_by(Team.name).all()
-    categories = ProjectCategory.query.filter_by(company_id=g.user.company_id).order_by(ProjectCategory.name).all()
-
-    return render_template('edit_project.html', title='Edit Project', project=project, teams=teams, categories=categories)
-
-@app.route('/admin/projects/delete/<int:project_id>', methods=['POST'])
-@role_required(Role.ADMIN)  # Only admins can delete projects
-@company_required
-def delete_project(project_id):
-    project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first_or_404()
-
-    # Check if there are time entries associated with this project
-    time_entries_count = TimeEntry.query.filter_by(project_id=project_id).count()
-
-    if time_entries_count > 0:
-        flash(f'Cannot delete project "{project.name}" - it has {time_entries_count} time entries associated with it. Deactivate the project instead.', 'error')
-    else:
-        project_name = project.name
-        db.session.delete(project)
-        db.session.commit()
-        flash(f'Project "{project_name}" deleted successfully!', 'success')
-
-    return redirect(url_for('admin_projects'))
-
-@app.route('/api/team/hours_data', methods=['GET'])
-@login_required
-@role_required(Role.TEAM_LEADER)  # Only team leaders and above can access
-@company_required
-def team_hours_data():
-    # Get the current user's team
-    team = Team.query.get(g.user.team_id)
-
-    if not team:
-        return jsonify({
-            'success': False,
-            'message': 'You are not assigned to any team.'
-        }), 400
-
-    # Get date range from query parameters or use current week as default
-    today = datetime.now().date()
-    start_of_week = today - timedelta(days=today.weekday())
-    end_of_week = start_of_week + timedelta(days=6)
-
-    start_date_str = request.args.get('start_date', start_of_week.strftime('%Y-%m-%d'))
-    end_date_str = request.args.get('end_date', end_of_week.strftime('%Y-%m-%d'))
-    include_self = request.args.get('include_self', 'false') == 'true'
-
-    try:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-    except ValueError:
-        return jsonify({
-            'success': False,
-            'message': 'Invalid date format.'
-        }), 400
-
-    # Get all team members
-    team_members = User.query.filter_by(team_id=team.id).all()
-
-    # Prepare data structure for team members' hours
-    team_data = []
-
-    for member in team_members:
-        # Skip if the member is the current user (team leader) and include_self is False
-        if member.id == g.user.id and not include_self:
-            continue
-
-        # Get time entries for this member in the date range
-        entries = TimeEntry.query.filter(
-            TimeEntry.user_id == member.id,
-            TimeEntry.arrival_time >= datetime.combine(start_date, time.min),
-            TimeEntry.arrival_time <= datetime.combine(end_date, time.max)
-        ).order_by(TimeEntry.arrival_time).all()
-
-        # Calculate daily and total hours
-        daily_hours = {}
-        total_seconds = 0
-
-        for entry in entries:
-            if entry.duration:  # Only count completed entries
-                entry_date = entry.arrival_time.date()
-                date_str = entry_date.strftime('%Y-%m-%d')
-
-                if date_str not in daily_hours:
-                    daily_hours[date_str] = 0
-
-                daily_hours[date_str] += entry.duration
-                total_seconds += entry.duration
-
-        # Convert seconds to hours for display
-        for date_str in daily_hours:
-            daily_hours[date_str] = round(daily_hours[date_str] / 3600, 2)  # Convert to hours
-
-        total_hours = round(total_seconds / 3600, 2)  # Convert to hours
-
-        # Format entries for JSON response
-        formatted_entries = []
-        for entry in entries:
-            formatted_entries.append({
-                'id': entry.id,
-                'arrival_time': entry.arrival_time.isoformat(),
-                'departure_time': entry.departure_time.isoformat() if entry.departure_time else None,
-                'duration': entry.duration,
-                'total_break_duration': entry.total_break_duration
-            })
-
-        # Add member data to team data
-        team_data.append({
-            'user': {
-                'id': member.id,
-                'username': member.username,
-                'email': member.email
-            },
-            'daily_hours': daily_hours,
-            'total_hours': total_hours,
-            'entries': formatted_entries
-        })
-
-    # Generate a list of dates in the range for the table header
-    date_range = []
-    current_date = start_date
-    while current_date <= end_date:
-        date_range.append(current_date.strftime('%Y-%m-%d'))
-        current_date += timedelta(days=1)
-
-    return jsonify({
-        'success': True,
-        'team': {
-            'id': team.id,
-            'name': team.name,
-            'description': team.description
-        },
-        'team_data': team_data,
-        'date_range': date_range,
-        'start_date': start_date.isoformat(),
-        'end_date': end_date.isoformat()
-    })
-
-@app.route('/export')
-def export():
-    return render_template('export.html', title='Export Data')
-
-def get_date_range(period, start_date_str=None, end_date_str=None):
-    """Get start and end date based on period or custom date range."""
-    today = datetime.now().date()
-
-    if period:
-        if period == 'today':
-            return today, today
-        elif period == 'week':
-            start_date = today - timedelta(days=today.weekday())
-            return start_date, today
-        elif period == 'month':
-            start_date = today.replace(day=1)
-            return start_date, today
-        elif period == 'all':
-            earliest_entry = TimeEntry.query.order_by(TimeEntry.arrival_time).first()
-            start_date = earliest_entry.arrival_time.date() if earliest_entry else today
-            return start_date, today
-    else:
-        # Custom date range
-        try:
-            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            return start_date, end_date
-        except (ValueError, TypeError):
-            raise ValueError('Invalid date format')
-
-@app.route('/download_export')
-def download_export():
-    """Handle export download requests."""
-    export_format = request.args.get('format', 'csv')
-    period = request.args.get('period')
-
-    try:
-        start_date, end_date = get_date_range(
-            period,
-            request.args.get('start_date'),
-            request.args.get('end_date')
-        )
-    except ValueError:
-        flash('Invalid date format. Please use YYYY-MM-DD format.')
-        return redirect(url_for('export'))
-
-    # Query entries within the date range
-    start_datetime = datetime.combine(start_date, time.min)
-    end_datetime = datetime.combine(end_date, time.max)
-
-    entries = TimeEntry.query.filter(
-        TimeEntry.arrival_time >= start_datetime,
-        TimeEntry.arrival_time <= end_datetime
-    ).order_by(TimeEntry.arrival_time).all()
-
-    if not entries:
-        flash('No entries found for the selected date range.')
-        return redirect(url_for('export'))
-
-    # Prepare data and filename
-    data = prepare_export_data(entries)
-    filename = f"timetrack_export_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}"
-
-    # Export based on format
-    if export_format == 'csv':
-        return export_to_csv(data, filename)
-    elif export_format == 'excel':
-        return export_to_excel(data, filename)
-    else:
-        flash('Invalid export format.')
-        return redirect(url_for('export'))
+# Export routes moved to routes/export.py
 
 
 @app.route('/analytics')
@@ -3546,95 +1980,14 @@ def analytics_data():
         logger.error(f"Error in analytics_data: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-def get_filtered_analytics_data(user, mode, start_date=None, end_date=None, project_filter=None):
-    """Get filtered time entry data for analytics"""
-    # Base query
-    query = TimeEntry.query
+# get_filtered_analytics_data moved to routes/export_api.py
 
-    # Apply user/team filter
-    if mode == 'personal':
-        query = query.filter(TimeEntry.user_id == user.id)
-    elif mode == 'team' and user.team_id:
-        team_user_ids = [u.id for u in User.query.filter_by(team_id=user.team_id).all()]
-        query = query.filter(TimeEntry.user_id.in_(team_user_ids))
-
-    # Apply date filters
-    if start_date:
-        query = query.filter(func.date(TimeEntry.arrival_time) >= start_date)
-    if end_date:
-        query = query.filter(func.date(TimeEntry.arrival_time) <= end_date)
-
-    # Apply project filter
-    if project_filter:
-        if project_filter == 'none':
-            query = query.filter(TimeEntry.project_id.is_(None))
-        else:
-            try:
-                project_id = int(project_filter)
-                query = query.filter(TimeEntry.project_id == project_id)
-            except ValueError:
-                pass
-
-    return query.order_by(TimeEntry.arrival_time.desc()).all()
-
-
-def get_filtered_tasks_for_burndown(user, mode, start_date=None, end_date=None, project_filter=None):
-    """Get filtered tasks for burndown chart"""
-    # Base query - get tasks from user's company
-    query = Task.query.join(Project).filter(Project.company_id == user.company_id)
-    
-    # Apply user/team filter
-    if mode == 'personal':
-        # For personal mode, get tasks assigned to the user or created by them
-        query = query.filter(
-            (Task.assigned_to_id == user.id) | 
-            (Task.created_by_id == user.id)
-        )
-    elif mode == 'team' and user.team_id:
-        # For team mode, get tasks from projects assigned to the team
-        query = query.filter(Project.team_id == user.team_id)
-    
-    # Apply project filter
-    if project_filter:
-        if project_filter == 'none':
-            # No project filter for tasks - they must belong to a project
-            return []
-        else:
-            try:
-                project_id = int(project_filter)
-                query = query.filter(Task.project_id == project_id)
-            except ValueError:
-                pass
-    
-    # Apply date filters - use task creation date and completion date
-    if start_date:
-        query = query.filter(
-            (Task.created_at >= datetime.combine(start_date, time.min)) |
-            (Task.completed_date >= start_date)
-        )
-    if end_date:
-        query = query.filter(
-            Task.created_at <= datetime.combine(end_date, time.max)
-        )
-    
-    return query.order_by(Task.created_at.desc()).all()
-
-
-@app.route('/api/companies/<int:company_id>/teams')
-@system_admin_required
-def api_company_teams(company_id):
-    """API: Get teams for a specific company (System Admin only)"""
-    teams = Team.query.filter_by(company_id=company_id).order_by(Team.name).all()
-    return jsonify([{
-        'id': team.id,
-        'name': team.name,
-        'description': team.description
-    } for team in teams])
 
 @app.route('/api/system-admin/stats')
 @system_admin_required
 def api_system_admin_stats():
     """API: Get real-time system statistics for dashboard"""
+    from datetime import datetime, timedelta
 
     # Get basic counts
     total_companies = Company.query.count()
@@ -3685,1572 +2038,10 @@ def api_system_admin_stats():
     })
 
 @app.route('/api/system-admin/companies/<int:company_id>/users')
-@system_admin_required
-def api_company_users(company_id):
-    """API: Get users for a specific company (System Admin only)"""
-    company = Company.query.get_or_404(company_id)
-    users = User.query.filter_by(company_id=company.id).order_by(User.username).all()
-
-    return jsonify({
-        'company': {
-            'id': company.id,
-            'name': company.name,
-            'is_personal': company.is_personal
-        },
-        'users': [{
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'role': user.role.value,
-            'is_blocked': user.is_blocked,
-            'is_verified': user.is_verified,
-            'created_at': user.created_at.isoformat(),
-            'team_id': user.team_id
-        } for user in users]
-    })
-
 @app.route('/api/system-admin/users/<int:user_id>/toggle-block', methods=['POST'])
-@system_admin_required
-def api_toggle_user_block(user_id):
-    """API: Toggle user blocked status (System Admin only)"""
-    user = User.query.get_or_404(user_id)
-
-    # Safety check: prevent blocking yourself
-    if user.id == g.user.id:
-        return jsonify({'error': 'Cannot block your own account'}), 400
-
-    # Safety check: prevent blocking the last system admin
-    if user.role == Role.SYSTEM_ADMIN and not user.is_blocked:
-        system_admin_count = User.query.filter_by(role=Role.SYSTEM_ADMIN, is_blocked=False).count()
-        if system_admin_count <= 1:
-            return jsonify({'error': 'Cannot block the last system administrator'}), 400
-
-    user.is_blocked = not user.is_blocked
-    db.session.commit()
-
-    return jsonify({
-        'id': user.id,
-        'username': user.username,
-        'is_blocked': user.is_blocked,
-        'message': f'User {"blocked" if user.is_blocked else "unblocked"} successfully'
-    })
-
 @app.route('/api/system-admin/companies/<int:company_id>/stats')
-@system_admin_required
-def api_company_stats(company_id):
-    """API: Get detailed statistics for a specific company"""
-    company = Company.query.get_or_404(company_id)
+# Analytics export API moved to routes/export_api.py
 
-    # User counts by role
-    role_counts = {}
-    for role in Role:
-        count = User.query.filter_by(company_id=company.id, role=role).count()
-        if count > 0:
-            role_counts[role.value] = count
-
-    # Team and project counts
-    team_count = Team.query.filter_by(company_id=company.id).count()
-    project_count = Project.query.filter_by(company_id=company.id).count()
-    active_projects = Project.query.filter_by(company_id=company.id, is_active=True).count()
-
-    # Time entries statistics
-    week_ago = datetime.now() - timedelta(days=7)
-    month_ago = datetime.now() - timedelta(days=30)
-
-    weekly_entries = TimeEntry.query.join(User).filter(
-        User.company_id == company.id,
-        TimeEntry.arrival_time >= week_ago
-    ).count()
-
-    monthly_entries = TimeEntry.query.join(User).filter(
-        User.company_id == company.id,
-        TimeEntry.arrival_time >= month_ago
-    ).count()
-
-    # Active sessions
-    active_sessions = TimeEntry.query.join(User).filter(
-        User.company_id == company.id,
-        TimeEntry.departure_time == None,
-        TimeEntry.is_paused == False
-    ).count()
-
-    return jsonify({
-        'company': {
-            'id': company.id,
-            'name': company.name,
-            'is_personal': company.is_personal,
-            'is_active': company.is_active
-        },
-        'users': {
-            'total': sum(role_counts.values()),
-            'by_role': role_counts
-        },
-        'structure': {
-            'teams': team_count,
-            'projects': project_count,
-            'active_projects': active_projects
-        },
-        'activity': {
-            'weekly_entries': weekly_entries,
-            'monthly_entries': monthly_entries,
-            'active_sessions': active_sessions
-        }
-    })
-
-@app.route('/api/analytics/export')
-@login_required
-def analytics_export():
-    """Export analytics data in various formats"""
-    export_format = request.args.get('format', 'csv')
-    view_type = request.args.get('view', 'table')
-    mode = request.args.get('mode', 'personal')
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    project_filter = request.args.get('project_id')
-
-    # Validate permissions
-    if mode == 'team':
-        if not g.user.team_id:
-            flash('No team assigned', 'error')
-            return redirect(url_for('analytics'))
-        if g.user.role not in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN]:
-            flash('Insufficient permissions', 'error')
-            return redirect(url_for('analytics'))
-
-    try:
-        # Parse dates
-        if start_date:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-        if end_date:
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-
-        # Get data
-        data = get_filtered_analytics_data(g.user, mode, start_date, end_date, project_filter)
-
-        if export_format == 'csv':
-            return export_analytics_csv(data, view_type, mode)
-        elif export_format == 'excel':
-            return export_analytics_excel(data, view_type, mode)
-        else:
-            flash('Invalid export format', 'error')
-            return redirect(url_for('analytics'))
-
-    except Exception as e:
-        logger.error(f"Error in analytics export: {str(e)}")
-        flash('Error generating export', 'error')
-        return redirect(url_for('analytics'))
-
-# Task Management Routes
-@app.route('/admin/projects/<int:project_id>/tasks')
-@role_required(Role.TEAM_MEMBER)  # All authenticated users can view tasks
-@company_required
-def manage_project_tasks(project_id):
-    project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first_or_404()
-
-    # Check if user has access to this project
-    if not project.is_user_allowed(g.user):
-        flash('You do not have access to this project.', 'error')
-        return redirect(url_for('admin_projects'))
-
-    # Get all tasks for this project
-    tasks = Task.query.filter_by(project_id=project_id).order_by(Task.created_at.desc()).all()
-
-    # Get team members for assignment dropdown
-    if project.team_id:
-        # If project is assigned to a specific team, only show team members
-        team_members = User.query.filter_by(team_id=project.team_id, company_id=g.user.company_id).all()
-    else:
-        # If project is available to all teams, show all company users
-        team_members = User.query.filter_by(company_id=g.user.company_id).all()
-
-    return render_template('manage_project_tasks.html',
-                         title=f'Tasks - {project.name}',
-                         project=project,
-                         tasks=tasks,
-                         team_members=team_members)
-
-
-# Unified Task Management Route
-@app.route('/tasks')
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def unified_task_management():
-    """Unified task management interface"""
-    
-    # Get all projects the user has access to (for filtering and task creation)
-    if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
-        # Admins and Supervisors can see all company projects
-        available_projects = Project.query.filter_by(
-            company_id=g.user.company_id, 
-            is_active=True
-        ).order_by(Project.name).all()
-    elif g.user.team_id:
-        # Team members see team projects + unassigned projects
-        available_projects = Project.query.filter(
-            Project.company_id == g.user.company_id,
-            Project.is_active == True,
-            db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
-        ).order_by(Project.name).all()
-        # Filter by actual access permissions
-        available_projects = [p for p in available_projects if p.is_user_allowed(g.user)]
-    else:
-        # Unassigned users see only unassigned projects
-        available_projects = Project.query.filter_by(
-            company_id=g.user.company_id,
-            team_id=None,
-            is_active=True
-        ).order_by(Project.name).all()
-        available_projects = [p for p in available_projects if p.is_user_allowed(g.user)]
-    
-    # Get team members for task assignment (company-scoped)
-    if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
-        # Admins can assign to anyone in the company
-        team_members = User.query.filter_by(
-            company_id=g.user.company_id,
-            is_blocked=False
-        ).order_by(User.username).all()
-    elif g.user.team_id:
-        # Team members can assign to team members + supervisors/admins
-        team_members = User.query.filter(
-            User.company_id == g.user.company_id,
-            User.is_blocked == False,
-            db.or_(
-                User.team_id == g.user.team_id,
-                User.role.in_([Role.ADMIN, Role.SUPERVISOR])
-            )
-        ).order_by(User.username).all()
-    else:
-        # Unassigned users can assign to supervisors/admins only
-        team_members = User.query.filter(
-            User.company_id == g.user.company_id,
-            User.is_blocked == False,
-            User.role.in_([Role.ADMIN, Role.SUPERVISOR])
-        ).order_by(User.username).all()
-    
-    # Convert team members to JSON-serializable format
-    team_members_data = [{
-        'id': member.id,
-        'username': member.username,
-        'email': member.email,
-        'role': member.role.value if member.role else 'Team Member',
-        'avatar_url': member.get_avatar_url(32)
-    } for member in team_members]
-    
-    return render_template('unified_task_management.html',
-                         title='Task Management',
-                         available_projects=available_projects,
-                         team_members=team_members_data)
-
-# Sprint Management Route
-@app.route('/sprints')
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def sprint_management():
-    """Sprint management interface"""
-    
-    # Get all projects the user has access to (for sprint assignment)
-    if g.user.role in [Role.ADMIN, Role.SUPERVISOR]:
-        # Admins and Supervisors can see all company projects
-        available_projects = Project.query.filter_by(
-            company_id=g.user.company_id, 
-            is_active=True
-        ).order_by(Project.name).all()
-    elif g.user.team_id:
-        # Team members see team projects + unassigned projects
-        available_projects = Project.query.filter(
-            Project.company_id == g.user.company_id,
-            Project.is_active == True,
-            db.or_(Project.team_id == g.user.team_id, Project.team_id == None)
-        ).order_by(Project.name).all()
-        # Filter by actual access permissions
-        available_projects = [p for p in available_projects if p.is_user_allowed(g.user)]
-    else:
-        # Unassigned users see only unassigned projects
-        available_projects = Project.query.filter_by(
-            company_id=g.user.company_id,
-            team_id=None,
-            is_active=True
-        ).order_by(Project.name).all()
-        available_projects = [p for p in available_projects if p.is_user_allowed(g.user)]
-    
-    return render_template('sprint_management.html',
-                         title='Sprint Management',
-                         available_projects=available_projects)
-
-# Task API Routes
-@app.route('/api/tasks', methods=['POST'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def create_task():
-    try:
-        data = request.get_json()
-        project_id = data.get('project_id')
-
-        # Verify project access
-        project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
-        if not project or not project.is_user_allowed(g.user):
-            return jsonify({'success': False, 'message': 'Project not found or access denied'})
-
-        # Validate required fields
-        name = data.get('name')
-        if not name:
-            return jsonify({'success': False, 'message': 'Task name is required'})
-
-        # Parse dates
-        start_date = None
-        due_date = None
-        if data.get('start_date'):
-            start_date = datetime.strptime(data.get('start_date'), '%Y-%m-%d').date()
-        if data.get('due_date'):
-            due_date = datetime.strptime(data.get('due_date'), '%Y-%m-%d').date()
-
-        # Generate task number
-        task_number = Task.generate_task_number(g.user.company_id)
-        
-        # Create task
-        task = Task(
-            task_number=task_number,
-            name=name,
-            description=data.get('description', ''),
-            status=TaskStatus[data.get('status', 'NOT_STARTED')],
-            priority=TaskPriority[data.get('priority', 'MEDIUM')],
-            estimated_hours=float(data.get('estimated_hours')) if data.get('estimated_hours') else None,
-            project_id=project_id,
-            assigned_to_id=int(data.get('assigned_to_id')) if data.get('assigned_to_id') else None,
-            sprint_id=int(data.get('sprint_id')) if data.get('sprint_id') else None,
-            start_date=start_date,
-            due_date=due_date,
-            created_by_id=g.user.id
-        )
-
-        db.session.add(task)
-        db.session.commit()
-
-        return jsonify({
-            'success': True, 
-            'message': 'Task created successfully',
-            'task': {
-                'id': task.id,
-                'task_number': task.task_number
-            }
-        })
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/tasks/<int:task_id>', methods=['GET'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def get_task(task_id):
-    try:
-        task = Task.query.join(Project).filter(
-            Task.id == task_id,
-            Project.company_id == g.user.company_id
-        ).first()
-
-        if not task or not task.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Task not found or access denied'})
-
-        task_data = {
-            'id': task.id,
-            'task_number': getattr(task, 'task_number', f'TSK-{task.id:03d}'),
-            'name': task.name,
-            'description': task.description,
-            'status': task.status.name,
-            'priority': task.priority.name,
-            'estimated_hours': task.estimated_hours,
-            'assigned_to_id': task.assigned_to_id,
-            'assigned_to_name': task.assigned_to.username if task.assigned_to else None,
-            'project_id': task.project_id,
-            'project_name': task.project.name if task.project else None,
-            'project_code': task.project.code if task.project else None,
-            'start_date': task.start_date.isoformat() if task.start_date else None,
-            'due_date': task.due_date.isoformat() if task.due_date else None,
-            'completed_date': task.completed_date.isoformat() if task.completed_date else None,
-            'archived_date': task.archived_date.isoformat() if task.archived_date else None,
-            'sprint_id': task.sprint_id,
-            'subtasks': [{
-                'id': subtask.id,
-                'name': subtask.name,
-                'status': subtask.status.name,
-                'priority': subtask.priority.name,
-                'assigned_to_id': subtask.assigned_to_id,
-                'assigned_to_name': subtask.assigned_to.username if subtask.assigned_to else None
-            } for subtask in task.subtasks] if task.subtasks else []
-        }
-
-        return jsonify(task_data)
-
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/tasks/<int:task_id>', methods=['PUT'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def update_task(task_id):
-    try:
-        task = Task.query.join(Project).filter(
-            Task.id == task_id,
-            Project.company_id == g.user.company_id
-        ).first()
-
-        if not task or not task.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Task not found or access denied'})
-
-        data = request.get_json()
-
-        # Update task fields
-        if 'name' in data:
-            task.name = data['name']
-        if 'description' in data:
-            task.description = data['description']
-        if 'status' in data:
-            task.status = TaskStatus[data['status']]
-            if data['status'] == 'COMPLETED':
-                task.completed_date = datetime.now().date()
-            else:
-                task.completed_date = None
-        if 'priority' in data:
-            task.priority = TaskPriority[data['priority']]
-        if 'estimated_hours' in data:
-            task.estimated_hours = float(data['estimated_hours']) if data['estimated_hours'] else None
-        if 'assigned_to_id' in data:
-            task.assigned_to_id = int(data['assigned_to_id']) if data['assigned_to_id'] else None
-        if 'sprint_id' in data:
-            task.sprint_id = int(data['sprint_id']) if data['sprint_id'] else None
-        if 'start_date' in data:
-            task.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date() if data['start_date'] else None
-        if 'due_date' in data:
-            task.due_date = datetime.strptime(data['due_date'], '%Y-%m-%d').date() if data['due_date'] else None
-
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Task updated successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
-@role_required(Role.TEAM_LEADER)  # Only team leaders and above can delete tasks
-@company_required
-def delete_task(task_id):
-    try:
-        task = Task.query.join(Project).filter(
-            Task.id == task_id,
-            Project.company_id == g.user.company_id
-        ).first()
-
-        if not task or not task.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Task not found or access denied'})
-
-        db.session.delete(task)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Task deleted successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-# Unified Task Management APIs
-@app.route('/api/tasks/unified')
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def get_unified_tasks():
-    """Get all tasks for unified task view"""
-    try:
-        # Base query for tasks in user's company
-        query = Task.query.join(Project).filter(Project.company_id == g.user.company_id)
-        
-        # Apply access restrictions based on user role and team
-        if g.user.role not in [Role.ADMIN, Role.SUPERVISOR]:
-            # Regular users can only see tasks from projects they have access to
-            accessible_project_ids = []
-            projects = Project.query.filter_by(company_id=g.user.company_id).all()
-            for project in projects:
-                if project.is_user_allowed(g.user):
-                    accessible_project_ids.append(project.id)
-            
-            if accessible_project_ids:
-                query = query.filter(Task.project_id.in_(accessible_project_ids))
-            else:
-                # No accessible projects, return empty list
-                return jsonify({'success': True, 'tasks': []})
-        
-        tasks = query.order_by(Task.created_at.desc()).all()
-        
-        task_list = []
-        for task in tasks:
-            # Determine if this is a team task
-            is_team_task = (
-                g.user.team_id and 
-                task.project and 
-                task.project.team_id == g.user.team_id
-            )
-            
-            task_data = {
-                'id': task.id,
-                'task_number': getattr(task, 'task_number', f'TSK-{task.id:03d}'),  # Fallback for existing tasks
-                'name': task.name,
-                'description': task.description,
-                'status': task.status.name,
-                'priority': task.priority.name,
-                'estimated_hours': task.estimated_hours,
-                'project_id': task.project_id,
-                'project_name': task.project.name if task.project else None,
-                'project_code': task.project.code if task.project else None,
-                'assigned_to_id': task.assigned_to_id,
-                'assigned_to_name': task.assigned_to.username if task.assigned_to else None,
-                'created_by_id': task.created_by_id,
-                'created_by_name': task.created_by.username if task.created_by else None,
-                'start_date': task.start_date.isoformat() if task.start_date else None,
-                'due_date': task.due_date.isoformat() if task.due_date else None,
-                'completed_date': task.completed_date.isoformat() if task.completed_date else None,
-                'created_at': task.created_at.isoformat(),
-                'is_team_task': is_team_task,
-                'subtask_count': len(task.subtasks) if task.subtasks else 0,
-                'subtasks': [{
-                    'id': subtask.id,
-                    'name': subtask.name,
-                    'status': subtask.status.name,
-                    'priority': subtask.priority.name,
-                    'assigned_to_id': subtask.assigned_to_id,
-                    'assigned_to_name': subtask.assigned_to.username if subtask.assigned_to else None
-                } for subtask in task.subtasks] if task.subtasks else [],
-                'sprint_id': task.sprint_id,
-                'sprint_name': task.sprint.name if task.sprint else None,
-                'is_current_sprint': task.sprint.is_current if task.sprint else False
-            }
-            task_list.append(task_data)
-        
-        return jsonify({'success': True, 'tasks': task_list})
-        
-    except Exception as e:
-        logger.error(f"Error in get_unified_tasks: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/tasks/<int:task_id>/status', methods=['PUT'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def update_task_status(task_id):
-    """Update task status"""
-    try:
-        task = Task.query.join(Project).filter(
-            Task.id == task_id,
-            Project.company_id == g.user.company_id
-        ).first()
-
-        if not task or not task.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Task not found or access denied'})
-
-        data = request.get_json()
-        new_status = data.get('status')
-        
-        if not new_status:
-            return jsonify({'success': False, 'message': 'Status is required'})
-        
-        # Validate status value - convert from enum name to enum object
-        try:
-            task_status = TaskStatus[new_status]
-        except KeyError:
-            return jsonify({'success': False, 'message': 'Invalid status value'})
-        
-        # Update task status
-        old_status = task.status
-        task.status = task_status
-        
-        # Set completion date if status is COMPLETED
-        if task_status == TaskStatus.COMPLETED:
-            task.completed_date = datetime.now().date()
-        elif old_status == TaskStatus.COMPLETED:
-            # Clear completion date if moving away from completed
-            task.completed_date = None
-        
-        # Set archived date if status is ARCHIVED
-        if task_status == TaskStatus.ARCHIVED:
-            task.archived_date = datetime.now().date()
-        elif old_status == TaskStatus.ARCHIVED:
-            # Clear archived date if moving away from archived
-            task.archived_date = None
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True, 
-            'message': 'Task status updated successfully',
-            'old_status': old_status.name,
-            'new_status': task_status.name
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error updating task status: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-
-# Task Dependencies APIs
-@app.route('/api/tasks/<int:task_id>/dependencies')
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def get_task_dependencies(task_id):
-    """Get dependencies for a specific task"""
-    try:
-        # Get the task and verify ownership
-        task = Task.query.filter_by(id=task_id, company_id=g.user.company_id).first()
-        if not task:
-            return jsonify({'success': False, 'message': 'Task not found'})
-        
-        # Get blocked by dependencies (tasks that block this one)
-        blocked_by_query = db.session.query(Task).join(
-            TaskDependency, Task.id == TaskDependency.blocking_task_id
-        ).filter(TaskDependency.blocked_task_id == task_id)
-        
-        # Get blocks dependencies (tasks that this one blocks)
-        blocks_query = db.session.query(Task).join(
-            TaskDependency, Task.id == TaskDependency.blocked_task_id
-        ).filter(TaskDependency.blocking_task_id == task_id)
-        
-        blocked_by_tasks = blocked_by_query.all()
-        blocks_tasks = blocks_query.all()
-        
-        def task_to_dict(t):
-            return {
-                'id': t.id,
-                'name': t.name,
-                'task_number': t.task_number
-            }
-        
-        return jsonify({
-            'success': True,
-            'dependencies': {
-                'blocked_by': [task_to_dict(t) for t in blocked_by_tasks],
-                'blocks': [task_to_dict(t) for t in blocks_tasks]
-            }
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting task dependencies: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-
-@app.route('/api/tasks/<int:task_id>/dependencies', methods=['POST'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def add_task_dependency(task_id):
-    """Add a dependency for a task"""
-    try:
-        data = request.get_json()
-        task_number = data.get('task_number')
-        dependency_type = data.get('type')  # 'blocked_by' or 'blocks'
-        
-        if not task_number or not dependency_type:
-            return jsonify({'success': False, 'message': 'Task number and type are required'})
-        
-        # Get the main task
-        task = Task.query.filter_by(id=task_id, company_id=g.user.company_id).first()
-        if not task:
-            return jsonify({'success': False, 'message': 'Task not found'})
-        
-        # Find the dependency task by task number
-        dependency_task = Task.query.filter_by(
-            task_number=task_number, 
-            company_id=g.user.company_id
-        ).first()
-        
-        if not dependency_task:
-            return jsonify({'success': False, 'message': f'Task {task_number} not found'})
-        
-        # Prevent self-dependency
-        if dependency_task.id == task_id:
-            return jsonify({'success': False, 'message': 'A task cannot depend on itself'})
-        
-        # Create the dependency based on type
-        if dependency_type == 'blocked_by':
-            # Current task is blocked by the dependency task
-            blocked_task_id = task_id
-            blocking_task_id = dependency_task.id
-        elif dependency_type == 'blocks':
-            # Current task blocks the dependency task
-            blocked_task_id = dependency_task.id
-            blocking_task_id = task_id
-        else:
-            return jsonify({'success': False, 'message': 'Invalid dependency type'})
-        
-        # Check if dependency already exists
-        existing_dep = TaskDependency.query.filter_by(
-            blocked_task_id=blocked_task_id,
-            blocking_task_id=blocking_task_id
-        ).first()
-        
-        if existing_dep:
-            return jsonify({'success': False, 'message': 'This dependency already exists'})
-        
-        # Check for circular dependencies
-        def would_create_cycle(blocked_id, blocking_id):
-            # Use a simple DFS to check if adding this dependency would create a cycle
-            visited = set()
-            
-            def dfs(current_blocked_id):
-                if current_blocked_id in visited:
-                    return False
-                visited.add(current_blocked_id)
-                
-                # If we reach the original blocking task, we have a cycle
-                if current_blocked_id == blocking_id:
-                    return True
-                
-                # Check all tasks that block the current task
-                dependencies = TaskDependency.query.filter_by(blocked_task_id=current_blocked_id).all()
-                for dep in dependencies:
-                    if dfs(dep.blocking_task_id):
-                        return True
-                
-                return False
-            
-            return dfs(blocked_id)
-        
-        if would_create_cycle(blocked_task_id, blocking_task_id):
-            return jsonify({'success': False, 'message': 'This dependency would create a circular dependency'})
-        
-        # Create the new dependency
-        new_dependency = TaskDependency(
-            blocked_task_id=blocked_task_id,
-            blocking_task_id=blocking_task_id
-        )
-        
-        db.session.add(new_dependency)
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': 'Dependency added successfully'})
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error adding task dependency: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-
-@app.route('/api/tasks/<int:task_id>/dependencies/<int:dependency_task_id>', methods=['DELETE'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def remove_task_dependency(task_id, dependency_task_id):
-    """Remove a dependency for a task"""
-    try:
-        data = request.get_json()
-        dependency_type = data.get('type')  # 'blocked_by' or 'blocks'
-        
-        if not dependency_type:
-            return jsonify({'success': False, 'message': 'Dependency type is required'})
-        
-        # Get the main task
-        task = Task.query.filter_by(id=task_id, company_id=g.user.company_id).first()
-        if not task:
-            return jsonify({'success': False, 'message': 'Task not found'})
-        
-        # Determine which dependency to remove based on type
-        if dependency_type == 'blocked_by':
-            # Remove dependency where current task is blocked by dependency_task_id
-            dependency = TaskDependency.query.filter_by(
-                blocked_task_id=task_id,
-                blocking_task_id=dependency_task_id
-            ).first()
-        elif dependency_type == 'blocks':
-            # Remove dependency where current task blocks dependency_task_id
-            dependency = TaskDependency.query.filter_by(
-                blocked_task_id=dependency_task_id,
-                blocking_task_id=task_id
-            ).first()
-        else:
-            return jsonify({'success': False, 'message': 'Invalid dependency type'})
-        
-        if not dependency:
-            return jsonify({'success': False, 'message': 'Dependency not found'})
-        
-        db.session.delete(dependency)
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': 'Dependency removed successfully'})
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error removing task dependency: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-
-# Task Archive/Restore APIs
-@app.route('/api/tasks/<int:task_id>/archive', methods=['POST'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def archive_task(task_id):
-    """Archive a completed task"""
-    try:
-        # Get the task and verify ownership through project
-        task = Task.query.join(Project).filter(
-            Task.id == task_id,
-            Project.company_id == g.user.company_id
-        ).first()
-        if not task:
-            return jsonify({'success': False, 'message': 'Task not found'})
-        
-        # Only allow archiving completed tasks
-        if task.status != TaskStatus.COMPLETED:
-            return jsonify({'success': False, 'message': 'Only completed tasks can be archived'})
-        
-        # Archive the task
-        task.status = TaskStatus.ARCHIVED
-        task.archived_date = datetime.now().date()
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True, 
-            'message': 'Task archived successfully',
-            'archived_date': task.archived_date.isoformat()
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error archiving task: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-
-@app.route('/api/tasks/<int:task_id>/restore', methods=['POST'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def restore_task(task_id):
-    """Restore an archived task to completed status"""
-    try:
-        # Get the task and verify ownership through project
-        task = Task.query.join(Project).filter(
-            Task.id == task_id,
-            Project.company_id == g.user.company_id
-        ).first()
-        if not task:
-            return jsonify({'success': False, 'message': 'Task not found'})
-        
-        # Only allow restoring archived tasks
-        if task.status != TaskStatus.ARCHIVED:
-            return jsonify({'success': False, 'message': 'Only archived tasks can be restored'})
-        
-        # Restore the task to completed status
-        task.status = TaskStatus.COMPLETED
-        task.archived_date = None
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True, 
-            'message': 'Task restored successfully'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error restoring task: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-
-# Sprint Management APIs
-@app.route('/api/sprints')
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def get_sprints():
-    """Get all sprints for the user's company"""
-    try:
-        # Base query for sprints in user's company
-        query = Sprint.query.filter(Sprint.company_id == g.user.company_id)
-        
-        # Apply access restrictions based on user role and team
-        if g.user.role not in [Role.ADMIN, Role.SUPERVISOR]:
-            # Regular users can only see sprints they have access to
-            accessible_sprint_ids = []
-            sprints = query.all()
-            for sprint in sprints:
-                if sprint.can_user_access(g.user):
-                    accessible_sprint_ids.append(sprint.id)
-            
-            if accessible_sprint_ids:
-                query = query.filter(Sprint.id.in_(accessible_sprint_ids))
-            else:
-                # No accessible sprints, return empty list
-                return jsonify({'success': True, 'sprints': []})
-        
-        sprints = query.order_by(Sprint.created_at.desc()).all()
-        
-        sprint_list = []
-        for sprint in sprints:
-            task_summary = sprint.get_task_summary()
-            
-            sprint_data = {
-                'id': sprint.id,
-                'name': sprint.name,
-                'description': sprint.description,
-                'status': sprint.status.name,
-                'company_id': sprint.company_id,
-                'project_id': sprint.project_id,
-                'project_name': sprint.project.name if sprint.project else None,
-                'project_code': sprint.project.code if sprint.project else None,
-                'start_date': sprint.start_date.isoformat(),
-                'end_date': sprint.end_date.isoformat(),
-                'goal': sprint.goal,
-                'capacity_hours': sprint.capacity_hours,
-                'created_by_id': sprint.created_by_id,
-                'created_by_name': sprint.created_by.username if sprint.created_by else None,
-                'created_at': sprint.created_at.isoformat(),
-                'is_current': sprint.is_current,
-                'duration_days': sprint.duration_days,
-                'days_remaining': sprint.days_remaining,
-                'progress_percentage': sprint.progress_percentage,
-                'task_summary': task_summary
-            }
-            sprint_list.append(sprint_data)
-        
-        return jsonify({'success': True, 'sprints': sprint_list})
-        
-    except Exception as e:
-        logger.error(f"Error in get_sprints: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/sprints', methods=['POST'])
-@role_required(Role.TEAM_LEADER)  # Team leaders and above can create sprints
-@company_required
-def create_sprint():
-    """Create a new sprint"""
-    try:
-        data = request.get_json()
-        
-        # Validate required fields
-        name = data.get('name')
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
-        
-        if not name:
-            return jsonify({'success': False, 'message': 'Sprint name is required'})
-        if not start_date:
-            return jsonify({'success': False, 'message': 'Start date is required'})
-        if not end_date:
-            return jsonify({'success': False, 'message': 'End date is required'})
-        
-        # Parse dates
-        try:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-        except ValueError:
-            return jsonify({'success': False, 'message': 'Invalid date format'})
-        
-        if start_date >= end_date:
-            return jsonify({'success': False, 'message': 'End date must be after start date'})
-        
-        # Verify project access if project is specified
-        project_id = data.get('project_id')
-        if project_id:
-            project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
-            if not project or not project.is_user_allowed(g.user):
-                return jsonify({'success': False, 'message': 'Project not found or access denied'})
-        
-        # Create sprint
-        sprint = Sprint(
-            name=name,
-            description=data.get('description', ''),
-            status=SprintStatus[data.get('status', 'PLANNING')],
-            company_id=g.user.company_id,
-            project_id=int(project_id) if project_id else None,
-            start_date=start_date,
-            end_date=end_date,
-            goal=data.get('goal'),
-            capacity_hours=int(data.get('capacity_hours')) if data.get('capacity_hours') else None,
-            created_by_id=g.user.id
-        )
-        
-        db.session.add(sprint)
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': 'Sprint created successfully'})
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error creating sprint: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/sprints/<int:sprint_id>', methods=['PUT'])
-@role_required(Role.TEAM_LEADER)
-@company_required
-def update_sprint(sprint_id):
-    """Update an existing sprint"""
-    try:
-        sprint = Sprint.query.filter_by(id=sprint_id, company_id=g.user.company_id).first()
-        
-        if not sprint or not sprint.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Sprint not found or access denied'})
-        
-        data = request.get_json()
-        
-        # Update sprint fields
-        if 'name' in data:
-            sprint.name = data['name']
-        if 'description' in data:
-            sprint.description = data['description']
-        if 'status' in data:
-            sprint.status = SprintStatus[data['status']]
-        if 'goal' in data:
-            sprint.goal = data['goal']
-        if 'capacity_hours' in data:
-            sprint.capacity_hours = int(data['capacity_hours']) if data['capacity_hours'] else None
-        if 'project_id' in data:
-            project_id = data['project_id']
-            if project_id:
-                project = Project.query.filter_by(id=project_id, company_id=g.user.company_id).first()
-                if not project or not project.is_user_allowed(g.user):
-                    return jsonify({'success': False, 'message': 'Project not found or access denied'})
-                sprint.project_id = int(project_id)
-            else:
-                sprint.project_id = None
-        
-        # Update dates if provided
-        if 'start_date' in data:
-            try:
-                sprint.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
-            except ValueError:
-                return jsonify({'success': False, 'message': 'Invalid start date format'})
-        
-        if 'end_date' in data:
-            try:
-                sprint.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
-            except ValueError:
-                return jsonify({'success': False, 'message': 'Invalid end date format'})
-        
-        # Validate date order
-        if sprint.start_date >= sprint.end_date:
-            return jsonify({'success': False, 'message': 'End date must be after start date'})
-        
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': 'Sprint updated successfully'})
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error updating sprint: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/sprints/<int:sprint_id>', methods=['DELETE'])
-@role_required(Role.TEAM_LEADER)
-@company_required
-def delete_sprint(sprint_id):
-    """Delete a sprint and remove it from all associated tasks"""
-    try:
-        sprint = Sprint.query.filter_by(id=sprint_id, company_id=g.user.company_id).first()
-        
-        if not sprint or not sprint.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Sprint not found or access denied'})
-        
-        # Remove sprint assignment from all tasks
-        Task.query.filter_by(sprint_id=sprint_id).update({'sprint_id': None})
-        
-        # Delete the sprint
-        db.session.delete(sprint)
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': 'Sprint deleted successfully'})
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error deleting sprint: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-# Subtask API Routes
-@app.route('/api/subtasks', methods=['POST'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def create_subtask():
-    try:
-        data = request.get_json()
-        task_id = data.get('task_id')
-
-        # Verify task access
-        task = Task.query.join(Project).filter(
-            Task.id == task_id,
-            Project.company_id == g.user.company_id
-        ).first()
-
-        if not task or not task.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Task not found or access denied'})
-
-        # Validate required fields
-        name = data.get('name')
-        if not name:
-            return jsonify({'success': False, 'message': 'Subtask name is required'})
-
-        # Parse dates
-        start_date = None
-        due_date = None
-        if data.get('start_date'):
-            start_date = datetime.strptime(data.get('start_date'), '%Y-%m-%d').date()
-        if data.get('due_date'):
-            due_date = datetime.strptime(data.get('due_date'), '%Y-%m-%d').date()
-
-        # Create subtask
-        subtask = SubTask(
-            name=name,
-            description=data.get('description', ''),
-            status=TaskStatus[data.get('status', 'NOT_STARTED')],
-            priority=TaskPriority[data.get('priority', 'MEDIUM')],
-            estimated_hours=float(data.get('estimated_hours')) if data.get('estimated_hours') else None,
-            task_id=task_id,
-            assigned_to_id=int(data.get('assigned_to_id')) if data.get('assigned_to_id') else None,
-            start_date=start_date,
-            due_date=due_date,
-            created_by_id=g.user.id
-        )
-
-        db.session.add(subtask)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Subtask created successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/subtasks/<int:subtask_id>', methods=['GET'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def get_subtask(subtask_id):
-    try:
-        subtask = SubTask.query.join(Task).join(Project).filter(
-            SubTask.id == subtask_id,
-            Project.company_id == g.user.company_id
-        ).first()
-
-        if not subtask or not subtask.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Subtask not found or access denied'})
-
-        subtask_data = {
-            'id': subtask.id,
-            'name': subtask.name,
-            'description': subtask.description,
-            'status': subtask.status.name,
-            'priority': subtask.priority.name,
-            'estimated_hours': subtask.estimated_hours,
-            'assigned_to_id': subtask.assigned_to_id,
-            'start_date': subtask.start_date.isoformat() if subtask.start_date else None,
-            'due_date': subtask.due_date.isoformat() if subtask.due_date else None
-        }
-
-        return jsonify({'success': True, 'subtask': subtask_data})
-
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/subtasks/<int:subtask_id>', methods=['PUT'])
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def update_subtask(subtask_id):
-    try:
-        subtask = SubTask.query.join(Task).join(Project).filter(
-            SubTask.id == subtask_id,
-            Project.company_id == g.user.company_id
-        ).first()
-
-        if not subtask or not subtask.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Subtask not found or access denied'})
-
-        data = request.get_json()
-
-        # Update subtask fields
-        if 'name' in data:
-            subtask.name = data['name']
-        if 'description' in data:
-            subtask.description = data['description']
-        if 'status' in data:
-            subtask.status = TaskStatus[data['status']]
-            if data['status'] == 'COMPLETED':
-                subtask.completed_date = datetime.now().date()
-            else:
-                subtask.completed_date = None
-        if 'priority' in data:
-            subtask.priority = TaskPriority[data['priority']]
-        if 'estimated_hours' in data:
-            subtask.estimated_hours = float(data['estimated_hours']) if data['estimated_hours'] else None
-        if 'assigned_to_id' in data:
-            subtask.assigned_to_id = int(data['assigned_to_id']) if data['assigned_to_id'] else None
-        if 'start_date' in data:
-            subtask.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date() if data['start_date'] else None
-        if 'due_date' in data:
-            subtask.due_date = datetime.strptime(data['due_date'], '%Y-%m-%d').date() if data['due_date'] else None
-
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Subtask updated successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/subtasks/<int:subtask_id>', methods=['DELETE'])
-@role_required(Role.TEAM_LEADER)  # Only team leaders and above can delete subtasks
-@company_required
-def delete_subtask(subtask_id):
-    try:
-        subtask = SubTask.query.join(Task).join(Project).filter(
-            SubTask.id == subtask_id,
-            Project.company_id == g.user.company_id
-        ).first()
-
-        if not subtask or not subtask.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Subtask not found or access denied'})
-
-        db.session.delete(subtask)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Subtask deleted successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-# Comment API Routes
-@app.route('/api/tasks/<int:task_id>/comments')
-@login_required
-@company_required
-def get_task_comments(task_id):
-    """Get all comments for a task that the user can view"""
-    try:
-        task = Task.query.join(Project).filter(
-            Task.id == task_id,
-            Project.company_id == g.user.company_id
-        ).first()
-        
-        if not task or not task.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Task not found or access denied'})
-        
-        # Get all comments for the task
-        comments = []
-        for comment in task.comments.order_by(Comment.created_at.desc()):
-            if comment.can_user_view(g.user):
-                comment_data = {
-                    'id': comment.id,
-                    'content': comment.content,
-                    'visibility': comment.visibility.value,
-                    'is_edited': comment.is_edited,
-                    'edited_at': comment.edited_at.isoformat() if comment.edited_at else None,
-                    'created_at': comment.created_at.isoformat(),
-                    'author': {
-                        'id': comment.created_by.id,
-                        'username': comment.created_by.username,
-                        'avatar_url': comment.created_by.get_avatar_url(40)
-                    },
-                    'can_edit': comment.can_user_edit(g.user),
-                    'can_delete': comment.can_user_delete(g.user),
-                    'replies': []
-                }
-                
-                # Add replies if any
-                for reply in comment.replies:
-                    if reply.can_user_view(g.user):
-                        reply_data = {
-                            'id': reply.id,
-                            'content': reply.content,
-                            'is_edited': reply.is_edited,
-                            'edited_at': reply.edited_at.isoformat() if reply.edited_at else None,
-                            'created_at': reply.created_at.isoformat(),
-                            'author': {
-                                'id': reply.created_by.id,
-                                'username': reply.created_by.username,
-                                'avatar_url': reply.created_by.get_avatar_url(40)
-                            },
-                            'can_edit': reply.can_user_edit(g.user),
-                            'can_delete': reply.can_user_delete(g.user)
-                        }
-                        comment_data['replies'].append(reply_data)
-                
-                comments.append(comment_data)
-        
-        # Check if user can use team visibility
-        company_settings = CompanySettings.query.filter_by(company_id=g.user.company_id).first()
-        allow_team_visibility = company_settings.allow_team_visibility_comments if company_settings else True
-        
-        return jsonify({
-            'success': True,
-            'comments': comments,
-            'allow_team_visibility': allow_team_visibility
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/tasks/<int:task_id>/comments', methods=['POST'])
-@login_required
-@company_required
-def create_task_comment(task_id):
-    """Create a new comment on a task"""
-    try:
-        task = Task.query.join(Project).filter(
-            Task.id == task_id,
-            Project.company_id == g.user.company_id
-        ).first()
-        
-        if not task or not task.can_user_access(g.user):
-            return jsonify({'success': False, 'message': 'Task not found or access denied'})
-        
-        data = request.get_json()
-        content = data.get('content', '').strip()
-        visibility = data.get('visibility', 'COMPANY')
-        parent_comment_id = data.get('parent_comment_id')
-        
-        if not content:
-            return jsonify({'success': False, 'message': 'Comment content is required'})
-        
-        # Check visibility settings
-        company_settings = CompanySettings.query.filter_by(company_id=g.user.company_id).first()
-        if visibility == 'TEAM' and company_settings and not company_settings.allow_team_visibility_comments:
-            visibility = 'COMPANY'
-        
-        # Validate parent comment if provided
-        if parent_comment_id:
-            parent_comment = Comment.query.filter_by(
-                id=parent_comment_id,
-                task_id=task_id
-            ).first()
-            
-            if not parent_comment or not parent_comment.can_user_view(g.user):
-                return jsonify({'success': False, 'message': 'Parent comment not found or access denied'})
-        
-        # Create comment
-        comment = Comment(
-            content=content,
-            task_id=task_id,
-            parent_comment_id=parent_comment_id,
-            visibility=CommentVisibility[visibility],
-            created_by_id=g.user.id
-        )
-        
-        db.session.add(comment)
-        db.session.commit()
-        
-        # Log system event
-        SystemEvent.log_event(
-            event_type='comment_created',
-            event_category='task',
-            description=f'Comment added to task {task.task_number}',
-            user_id=g.user.id,
-            company_id=g.user.company_id,
-            event_metadata={'task_id': task_id, 'comment_id': comment.id}
-        )
-        
-        # Return the created comment
-        comment_data = {
-            'id': comment.id,
-            'content': comment.content,
-            'visibility': comment.visibility.value,
-            'is_edited': comment.is_edited,
-            'created_at': comment.created_at.isoformat(),
-            'author': {
-                'id': comment.created_by.id,
-                'username': comment.created_by.username,
-                'avatar_url': comment.created_by.get_avatar_url(40)
-            },
-            'can_edit': True,
-            'can_delete': True
-        }
-        
-        return jsonify({
-            'success': True,
-            'message': 'Comment posted successfully',
-            'comment': comment_data
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/comments/<int:comment_id>', methods=['PUT'])
-@login_required
-@company_required
-def update_comment(comment_id):
-    """Update an existing comment"""
-    try:
-        comment = Comment.query.join(Task).join(Project).filter(
-            Comment.id == comment_id,
-            Project.company_id == g.user.company_id
-        ).first()
-        
-        if not comment:
-            return jsonify({'success': False, 'message': 'Comment not found'})
-        
-        if not comment.can_user_edit(g.user):
-            return jsonify({'success': False, 'message': 'You cannot edit this comment'})
-        
-        data = request.get_json()
-        content = data.get('content', '').strip()
-        
-        if not content:
-            return jsonify({'success': False, 'message': 'Comment content is required'})
-        
-        comment.content = content
-        comment.is_edited = True
-        comment.edited_at = datetime.now()
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Comment updated successfully',
-            'edited_at': comment.edited_at.isoformat()
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/comments/<int:comment_id>', methods=['DELETE'])
-@login_required
-@company_required
-def delete_comment(comment_id):
-    """Delete a comment"""
-    try:
-        comment = Comment.query.join(Task).join(Project).filter(
-            Comment.id == comment_id,
-            Project.company_id == g.user.company_id
-        ).first()
-        
-        if not comment:
-            return jsonify({'success': False, 'message': 'Comment not found'})
-        
-        if not comment.can_user_delete(g.user):
-            return jsonify({'success': False, 'message': 'You cannot delete this comment'})
-        
-        # Log system event before deletion
-        SystemEvent.log_event(
-            event_type='comment_deleted',
-            event_category='task',
-            description=f'Comment deleted from task {comment.task.task_number}',
-            user_id=g.user.id,
-            company_id=g.user.company_id,
-            event_metadata={'task_id': comment.task_id, 'comment_id': comment.id}
-        )
-        
-        db.session.delete(comment)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Comment deleted successfully'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-# Category Management API Routes
-@app.route('/api/admin/categories', methods=['POST'])
-@role_required(Role.ADMIN)
-@company_required
-def create_category():
-    try:
-        data = request.get_json()
-        name = data.get('name')
-        description = data.get('description', '')
-        color = data.get('color', '#007bff')
-        icon = data.get('icon', '')
-
-        if not name:
-            return jsonify({'success': False, 'message': 'Category name is required'})
-
-        # Check if category already exists
-        existing = ProjectCategory.query.filter_by(
-            name=name,
-            company_id=g.user.company_id
-        ).first()
-
-        if existing:
-            return jsonify({'success': False, 'message': 'Category name already exists'})
-
-        category = ProjectCategory(
-            name=name,
-            description=description,
-            color=color,
-            icon=icon,
-            company_id=g.user.company_id,
-            created_by_id=g.user.id
-        )
-
-        db.session.add(category)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Category created successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/admin/categories/<int:category_id>', methods=['PUT'])
-@role_required(Role.ADMIN)
-@company_required
-def update_category(category_id):
-    try:
-        category = ProjectCategory.query.filter_by(
-            id=category_id,
-            company_id=g.user.company_id
-        ).first()
-
-        if not category:
-            return jsonify({'success': False, 'message': 'Category not found'})
-
-        data = request.get_json()
-        name = data.get('name')
-
-        if not name:
-            return jsonify({'success': False, 'message': 'Category name is required'})
-
-        # Check if name conflicts with another category
-        existing = ProjectCategory.query.filter(
-            ProjectCategory.name == name,
-            ProjectCategory.company_id == g.user.company_id,
-            ProjectCategory.id != category_id
-        ).first()
-
-        if existing:
-            return jsonify({'success': False, 'message': 'Category name already exists'})
-
-        category.name = name
-        category.description = data.get('description', '')
-        category.color = data.get('color', category.color)
-        category.icon = data.get('icon', '')
-
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Category updated successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/admin/categories/<int:category_id>', methods=['DELETE'])
-@role_required(Role.ADMIN)
-@company_required
-def delete_category(category_id):
-    try:
-        category = ProjectCategory.query.filter_by(
-            id=category_id,
-            company_id=g.user.company_id
-        ).first()
-
-        if not category:
-            return jsonify({'success': False, 'message': 'Category not found'})
-
-        # Unassign projects from this category
-        projects = Project.query.filter_by(category_id=category_id).all()
-        for project in projects:
-            project.category_id = None
-
-        db.session.delete(category)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Category deleted successfully'})
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
 
 # Dashboard API Endpoints
 @app.route('/api/dashboard')
@@ -5273,6 +2064,7 @@ def get_dashboard():
         widgets = DashboardWidget.query.filter_by(dashboard_id=dashboard.id).order_by(DashboardWidget.grid_y, DashboardWidget.grid_x).all()
 
         logger.info(f"Found {len(widgets)} widgets for dashboard {dashboard.id}")
+        logger.info(f"Widget details: {[(w.id, w.widget_type.value, w.grid_x, w.grid_y) for w in widgets]}")
 
         # Convert to JSON format
         widget_data = []
@@ -5291,6 +2083,7 @@ def get_dashboard():
 
             # Parse config JSON
             try:
+                import json
                 config = json.loads(widget.config) if widget.config else {}
             except (json.JSONDecodeError, TypeError):
                 config = {}
@@ -5386,6 +2179,7 @@ def create_or_update_widget():
 
         # Store config as JSON string
         if config:
+            import json
             widget.config = json.dumps(config)
         else:
             widget.config = None
@@ -5420,6 +2214,7 @@ def create_or_update_widget():
 
         # Parse config for response
         try:
+            import json
             config_dict = json.loads(widget.config) if widget.config else {}
         except (json.JSONDecodeError, TypeError):
             config_dict = {}
@@ -5463,12 +2258,23 @@ def delete_widget(widget_id):
         ).first()
 
         if not widget:
+            logger.error(f"Widget {widget_id} not found for dashboard {dashboard.id}")
             return jsonify({'success': False, 'error': 'Widget not found'})
+
+        logger.info(f"Deleting widget {widget_id} of type {widget.widget_type.value} from dashboard {dashboard.id}")
+
+        # Log all widgets before deletion
+        all_widgets = DashboardWidget.query.filter_by(dashboard_id=dashboard.id).all()
+        logger.info(f"Widgets before deletion: {[(w.id, w.widget_type.value) for w in all_widgets]}")
 
         # No need to update positions for grid-based layout
 
         db.session.delete(widget)
         db.session.commit()
+
+        # Log all widgets after deletion
+        remaining_widgets = DashboardWidget.query.filter_by(dashboard_id=dashboard.id).all()
+        logger.info(f"Widgets after deletion: {[(w.id, w.widget_type.value) for w in remaining_widgets]}")
 
         return jsonify({'success': True, 'message': 'Widget deleted successfully'})
 
@@ -5537,6 +2343,7 @@ def get_widget_data(widget_id):
         widget_data = {}
 
         if widget.widget_type == WidgetType.DAILY_SUMMARY:
+            from datetime import datetime, timedelta
 
             config = widget.config or {}
             period = config.get('summary_period', 'daily')
@@ -5616,7 +2423,8 @@ def get_widget_data(widget_id):
             if task_filter == 'assigned':
                 tasks = Task.query.filter_by(assigned_to_id=g.user.id)
             elif task_filter == 'created':
-                tasks = Task.query.filter_by(created_by_id=g.user.id)
+                # Filter by created tasks - using assigned_to as fallback since created_by_id was removed
+                tasks = Task.query.filter_by(assigned_to_id=g.user.id)
             else:
                 # Get tasks from user's projects
                 if g.user.team_id:
@@ -5649,6 +2457,7 @@ def get_widget_data(widget_id):
             } for t in tasks]
 
         elif widget.widget_type == WidgetType.WEEKLY_CHART:
+            from datetime import datetime, timedelta
 
             # Get weekly data for chart
             now = datetime.now()
@@ -5740,6 +2549,7 @@ def get_widget_data(widget_id):
             widget_data['project_progress'] = project_progress
 
         elif widget.widget_type == WidgetType.PRODUCTIVITY_METRICS:
+            from datetime import datetime, timedelta
 
             # Calculate productivity metrics
             now = datetime.now()
@@ -5818,79 +2628,6 @@ def get_current_timer_status():
         return jsonify({'success': False, 'error': str(e)})
 
 # Smart Search API Endpoints
-@app.route('/api/search/users')
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def search_users():
-    """Search for users for smart search auto-completion"""
-    try:
-        query = request.args.get('q', '').strip()
-        
-        if not query:
-            return jsonify({'success': True, 'users': []})
-        
-        # Search users in the same company
-        users = User.query.filter(
-            User.company_id == g.user.company_id,
-            User.username.ilike(f'%{query}%')
-        ).limit(10).all()
-        
-        user_list = [
-            {
-                'id': user.id,
-                'username': user.username,
-                'full_name': f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else user.username
-            }
-            for user in users
-        ]
-        
-        return jsonify({'success': True, 'users': user_list})
-        
-    except Exception as e:
-        logger.error(f"Error in search_users: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/search/projects')
-@role_required(Role.TEAM_MEMBER)
-@company_required
-def search_projects():
-    """Search for projects for smart search auto-completion"""
-    try:
-        query = request.args.get('q', '').strip()
-        
-        if not query:
-            return jsonify({'success': True, 'projects': []})
-        
-        # Search projects the user has access to
-        projects = Project.query.filter(
-            Project.company_id == g.user.company_id,
-            db.or_(
-                Project.code.ilike(f'%{query}%'),
-                Project.name.ilike(f'%{query}%')
-            )
-        ).limit(10).all()
-        
-        # Filter projects user has access to
-        accessible_projects = [
-            project for project in projects 
-            if project.is_user_allowed(g.user)
-        ]
-        
-        project_list = [
-            {
-                'id': project.id,
-                'code': project.code,
-                'name': project.name
-            }
-            for project in accessible_projects
-        ]
-        
-        return jsonify({'success': True, 'projects': project_list})
-        
-    except Exception as e:
-        logger.error(f"Error in search_projects: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
-
 @app.route('/api/search/sprints')
 @role_required(Role.TEAM_MEMBER)
 @company_required
@@ -5898,22 +2635,22 @@ def search_sprints():
     """Search for sprints for smart search auto-completion"""
     try:
         query = request.args.get('q', '').strip()
-        
+
         if not query:
             return jsonify({'success': True, 'sprints': []})
-        
+
         # Search sprints in the same company
         sprints = Sprint.query.filter(
             Sprint.company_id == g.user.company_id,
             Sprint.name.ilike(f'%{query}%')
         ).limit(10).all()
-        
+
         # Filter sprints user has access to
         accessible_sprints = [
-            sprint for sprint in sprints 
+            sprint for sprint in sprints
             if sprint.can_user_access(g.user)
         ]
-        
+
         sprint_list = [
             {
                 'id': sprint.id,
@@ -5922,14 +2659,13 @@ def search_sprints():
             }
             for sprint in accessible_sprints
         ]
-        
+
         return jsonify({'success': True, 'sprints': sprint_list})
-        
+
     except Exception as e:
         logger.error(f"Error in search_sprints: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
-# Markdown rendering API
 @app.route('/api/render-markdown', methods=['POST'])
 @login_required
 def render_markdown():
@@ -5939,18 +2675,26 @@ def render_markdown():
         content = data.get('content', '')
         
         if not content:
-            return jsonify({'html': ''})
+            return jsonify({'html': '<p class="preview-placeholder">Start typing to see the preview...</p>'})
         
-        # Import markdown here to avoid issues if not installed
-        html = markdown.markdown(content, extensions=['extra', 'codehilite', 'toc'])
+        # Parse frontmatter and extract body
+        from frontmatter_utils import parse_frontmatter
+        metadata, body = parse_frontmatter(content)
+        
+        # Render markdown to HTML
+        try:
+            import markdown
+            # Use extensions for better markdown support
+            html = markdown.markdown(body, extensions=['extra', 'codehilite', 'toc', 'tables', 'fenced_code'])
+        except ImportError:
+            # Fallback if markdown not installed
+            html = f'<pre>{body}</pre>'
         
         return jsonify({'html': html})
         
     except Exception as e:
         logger.error(f"Error rendering markdown: {str(e)}")
-        return jsonify({'html': '<p>Error rendering markdown</p>'})
-
-# Note link deletion endpoint
+        return jsonify({'html': '<p class="error">Error rendering markdown</p>'})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

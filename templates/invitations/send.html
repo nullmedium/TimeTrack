@@ -1,0 +1,378 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="invitation-send-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon">✉️</span>
+                    Send Invitation
+                </h1>
+                <p class="page-subtitle">Invite team members to join {{ g.user.company.name }}</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('invitations.list_invitations') }}" class="btn btn-secondary">
+                    <span class="icon">←</span>
+                    Back to Invitations
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content-wrapper">
+        <div class="card invitation-form-card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <span class="icon">👥</span>
+                    Invitation Details
+                </h2>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('invitations.send_invitation') }}" class="modern-form">
+                    <div class="form-group">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" id="email" name="email" class="form-control" 
+                               placeholder="colleague@example.com" required autofocus>
+                        <span class="form-hint">The email address where the invitation will be sent</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="role" class="form-label">Role</label>
+                        <select id="role" name="role" class="form-control">
+                            {% for role in roles %}
+                            <option value="{{ role }}" {% if role == 'Team Member' %}selected{% endif %}>
+                                {{ role }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <span class="form-hint">The role this user will have when they join</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="custom_message" class="form-label">Personal Message (Optional)</label>
+                        <textarea id="custom_message" name="custom_message" class="form-control" 
+                                  rows="4" placeholder="Add a personal message to the invitation..."></textarea>
+                        <span class="form-hint">This message will be included in the invitation email</span>
+                    </div>
+
+                    <div class="info-panel">
+                        <div class="info-item">
+                            <span class="info-icon">📧</span>
+                            <div class="info-content">
+                                <h4>What happens next?</h4>
+                                <ul>
+                                    <li>An email invitation will be sent immediately</li>
+                                    <li>The recipient will have 7 days to accept</li>
+                                    <li>They'll create their account using the invitation link</li>
+                                    <li>They'll automatically join {{ g.user.company.name }}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="icon">📤</span>
+                            Send Invitation
+                        </button>
+                        <a href="{{ url_for('invitations.list_invitations') }}" class="btn btn-ghost">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Preview Section -->
+        <div class="card preview-card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <span class="icon">👁️</span>
+                    Email Preview
+                </h2>
+            </div>
+            <div class="card-body">
+                <div class="email-preview">
+                    <div class="preview-from">
+                        <strong>From:</strong> {{ g.branding.app_name }} &lt;{{ g.branding.email_from or 'noreply@timetrack.com' }}&gt;
+                    </div>
+                    <div class="preview-to">
+                        <strong>To:</strong> <span id="preview-email">colleague@example.com</span>
+                    </div>
+                    <div class="preview-subject">
+                        <strong>Subject:</strong> Invitation to join {{ g.user.company.name }} on {{ g.branding.app_name }}
+                    </div>
+                    <div class="preview-body">
+                        <p>Hello,</p>
+                        <p>{{ g.user.username }} has invited you to join {{ g.user.company.name }} on {{ g.branding.app_name }}.</p>
+                        <p id="preview-message" style="display: none;"></p>
+                        <p>Click the link below to accept the invitation and create your account:</p>
+                        <p><a href="#" class="preview-link">[Invitation Link]</a></p>
+                        <p>This invitation will expire in 7 days.</p>
+                        <p>Best regards,<br>The {{ g.branding.app_name }} Team</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.invitation-send-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.content-wrapper {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+@media (max-width: 1024px) {
+    .content-wrapper {
+        grid-template-columns: 1fr;
+    }
+}
+
+.invitation-form-card,
+.preview-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+}
+
+.email-preview {
+    background: #f8f9fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+.email-preview > div {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.preview-body {
+    border-bottom: none !important;
+    margin-top: 1rem;
+}
+
+.preview-link {
+    color: #667eea;
+    text-decoration: underline;
+}
+
+/* Reuse existing styles */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.modern-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.95rem;
+}
+
+.form-control {
+    padding: 0.75rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    background-color: #f9fafb;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-hint {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.info-panel {
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.info-item {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.info-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.info-content h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+}
+
+.info-content ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.info-content li {
+    margin-bottom: 0.25rem;
+    color: #4b5563;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #4b5563;
+    border: 2px solid #e5e7eb;
+}
+
+.btn-secondary:hover {
+    background: #f3f4f6;
+}
+
+.btn-ghost {
+    background: transparent;
+    color: #6b7280;
+}
+
+.btn-ghost:hover {
+    color: #374151;
+    background: #f3f4f6;
+}
+</style>
+
+<script>
+// Live preview updates
+document.getElementById('email').addEventListener('input', function(e) {
+    document.getElementById('preview-email').textContent = e.target.value || 'colleague@example.com';
+});
+
+document.getElementById('custom_message').addEventListener('input', function(e) {
+    const previewMessage = document.getElementById('preview-message');
+    if (e.target.value.trim()) {
+        previewMessage.textContent = e.target.value;
+        previewMessage.style.display = 'block';
+    } else {
+        previewMessage.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

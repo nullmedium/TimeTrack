@@ -1,0 +1,473 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="invitations-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon">📨</span>
+                    Invitations
+                </h1>
+                <p class="page-subtitle">Manage team invitations for {{ g.user.company.name }}</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('invitations.send_invitation') }}" class="btn btn-primary">
+                    <span class="icon">+</span>
+                    Send New Invitation
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stats-section">
+        <div class="stat-card">
+            <div class="stat-value">{{ pending_invitations|length }}</div>
+            <div class="stat-label">Pending</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ accepted_invitations|length }}</div>
+            <div class="stat-label">Accepted</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ expired_invitations|length }}</div>
+            <div class="stat-label">Expired</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ (pending_invitations|length + accepted_invitations|length + expired_invitations|length) }}</div>
+            <div class="stat-label">Total Sent</div>
+        </div>
+    </div>
+
+    <!-- Pending Invitations -->
+    {% if pending_invitations %}
+    <div class="section">
+        <h2 class="section-title">
+            <span class="icon">⏳</span>
+            Pending Invitations
+        </h2>
+        <div class="invitations-list">
+            {% for invitation in pending_invitations %}
+            <div class="invitation-card pending">
+                <div class="invitation-header">
+                    <div class="invitation-info">
+                        <h3 class="invitation-email">{{ invitation.email }}</h3>
+                        <div class="invitation-meta">
+                            <span class="meta-item">
+                                <span class="icon">👤</span>
+                                Role: {{ invitation.role }}
+                            </span>
+                            <span class="meta-item">
+                                <span class="icon">📅</span>
+                                Sent {{ invitation.created_at.strftime('%b %d, %Y') }}
+                            </span>
+                            <span class="meta-item">
+                                <span class="icon">⏰</span>
+                                Expires {{ invitation.expires_at.strftime('%b %d, %Y') }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="invitation-actions">
+                        <form method="POST" action="{{ url_for('invitations.resend_invitation', invitation_id=invitation.id) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-secondary">
+                                <span class="icon">🔄</span>
+                                Resend
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('invitations.revoke_invitation', invitation_id=invitation.id) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to revoke this invitation?');">
+                                <span class="icon">❌</span>
+                                Revoke
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="invitation-footer">
+                    <span class="footer-text">Invited by {{ invitation.invited_by.username }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Accepted Invitations -->
+    {% if accepted_invitations %}
+    <div class="section">
+        <h2 class="section-title">
+            <span class="icon">✅</span>
+            Accepted Invitations
+        </h2>
+        <div class="invitations-list">
+            {% for invitation in accepted_invitations %}
+            <div class="invitation-card accepted">
+                <div class="invitation-header">
+                    <div class="invitation-info">
+                        <h3 class="invitation-email">{{ invitation.email }}</h3>
+                        <div class="invitation-meta">
+                            <span class="meta-item">
+                                <span class="icon">👤</span>
+                                Joined as: {{ invitation.accepted_by.username }} ({{ invitation.role }})
+                            </span>
+                            <span class="meta-item">
+                                <span class="icon">📅</span>
+                                Accepted {{ invitation.accepted_at.strftime('%b %d, %Y') }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="invitation-actions">
+                        <a href="{{ url_for('users.view_user', user_id=invitation.accepted_by.id) }}" class="btn btn-sm btn-secondary">
+                            <span class="icon">👁️</span>
+                            View User
+                        </a>
+                    </div>
+                </div>
+                <div class="invitation-footer">
+                    <span class="footer-text">Invited by {{ invitation.invited_by.username }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Expired Invitations -->
+    {% if expired_invitations %}
+    <div class="section">
+        <h2 class="section-title">
+            <span class="icon">⏱️</span>
+            Expired Invitations
+        </h2>
+        <div class="invitations-list">
+            {% for invitation in expired_invitations %}
+            <div class="invitation-card expired">
+                <div class="invitation-header">
+                    <div class="invitation-info">
+                        <h3 class="invitation-email">{{ invitation.email }}</h3>
+                        <div class="invitation-meta">
+                            <span class="meta-item">
+                                <span class="icon">👤</span>
+                                Role: {{ invitation.role }}
+                            </span>
+                            <span class="meta-item">
+                                <span class="icon">📅</span>
+                                Expired {{ invitation.expires_at.strftime('%b %d, %Y') }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="invitation-actions">
+                        <form method="POST" action="{{ url_for('invitations.resend_invitation', invitation_id=invitation.id) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <span class="icon">📤</span>
+                                Send New Invitation
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="invitation-footer">
+                    <span class="footer-text">Originally invited by {{ invitation.invited_by.username }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Empty State -->
+    {% if not pending_invitations and not accepted_invitations and not expired_invitations %}
+    <div class="empty-state">
+        <div class="empty-icon">📨</div>
+        <h3>No invitations yet</h3>
+        <p>Start building your team by sending invitations</p>
+        <a href="{{ url_for('invitations.send_invitation') }}" class="btn btn-primary">
+            <span class="icon">+</span>
+            Send First Invitation
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.invitations-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Header styles - reuse from other pages */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+/* Stats section */
+.stats-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #667eea;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* Sections */
+.section {
+    margin-bottom: 2rem;
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Invitation cards */
+.invitations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.invitation-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.invitation-card.pending {
+    border-left: 4px solid #f59e0b;
+}
+
+.invitation-card.accepted {
+    border-left: 4px solid #10b981;
+}
+
+.invitation-card.expired {
+    border-left: 4px solid #ef4444;
+}
+
+.invitation-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.invitation-header {
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.invitation-email {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+}
+
+.invitation-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.invitation-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.invitation-footer {
+    background: #f8f9fa;
+    padding: 0.75rem 1.5rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.footer-text {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #4b5563;
+    border: 2px solid #e5e7eb;
+}
+
+.btn-secondary:hover {
+    background: #f3f4f6;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: #6b7280;
+    margin-bottom: 2rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .invitations-container {
+        padding: 1rem;
+    }
+    
+    .invitation-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .invitation-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .meta-item {
+        font-size: 0.8rem;
+    }
+}
+</style>
+{% endblock %}

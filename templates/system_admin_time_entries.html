@@ -5,7 +5,7 @@
     <div class="header-section">
         <h1>⏱️ System Admin - Time Entries</h1>
         <p class="subtitle">View time entries across all companies</p>
-        <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+        <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
     </div>
 
     <!-- Filter Section -->
@@ -25,7 +25,7 @@
                 </select>
             </div>
             {% if current_company %}
-            <a href="{{ url_for('system_admin_time_entries') }}" class="btn btn-sm btn-outline">Clear Filter</a>
+            <a href="{{ url_for('system_admin.system_admin_time_entries') }}" class="btn btn-sm btn-outline">Clear Filter</a>
             {% endif %}
         </form>
     </div>
@@ -112,13 +112,13 @@
     <div class="pagination-section">
         <div class="pagination">
             {% if entries.has_prev %}
-                <a href="{{ url_for('system_admin_time_entries', page=entries.prev_num, company=current_company) }}" class="page-link">← Previous</a>
+                <a href="{{ url_for('system_admin.system_admin_time_entries', page=entries.prev_num, company=current_company) }}" class="page-link">← Previous</a>
             {% endif %}
             
             {% for page_num in entries.iter_pages() %}
                 {% if page_num %}
                     {% if page_num != entries.page %}
-                        <a href="{{ url_for('system_admin_time_entries', page=page_num, company=current_company) }}" class="page-link">{{ page_num }}</a>
+                        <a href="{{ url_for('system_admin.system_admin_time_entries', page=page_num, company=current_company) }}" class="page-link">{{ page_num }}</a>
                     {% else %}
                         <span class="page-link current">{{ page_num }}</span>
                     {% endif %}
@@ -128,7 +128,7 @@
             {% endfor %}
             
             {% if entries.has_next %}
-                <a href="{{ url_for('system_admin_time_entries', page=entries.next_num, company=current_company) }}" class="page-link">Next →</a>
+                <a href="{{ url_for('system_admin.system_admin_time_entries', page=entries.next_num, company=current_company) }}" class="page-link">Next →</a>
             {% endif %}
         </div>
         
@@ -170,7 +170,6 @@
             <div class="summary-card">
                 <h4>Completed Today</h4>
                 <p class="summary-number">
-                    {% set today = moment().date() %}
                     {{ entries.items | selectattr('0.arrival_time') | selectattr('0.departure_time', 'defined') | 
                        list | length }}
                 </p>

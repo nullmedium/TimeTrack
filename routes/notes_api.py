@@ -245,6 +245,36 @@ def update_note_folder(slug):
     })
 
 
+@notes_api_bp.route('/<int:note_id>/move', methods=['POST'])
+@login_required
+@company_required
+def move_note_to_folder(note_id):
+    """Move a note to a different folder (used by drag and drop)"""
+    note = Note.query.filter_by(id=note_id, company_id=g.user.company_id).first()
+    
+    if not note:
+        return jsonify({'success': False, 'error': 'Note not found'}), 404
+    
+    # Check permissions
+    if not note.can_user_edit(g.user):
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    new_folder = data.get('folder', '').strip()
+    
+    # Update note folder
+    note.folder = new_folder if new_folder else None
+    note.updated_at = datetime.now(timezone.utc)
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Note moved successfully',
+        'folder': note.folder or ''
+    })
+
+
 @notes_api_bp.route('/<int:note_id>/tags', methods=['POST'])
 @login_required
 @company_required

@@ -195,6 +195,7 @@ def create_note():
         tags = request.form.get('tags', '').strip()
         project_id = request.form.get('project_id')
         task_id = request.form.get('task_id')
+        is_pinned = request.form.get('is_pinned') == '1'
         
         # Validate
         if not title:
@@ -240,8 +241,12 @@ def create_note():
             company_id=g.user.company_id,
             created_by_id=g.user.id,
             project_id=project.id if project else None,
-            task_id=task.id if task else None
+            task_id=task.id if task else None,
+            is_pinned=is_pinned
         )
+        
+        # Generate slug before saving
+        note.generate_slug()
         
         db.session.add(note)
         db.session.commit()
@@ -258,7 +263,7 @@ def create_note():
     # Get projects for dropdown
     projects = Project.query.filter_by(
         company_id=g.user.company_id,
-        is_archived=False
+        is_active=True
     ).order_by(Project.name).all()
     
     # Get task if specified in URL
@@ -359,6 +364,7 @@ def edit_note(slug):
         tags = request.form.get('tags', '').strip()
         project_id = request.form.get('project_id')
         task_id = request.form.get('task_id')
+        is_pinned = request.form.get('is_pinned') == '1'
         
         # Validate
         if not title:
@@ -402,6 +408,7 @@ def edit_note(slug):
         note.tags = tags if tags else None
         note.project_id = project.id if project else None
         note.task_id = task.id if task else None
+        note.is_pinned = is_pinned
         note.updated_at = datetime.now(timezone.utc)
         
         # Update slug if title changed
@@ -421,7 +428,7 @@ def edit_note(slug):
     # Get projects for dropdown
     projects = Project.query.filter_by(
         company_id=g.user.company_id,
-        is_archived=False
+        is_active=True
     ).order_by(Project.name).all()
     
     return render_template('note_editor.html',

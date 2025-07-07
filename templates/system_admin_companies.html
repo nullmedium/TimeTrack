@@ -5,7 +5,10 @@
     <div class="header-section">
         <h1>🏢 System Admin - All Companies</h1>
         <p class="subtitle">Manage companies across the entire system</p>
-        <a href="{{ url_for('system_admin_dashboard') }}" class="btn btn-md btn-secondary">← Back to Dashboard</a>
+        <div class="header-actions">
+            <a href="/setup" class="btn btn-md btn-success">+ Add New Company</a>
+            <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-md btn-secondary">← Back to Dashboard</a>
+        </div>
     </div>
 
     <!-- Companies Table -->
@@ -57,7 +60,7 @@
                     <td>{{ company.created_at.strftime('%Y-%m-%d') }}</td>
                     <td>
                         <div class="action-buttons">
-                            <a href="{{ url_for('system_admin_company_detail', company_id=company.id) }}" 
+                            <a href="{{ url_for('system_admin.system_admin_company_detail', company_id=company.id) }}" 
                                class="btn btn-sm btn-primary">View Details</a>
                         </div>
                     </td>
@@ -72,13 +75,13 @@
     <div class="pagination-section">
         <div class="pagination">
             {% if companies.has_prev %}
-                <a href="{{ url_for('system_admin_companies', page=companies.prev_num) }}" class="page-link">← Previous</a>
+                <a href="{{ url_for('system_admin.system_admin_companies', page=companies.prev_num) }}" class="page-link">← Previous</a>
             {% endif %}
             
             {% for page_num in companies.iter_pages() %}
                 {% if page_num %}
                     {% if page_num != companies.page %}
-                        <a href="{{ url_for('system_admin_companies', page=page_num) }}" class="page-link">{{ page_num }}</a>
+                        <a href="{{ url_for('system_admin.system_admin_companies', page=page_num) }}" class="page-link">{{ page_num }}</a>
                     {% else %}
                         <span class="page-link current">{{ page_num }}</span>
                     {% endif %}
@@ -88,7 +91,7 @@
             {% endfor %}
             
             {% if companies.has_next %}
-                <a href="{{ url_for('system_admin_companies', page=companies.next_num) }}" class="page-link">Next →</a>
+                <a href="{{ url_for('system_admin.system_admin_companies', page=companies.next_num) }}" class="page-link">Next →</a>
             {% endif %}
         </div>
         

@@ -10,6 +10,9 @@ import sys
 import argparse
 from datetime import datetime
 
+# Add parent directory to path to import app
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # Try to import from Flask app context if available
 try:
     from app import app, db

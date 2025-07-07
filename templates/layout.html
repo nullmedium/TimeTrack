@@ -129,32 +129,31 @@
             <ul>
                 {% if g.user %}
                     <li><a href="{{ url_for('home') }}" data-tooltip="Home"><i class="nav-icon">🏠</i><span class="nav-text">Home</span></a></li>
+                    <li><a href="{{ url_for('time_tracking') }}" data-tooltip="Time Tracking"><i class="nav-icon">⏱️</i><span class="nav-text">Time Tracking</span></a></li>
                     <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📊</i><span class="nav-text">Dashboard</span></a></li>
-                    <li><a href="{{ url_for('unified_task_management') }}" data-tooltip="Task Management"><i class="nav-icon">📋</i><span class="nav-text">Task Management</span></a></li>
-                    <li><a href="{{ url_for('sprint_management') }}" data-tooltip="Sprint Management"><i class="nav-icon">🏃‍♂️</i><span class="nav-text">Sprints</span></a></li>
+                    <li><a href="{{ url_for('tasks.unified_task_management') }}" data-tooltip="Task Management"><i class="nav-icon">📋</i><span class="nav-text">Task Management</span></a></li>
+                    <li><a href="{{ url_for('sprints.sprint_management') }}" data-tooltip="Sprint Management"><i class="nav-icon">🏃‍♂️</i><span class="nav-text">Sprints</span></a></li>
                     <li><a href="{{ url_for('notes.notes_list') }}" data-tooltip="Notes"><i class="nav-icon">📝</i><span class="nav-text">Notes</span></a></li>
                     <li><a href="{{ url_for('analytics') }}" data-tooltip="Time Analytics"><i class="nav-icon">📊</i><span class="nav-text">Analytics</span></a></li>
                     
                     <!-- Role-based menu items -->
                     {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">Admin</li>
-                    <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📈</i><span class="nav-text">Dashboard</span></a></li>
-                    <li><a href="{{ url_for('admin_company') }}" data-tooltip="Company"><i class="nav-icon">🏢</i><span class="nav-text">Company</span></a></li>
-                    <li><a href="{{ url_for('admin_users') }}" data-tooltip="Manage Users"><i class="nav-icon">👥</i><span class="nav-text">Manage Users</span></a></li>
-                    <li><a href="{{ url_for('admin_teams') }}" data-tooltip="Manage Teams"><i class="nav-icon">🏭</i><span class="nav-text">Manage Teams</span></a></li>
-                    <li><a href="{{ url_for('admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
-                    <li><a href="{{ url_for('admin_work_policies') }}" data-tooltip="Work Policies"><i class="nav-icon">⚖️</i><span class="nav-text">Work Policies</span></a></li>
-                    <li><a href="{{ url_for('admin_settings') }}" data-tooltip="System Settings"><i class="nav-icon">🔧</i><span class="nav-text">System Settings</span></a></li>
+                    <li><a href="{{ url_for('companies.admin_company') }}" data-tooltip="Company Settings"><i class="nav-icon">🏢</i><span class="nav-text">Company Settings</span></a></li>
+                    <li><a href="{{ url_for('users.admin_users') }}" data-tooltip="Manage Users"><i class="nav-icon">👥</i><span class="nav-text">Manage Users</span></a></li>
+                    <li><a href="{{ url_for('invitations.list_invitations') }}" data-tooltip="Invitations"><i class="nav-icon">📨</i><span class="nav-text">Invitations</span></a></li>
+                    <li><a href="{{ url_for('teams.admin_teams') }}" data-tooltip="Manage Teams"><i class="nav-icon">🏭</i><span class="nav-text">Manage Teams</span></a></li>
+                    <li><a href="{{ url_for('projects.admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
                     {% if g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">System Admin</li>
-                    <li><a href="{{ url_for('system_admin_dashboard') }}" data-tooltip="System Dashboard"><i class="nav-icon">🌐</i><span class="nav-text">System Dashboard</span></a></li>
-                    <li><a href="{{ url_for('system_admin_announcements') }}" data-tooltip="Announcements"><i class="nav-icon">📢</i><span class="nav-text">Announcements</span></a></li>
+                    <li><a href="{{ url_for('system_admin.system_admin_dashboard') }}" data-tooltip="System Dashboard"><i class="nav-icon">🌐</i><span class="nav-text">System Dashboard</span></a></li>
+                    <li><a href="{{ url_for('announcements.index') }}" data-tooltip="Announcements"><i class="nav-icon">📢</i><span class="nav-text">Announcements</span></a></li>
                     {% endif %}
                     {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
                     <li class="nav-divider">Team</li>
                     <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📈</i><span class="nav-text">Dashboard</span></a></li>
                     {% if g.user.role == Role.SUPERVISOR %}
-                    <li><a href="{{ url_for('admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
+                    <li><a href="{{ url_for('projects.admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
                     {% endif %}
                     {% endif %}
                 {% else %}

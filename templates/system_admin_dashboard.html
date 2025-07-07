@@ -12,12 +12,12 @@
             <div class="stat-card">
                 <h3>{{ total_companies }}</h3>
                 <p>Total Companies</p>
-                <a href="{{ url_for('system_admin_companies') }}" class="stat-link">Manage →</a>
+                <a href="{{ url_for('system_admin.system_admin_companies') }}" class="stat-link">Manage →</a>
             </div>
             <div class="stat-card">
                 <h3>{{ total_users }}</h3>
                 <p>Total Users</p>
-                <a href="{{ url_for('system_admin_users') }}" class="stat-link">Manage →</a>
+                <a href="{{ url_for('users.system_admin_users') }}" class="stat-link">Manage →</a>
             </div>
             <div class="stat-card">
                 <h3>{{ total_teams }}</h3>
@@ -30,7 +30,7 @@
             <div class="stat-card">
                 <h3>{{ total_time_entries }}</h3>
                 <p>Time Entries</p>
-                <a href="{{ url_for('system_admin_time_entries') }}" class="stat-link">View →</a>
+                <a href="{{ url_for('system_admin.system_admin_time_entries') }}" class="stat-link">View →</a>
             </div>
         </div>
     </div>
@@ -51,7 +51,7 @@
                 <h3>{{ blocked_users }}</h3>
                 <p>Blocked Users</p>
                 {% if blocked_users > 0 %}
-                    <a href="{{ url_for('system_admin_users', filter='blocked') }}" class="stat-link">Review →</a>
+                    <a href="{{ url_for('users.system_admin_users', filter='blocked') }}" class="stat-link">Review →</a>
                 {% endif %}
             </div>
         </div>
@@ -118,7 +118,7 @@
                             <td>{{ company.name }}</td>
                             <td>{{ company.user_count }}</td>
                             <td>
-                                <a href="{{ url_for('system_admin_company_detail', company_id=company.id) }}" class="btn btn-sm">View</a>
+                                <a href="{{ url_for('system_admin.system_admin_company_detail', company_id=company.id) }}" class="btn btn-sm">View</a>
                             </td>
                         </tr>
                         {% endfor %}
@@ -155,7 +155,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{{ url_for('system_admin_company_detail', company_id=company.id) }}" class="btn btn-sm">View</a>
+                                <a href="{{ url_for('system_admin.system_admin_company_detail', company_id=company.id) }}" class="btn btn-sm">View</a>
                             </td>
                         </tr>
                         {% endfor %}
@@ -171,22 +171,22 @@
     <div class="admin-panel">
         <h2>🛠️ System Management</h2>
         <div class="admin-actions">
-            <a href="{{ url_for('system_admin_users') }}" class="btn btn-primary">
+            <a href="{{ url_for('users.system_admin_users') }}" class="btn btn-primary">
                 👥 Manage All Users
             </a>
-            <a href="{{ url_for('system_admin_companies') }}" class="btn btn-primary">
+            <a href="{{ url_for('system_admin.system_admin_companies') }}" class="btn btn-primary">
                 🏢 Manage Companies
             </a>
-            <a href="{{ url_for('system_admin_time_entries') }}" class="btn btn-primary">
+            <a href="{{ url_for('system_admin.system_admin_time_entries') }}" class="btn btn-primary">
                 ⏱️ View Time Entries
             </a>
-            <a href="{{ url_for('system_admin_settings') }}" class="btn btn-primary">
+            <a href="{{ url_for('system_admin.system_admin_settings') }}" class="btn btn-primary">
                 ⚙️ System Settings
             </a>
-            <a href="{{ url_for('system_admin_branding') }}" class="btn btn-primary">
+            <a href="{{ url_for('system_admin.branding') }}" class="btn btn-primary">
                 🎨 Branding Settings
             </a>
-            <a href="{{ url_for('system_admin_health') }}" class="btn btn-primary">
+            <a href="{{ url_for('system_admin.system_admin_health') }}" class="btn btn-primary">
                 🏥 System Health
             </a>
         </div>

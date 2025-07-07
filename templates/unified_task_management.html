@@ -52,12 +52,12 @@
 
     <!-- Task Board -->
     <div class="task-board" id="task-board">
-        <div class="task-column" data-status="NOT_STARTED">
+        <div class="task-column" data-status="TODO">
             <div class="column-header">
-                <h3>📝 Not Started</h3>
+                <h3>📝 To Do</h3>
                 <span class="task-count">0</span>
             </div>
-            <div class="column-content" id="column-NOT_STARTED">
+            <div class="column-content" id="column-TODO">
                 <!-- Task cards will be populated here -->
             </div>
         </div>
@@ -72,22 +72,32 @@
             </div>
         </div>
         
-        <div class="task-column" data-status="ON_HOLD">
+        <div class="task-column" data-status="IN_REVIEW">
             <div class="column-header">
-                <h3>⏸️ On Hold</h3>
+                <h3>🔍 In Review</h3>
                 <span class="task-count">0</span>
             </div>
-            <div class="column-content" id="column-ON_HOLD">
+            <div class="column-content" id="column-IN_REVIEW">
                 <!-- Task cards will be populated here -->
             </div>
         </div>
         
-        <div class="task-column" data-status="COMPLETED">
+        <div class="task-column" data-status="DONE">
             <div class="column-header">
-                <h3>✅ Completed</h3>
+                <h3>✅ Done</h3>
                 <span class="task-count">0</span>
             </div>
-            <div class="column-content" id="column-COMPLETED">
+            <div class="column-content" id="column-DONE">
+                <!-- Task cards will be populated here -->
+            </div>
+        </div>
+        
+        <div class="task-column" data-status="CANCELLED">
+            <div class="column-header">
+                <h3>❌ Cancelled</h3>
+                <span class="task-count">0</span>
+            </div>
+            <div class="column-content" id="column-CANCELLED">
                 <!-- Task cards will be populated here -->
             </div>
         </div>
@@ -875,10 +885,16 @@ class SmartTaskSearch {
     
     normalizeStatus(status) {
         const statusMap = {
-            'not-started': 'NOT_STARTED',
+            'not-started': 'TODO',
+            'to-do': 'TODO',
+            'todo': 'TODO',
             'in-progress': 'IN_PROGRESS',
-            'on-hold': 'ON_HOLD',
-            'completed': 'COMPLETED'
+            'in-review': 'IN_REVIEW',
+            'on-hold': 'IN_REVIEW',
+            'completed': 'DONE',
+            'done': 'DONE',
+            'cancelled': 'CANCELLED',
+            'archived': 'ARCHIVED'
         };
         return statusMap[status.toLowerCase()] || status.toUpperCase();
     }
@@ -1499,10 +1515,11 @@ class UnifiedTaskManager {
         
         // Group tasks by status
         const tasksByStatus = {
-            'NOT_STARTED': [],
+            'TODO': [],
             'IN_PROGRESS': [],
-            'ON_HOLD': [],
-            'COMPLETED': [],
+            'IN_REVIEW': [],
+            'DONE': [],
+            'CANCELLED': [],
             'ARCHIVED': []
         };
 
@@ -2300,8 +2317,27 @@ class UnifiedTaskManager {
         
         try {
             const response = await fetch(`/api/comments/${commentId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
+            
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                console.error('Response is not JSON:', await response.text());
+                if (response.status === 401) {
+                    alert('Your session has expired. Please refresh the page and login again.');
+                    window.location.href = '/login';
+                    return;
+                } else if (response.status === 404) {
+                    alert('Comment not found. It may have been already deleted.');
+                } else {
+                    alert('Failed to delete comment. Please try again.');
+                }
+                return;
+            }
             
             const data = await response.json();
             if (data.success) {
