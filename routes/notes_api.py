@@ -420,3 +420,141 @@ def unlink_notes(note_id):
         'success': True,
         'message': 'Link removed successfully'
     })
+
+
+@notes_api_bp.route('/<slug>/shares', methods=['POST'])
+@login_required
+@company_required
+def create_note_share(slug):
+    """Create a share link for a note"""
+    note = Note.query.filter_by(slug=slug, company_id=g.user.company_id).first()
+    
+    if not note:
+        return jsonify({'success': False, 'error': 'Note not found'}), 404
+    
+    # Check permissions - only editors can create shares
+    if not note.can_user_edit(g.user):
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    
+    try:
+        share = note.create_share_link(
+            expires_in_days=data.get('expires_in_days'),
+            password=data.get('password'),
+            max_views=data.get('max_views')
+        )
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'share': share.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@notes_api_bp.route('/<slug>/shares', methods=['GET'])
+@login_required
+@company_required
+def list_note_shares(slug):
+    """List all share links for a note"""
+    note = Note.query.filter_by(slug=slug, company_id=g.user.company_id).first()
+    
+    if not note:
+        return jsonify({'success': False, 'error': 'Note not found'}), 404
+    
+    # Check permissions
+    if not note.can_user_view(g.user):
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    
+    # Get all shares (not just active ones)
+    shares = note.get_all_shares()
+    
+    return jsonify({
+        'success': True,
+        'shares': [s.to_dict() for s in shares]
+    })
+
+
+@notes_api_bp.route('/shares/<int:share_id>', methods=['DELETE'])
+@login_required
+@company_required
+def delete_note_share(share_id):
+    """Delete a share link"""
+    from models import NoteShare
+    
+    share = NoteShare.query.get(share_id)
+    
+    if not share:
+        return jsonify({'success': False, 'error': 'Share not found'}), 404
+    
+    # Check permissions
+    if share.note.company_id != g.user.company_id:
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    
+    if not share.note.can_user_edit(g.user):
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    
+    try:
+        db.session.delete(share)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Share link deleted successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@notes_api_bp.route('/shares/<int:share_id>', methods=['PUT'])
+@login_required
+@company_required
+def update_note_share(share_id):
+    """Update a share link settings"""
+    from models import NoteShare
+    
+    share = NoteShare.query.get(share_id)
+    
+    if not share:
+        return jsonify({'success': False, 'error': 'Share not found'}), 404
+    
+    # Check permissions
+    if share.note.company_id != g.user.company_id:
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    
+    if not share.note.can_user_edit(g.user):
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    
+    try:
+        # Update expiration
+        if 'expires_in_days' in data:
+            if data['expires_in_days'] is None:
+                share.expires_at = None
+            else:
+                from datetime import datetime, timedelta
+                share.expires_at = datetime.now() + timedelta(days=data['expires_in_days'])
+        
+        # Update password
+        if 'password' in data:
+            share.set_password(data['password'])
+        
+        # Update view limit
+        if 'max_views' in data:
+            share.max_views = data['max_views']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'share': share.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500

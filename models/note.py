@@ -5,7 +5,7 @@ Migrated from models_old.py to maintain consistency with the new modular structu
 
 import enum
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import UniqueConstraint
 
@@ -223,6 +223,44 @@ class Note(db.Model):
                     self.tags = metadata['tags']
             if 'pinned' in metadata:
                 self.is_pinned = bool(metadata['pinned'])
+    
+    def create_share_link(self, expires_in_days=None, password=None, max_views=None, created_by=None):
+        """Create a public share link for this note"""
+        from .note_share import NoteShare
+        from flask import g
+        
+        share = NoteShare(
+            note_id=self.id,
+            created_by_id=created_by.id if created_by else g.user.id
+        )
+        
+        # Set expiration
+        if expires_in_days:
+            share.expires_at = datetime.now() + timedelta(days=expires_in_days)
+        
+        # Set password
+        if password:
+            share.set_password(password)
+        
+        # Set view limit
+        if max_views:
+            share.max_views = max_views
+        
+        db.session.add(share)
+        return share
+    
+    def get_active_shares(self):
+        """Get all active share links for this note"""
+        return [s for s in self.shares if s.is_valid()]
+    
+    def get_all_shares(self):
+        """Get all share links for this note"""
+        from models.note_share import NoteShare
+        return self.shares.order_by(NoteShare.created_at.desc()).all()
+    
+    def has_active_shares(self):
+        """Check if this note has any active share links"""
+        return any(s.is_valid() for s in self.shares)
 
 
 class NoteLink(db.Model):

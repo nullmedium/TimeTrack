@@ -17,6 +17,7 @@ MIGRATION_STATE_FILE = '/data/postgres_migrations_state.json'
 # List of PostgreSQL migrations in order
 POSTGRES_MIGRATIONS = [
     'postgres_only_migration.py',  # Main migration from commit 4214e88 onward
+    'add_note_sharing.sql',  # Add note sharing functionality
 ]
 
 
@@ -49,12 +50,27 @@ def run_migration(migration_file):
     print(f"\n🔄 Running migration: {migration_file}")
     
     try:
-        # Run the migration script
-        result = subprocess.run(
-            [sys.executable, script_path],
-            capture_output=True,
-            text=True
-        )
+        # Check if it's a SQL file
+        if migration_file.endswith('.sql'):
+            # Run SQL file using psql
+            import os
+            db_host = os.environ.get('POSTGRES_HOST', 'db')
+            db_name = os.environ.get('POSTGRES_DB', 'timetrack')
+            db_user = os.environ.get('POSTGRES_USER', 'timetrack')
+            
+            result = subprocess.run(
+                ['psql', '-h', db_host, '-U', db_user, '-d', db_name, '-f', script_path],
+                capture_output=True,
+                text=True,
+                env={**os.environ, 'PGPASSWORD': os.environ.get('POSTGRES_PASSWORD', 'timetrack')}
+            )
+        else:
+            # Run Python migration script
+            result = subprocess.run(
+                [sys.executable, script_path],
+                capture_output=True,
+                text=True
+            )
         
         if result.returncode == 0:
             print(f"✅ {migration_file} completed successfully")

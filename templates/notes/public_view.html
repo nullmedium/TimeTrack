@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ note.title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+    <style>
+        body {
+            background: #f9fafb;
+            margin: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        .public-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .header-content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .note-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0 0 0.5rem 0;
+        }
+        
+        .note-meta {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+        
+        .content-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 2rem 2rem;
+        }
+        
+        .content-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+            padding: 3rem;
+            margin-bottom: 2rem;
+        }
+        
+        .markdown-content {
+            line-height: 1.8;
+            color: #333;
+        }
+        
+        .markdown-content h1, 
+        .markdown-content h2, 
+        .markdown-content h3,
+        .markdown-content h4, 
+        .markdown-content h5, 
+        .markdown-content h6 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        
+        .markdown-content h1 { font-size: 2rem; }
+        .markdown-content h2 { font-size: 1.75rem; }
+        .markdown-content h3 { font-size: 1.5rem; }
+        .markdown-content h4 { font-size: 1.25rem; }
+        .markdown-content h5 { font-size: 1.125rem; }
+        .markdown-content h6 { font-size: 1rem; }
+        
+        .markdown-content p {
+            margin-bottom: 1rem;
+        }
+        
+        .markdown-content ul, 
+        .markdown-content ol {
+            margin-bottom: 1rem;
+            padding-left: 2rem;
+        }
+        
+        .markdown-content li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .markdown-content code {
+            background: #f3f4f6;
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-size: 0.875em;
+        }
+        
+        .markdown-content pre {
+            background: #f3f4f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin-bottom: 1rem;
+        }
+        
+        .markdown-content pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        .markdown-content blockquote {
+            border-left: 4px solid #e5e7eb;
+            padding-left: 1rem;
+            margin-left: 0;
+            margin-bottom: 1rem;
+            color: #6b7280;
+        }
+        
+        .markdown-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+        }
+        
+        .markdown-content th,
+        .markdown-content td {
+            border: 1px solid #e5e7eb;
+            padding: 0.75rem;
+            text-align: left;
+        }
+        
+        .markdown-content th {
+            background: #f9fafb;
+            font-weight: 600;
+        }
+        
+        .markdown-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+        }
+        
+        .markdown-content a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .markdown-content a:hover {
+            text-decoration: underline;
+        }
+        
+        .share-info {
+            background: #f3f4f6;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .share-info-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .share-info-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .download-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border-color: #e5e7eb;
+        }
+        
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border-color: #667eea;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="public-header">
+        <div class="header-content">
+            <h1 class="note-title">{{ note.title }}</h1>
+            <div class="note-meta">
+                Shared by {{ note.created_by.username }} • 
+                Created {{ note.created_at|format_date }}
+                {% if note.updated_at > note.created_at %}
+                • Updated {{ note.updated_at|format_date }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="content-container">
+        {% if share %}
+        <div class="share-info">
+            <div class="share-info-item">
+                <span>👁️</span>
+                <span>Views: {{ share.view_count }}{% if share.max_views %} / {{ share.max_views }}{% endif %}</span>
+            </div>
+            {% if share.expires_at %}
+            <div class="share-info-item">
+                <span>⏰</span>
+                <span>Expires: {{ share.expires_at|format_datetime }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <div class="content-card">
+            <div class="markdown-content">
+                {{ note.render_html()|safe }}
+            </div>
+            
+            <div class="download-buttons">
+                <a href="{{ url_for('notes_public.download_shared_note', token=share.token, format='md') }}" 
+                   class="btn btn-secondary">
+                    <span>📄</span>
+                    Download as Markdown
+                </a>
+                <a href="{{ url_for('notes_public.download_shared_note', token=share.token, format='html') }}" 
+                   class="btn btn-secondary">
+                    <span>🌐</span>
+                    Download as HTML
+                </a>
+                <a href="{{ url_for('notes_public.download_shared_note', token=share.token, format='pdf') }}" 
+                   class="btn btn-secondary">
+                    <span>📑</span>
+                    Download as PDF
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Powered by TimeTrack Notes</p>
+    </div>
+    
+    <!-- Syntax highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+</body>
+</html>

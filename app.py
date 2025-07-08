@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file, abort
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings, CompanyInvitation
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings, CompanyInvitation, Note, NoteFolder, NoteShare
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data, format_burndown_data
@@ -23,6 +23,7 @@ from werkzeug.security import check_password_hash
 from routes.notes import notes_bp
 from routes.notes_download import notes_download_bp
 from routes.notes_api import notes_api_bp
+from routes.notes_public import notes_public_bp
 from routes.tasks import tasks_bp, get_filtered_tasks_for_burndown
 from routes.tasks_api import tasks_api_bp
 from routes.sprints import sprints_bp
@@ -87,6 +88,7 @@ db.init_app(app)
 app.register_blueprint(notes_bp)
 app.register_blueprint(notes_download_bp)
 app.register_blueprint(notes_api_bp)
+app.register_blueprint(notes_public_bp)
 app.register_blueprint(tasks_bp)
 app.register_blueprint(tasks_api_bp)
 app.register_blueprint(sprints_bp)
