@@ -53,16 +53,28 @@ def run_migration(migration_file):
         # Check if it's a SQL file
         if migration_file.endswith('.sql'):
             # Run SQL file using psql
-            import os
-            db_host = os.environ.get('POSTGRES_HOST', 'db')
-            db_name = os.environ.get('POSTGRES_DB', 'timetrack')
-            db_user = os.environ.get('POSTGRES_USER', 'timetrack')
+            # Try to parse DATABASE_URL first, fall back to individual env vars
+            database_url = os.environ.get('DATABASE_URL')
+            if database_url:
+                # Parse DATABASE_URL: postgresql://user:password@host:port/dbname
+                from urllib.parse import urlparse
+                parsed = urlparse(database_url)
+                db_host = parsed.hostname or 'db'
+                db_port = parsed.port or 5432
+                db_name = parsed.path.lstrip('/') or 'timetrack'
+                db_user = parsed.username or 'timetrack'
+                db_password = parsed.password or 'timetrack'
+            else:
+                db_host = os.environ.get('POSTGRES_HOST', 'db')
+                db_name = os.environ.get('POSTGRES_DB', 'timetrack')
+                db_user = os.environ.get('POSTGRES_USER', 'timetrack')
+                db_password = os.environ.get('POSTGRES_PASSWORD', 'timetrack')
             
             result = subprocess.run(
                 ['psql', '-h', db_host, '-U', db_user, '-d', db_name, '-f', script_path],
                 capture_output=True,
                 text=True,
-                env={**os.environ, 'PGPASSWORD': os.environ.get('POSTGRES_PASSWORD', 'timetrack')}
+                env={**os.environ, 'PGPASSWORD': db_password}
             )
         else:
             # Run Python migration script
