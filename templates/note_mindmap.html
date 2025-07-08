@@ -1,57 +1,148 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="timetrack-container note-mindmap-container">
-    <div class="mindmap-header">
-        <h2>{{ note.title }} - Mind Map View</h2>
-        <div class="mindmap-actions">
-            <button type="button" class="btn btn-sm btn-secondary" onclick="resetZoom()">
-                Reset Zoom
-            </button>
-            <button type="button" class="btn btn-sm btn-secondary" onclick="toggleFullscreen()">
-                Fullscreen
-            </button>
-            <a href="{{ url_for('notes.view_note', slug=note.slug) }}" class="btn btn-sm btn-info">
-                Back to Note
-            </a>
+<div class="note-mindmap-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon">🧠</span>
+                    Mind Map View
+                </h1>
+                <p class="page-subtitle">{{ note.title }}</p>
+            </div>
+            <div class="header-actions">
+                <button type="button" class="btn btn-secondary" onclick="resetZoom()">
+                    <span class="icon">🔍</span>
+                    Reset Zoom
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="expandAll()">
+                    <span class="icon">➕</span>
+                    Expand All
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="collapseAll()">
+                    <span class="icon">➖</span>
+                    Collapse All
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="toggleFullscreen()">
+                    <span class="icon">🗖️</span>
+                    Fullscreen
+                </button>
+                <a href="{{ url_for('notes.view_note', slug=note.slug) }}" class="btn btn-secondary">
+                    <span class="icon">←</span>
+                    Back to Note
+                </a>
+            </div>
         </div>
     </div>
 
     <div id="mindmap-container" class="mindmap-container">
         <svg id="mindmap-svg"></svg>
+        <div class="node-count" id="node-count"></div>
     </div>
 </div>
 
 <style>
 .note-mindmap-container {
-    max-width: none !important;
-    width: 100% !important;
-    padding: 1rem !important;
-    margin: 0 !important;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 2rem;
     height: calc(100vh - 100px);
     display: flex;
     flex-direction: column;
 }
 
-.mindmap-header {
+/* Page Header - Time Tracking style */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.header-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 2rem;
 }
 
-.mindmap-actions {
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
     display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Button styles */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
     gap: 0.5rem;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border-color: #e5e7eb;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #667eea;
+}
+
+.btn .icon {
+    font-size: 1.1em;
 }
 
 .mindmap-container {
     flex: 1;
     background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
     overflow: hidden;
     position: relative;
+    min-height: 600px;
 }
 
 #mindmap-svg {
@@ -70,55 +161,70 @@
 
 .node circle {
     fill: #fff;
-    stroke: steelblue;
+    stroke: #667eea;
     stroke-width: 3px;
 }
 
 .node rect {
     fill: #f9f9f9;
-    stroke: steelblue;
+    stroke: #667eea;
     stroke-width: 2px;
-    rx: 5px;
+    rx: 8px;
 }
 
 .node text {
-    font: 12px sans-serif;
+    font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     pointer-events: none;
+    text-anchor: middle;
+    dominant-baseline: central;
 }
 
 .link {
     fill: none;
-    stroke: #ccc;
+    stroke: #e5e7eb;
     stroke-width: 2px;
 }
 
-.node.collapsed circle {
-    fill: steelblue;
-}
-
 .node.root rect {
-    fill: #4CAF50;
-    stroke: #45a049;
+    fill: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    stroke: none;
 }
 
 .node.root text {
     fill: white;
     font-weight: bold;
+    font-size: 16px;
 }
 
-.node.level1 rect {
-    fill: #e3f2fd;
-    stroke: #2196F3;
+.node.header1 rect {
+    fill: #e0e7ff;
+    stroke: #667eea;
 }
 
-.node.level2 rect {
-    fill: #f3e5f5;
-    stroke: #9C27B0;
+.node.header2 rect {
+    fill: #f0e6ff;
+    stroke: #9333ea;
 }
 
-.node.level3 rect {
-    fill: #fff3e0;
-    stroke: #FF9800;
+.node.header3 rect {
+    fill: #fef3c7;
+    stroke: #f59e0b;
+}
+
+.node.list rect {
+    fill: #f3f4f6;
+    stroke: #9ca3af;
+    stroke-width: 1px;
+}
+
+.node.list text {
+    font-size: 12px;
+}
+
+.node.paragraph rect {
+    fill: #fafafa;
+    stroke: #d1d5db;
+    stroke-dasharray: 4;
 }
 
 /* Fullscreen styles */
@@ -132,82 +238,185 @@
     margin: 0;
     border-radius: 0;
 }
+
+/* Tooltip styles */
+.tooltip {
+    position: absolute;
+    text-align: left;
+    padding: 8px;
+    font: 12px sans-serif;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: 0px;
+    border-radius: 4px;
+    pointer-events: none;
+}
+
+/* Node count indicator */
+.node-count {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 10;
+}
 </style>
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
-// Parse markdown content to extract structure
-const markdownContent = {{ note.content | tojson }};
+// Store the markdown content and title safely
+const noteData = {
+    content: {{ note.content|tojson }},
+    title: {{ note.title|tojson }}
+};
 
+// Improved Markdown parser
 function parseMarkdownToTree(markdown) {
     const lines = markdown.split('\n');
     const root = {
-        name: '{{ note.title }}',
+        name: noteData.title,
         children: [],
-        level: 0
+        level: 0,
+        type: 'root'
     };
     
-    const stack = [root];
-    let currentList = null;
+    const headerStack = [root];
+    let currentParent = root;
+    let lastNode = root;
+    let inCodeBlock = false;
+    let codeBlockContent = [];
     
-    lines.forEach(line => {
+    lines.forEach((line, index) => {
+        // Handle code blocks
+        if (line.trim().startsWith('```')) {
+            if (inCodeBlock) {
+                // End code block
+                const codeNode = {
+                    name: 'Code Block',
+                    content: codeBlockContent.join('\n'),
+                    children: [],
+                    type: 'code',
+                    level: currentParent.level + 1
+                };
+                currentParent.children.push(codeNode);
+                codeBlockContent = [];
+                inCodeBlock = false;
+            } else {
+                // Start code block
+                inCodeBlock = true;
+            }
+            return;
+        }
+        
+        if (inCodeBlock) {
+            codeBlockContent.push(line);
+            return;
+        }
+        
+        // Skip empty lines
+        if (!line.trim()) return;
+        
         // Check for headers
         const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
         if (headerMatch) {
             const level = headerMatch[1].length;
-            const text = headerMatch[2];
+            const text = headerMatch[2].trim();
             
-            // Pop stack until we find parent level
-            while (stack.length > level) {
-                stack.pop();
+            // Pop stack to find correct parent
+            while (headerStack.length > 1 && headerStack[headerStack.length - 1].level >= level) {
+                headerStack.pop();
             }
             
             const node = {
                 name: text,
                 children: [],
-                level: level
+                level: level,
+                type: `header${level}`
             };
             
-            const parent = stack[stack.length - 1];
-            if (!parent.children) parent.children = [];
+            const parent = headerStack[headerStack.length - 1];
             parent.children.push(node);
-            stack.push(node);
-            currentList = null;
+            headerStack.push(node);
+            currentParent = node;
+            lastNode = node;
+            return;
         }
         
-        // Check for list items
+        // Check for unordered list items
         const listMatch = line.match(/^(\s*)[*\-+]\s+(.+)$/);
         if (listMatch) {
             const indent = listMatch[1].length;
-            const text = listMatch[2];
+            const text = listMatch[2].trim();
             
             const node = {
                 name: text,
                 children: [],
-                level: stack[stack.length - 1].level + 1,
-                isList: true
+                level: currentParent.level + 1,
+                type: 'list',
+                indent: indent
             };
             
-            const parent = stack[stack.length - 1];
-            if (!parent.children) parent.children = [];
-            parent.children.push(node);
+            // Handle nested lists
+            if (lastNode.type === 'list' && indent > lastNode.indent) {
+                lastNode.children.push(node);
+            } else {
+                currentParent.children.push(node);
+            }
+            lastNode = node;
+            return;
         }
         
-        // Check for numbered lists
-        const numberedListMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
-        if (numberedListMatch) {
-            const text = numberedListMatch[2];
+        // Check for ordered list items
+        const orderedListMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
+        if (orderedListMatch) {
+            const indent = orderedListMatch[1].length;
+            const text = orderedListMatch[2].trim();
             
             const node = {
                 name: text,
                 children: [],
-                level: stack[stack.length - 1].level + 1,
-                isList: true
+                level: currentParent.level + 1,
+                type: 'list',
+                indent: indent
             };
             
-            const parent = stack[stack.length - 1];
-            if (!parent.children) parent.children = [];
-            parent.children.push(node);
+            currentParent.children.push(node);
+            lastNode = node;
+            return;
+        }
+        
+        // Check for blockquotes
+        if (line.trim().startsWith('>')) {
+            const text = line.replace(/^>\s*/, '').trim();
+            if (text) {
+                const node = {
+                    name: text,
+                    children: [],
+                    level: currentParent.level + 1,
+                    type: 'quote'
+                };
+                currentParent.children.push(node);
+                lastNode = node;
+            }
+            return;
+        }
+        
+        // Regular paragraph text
+        const text = line.trim();
+        if (text) {
+            const node = {
+                name: text.length > 80 ? text.substring(0, 80) + '...' : text,
+                fullText: text,
+                children: [],
+                level: currentParent.level + 1,
+                type: 'paragraph'
+            };
+            currentParent.children.push(node);
+            lastNode = node;
         }
     });
     
@@ -215,43 +424,84 @@ function parseMarkdownToTree(markdown) {
 }
 
 // D3 Mind Map Implementation
-const treeData = parseMarkdownToTree(markdownContent);
+const treeData = parseMarkdownToTree(noteData.content);
 
-const margin = {top: 20, right: 120, bottom: 20, left: 120};
-const width = document.getElementById('mindmap-container').clientWidth;
-const height = document.getElementById('mindmap-container').clientHeight;
+// Setup dimensions
+const containerWidth = document.getElementById('mindmap-container').clientWidth;
+const containerHeight = document.getElementById('mindmap-container').clientHeight;
 
+// Calculate dynamic dimensions based on content
+function calculateTreeDimensions(root) {
+    let maxDepth = 0;
+    let leafCount = 0;
+    
+    root.each(d => {
+        if (d.depth > maxDepth) maxDepth = d.depth;
+        if (!d.children && !d._children) leafCount++;
+    });
+    
+    // Dynamic sizing based on content
+    const nodeHeight = 50; // Height per node including spacing
+    const nodeWidth = 250; // Width per depth level
+    const width = Math.max(containerWidth, (maxDepth + 1) * nodeWidth);
+    const height = Math.max(containerHeight, leafCount * nodeHeight);
+    
+    return { width, height, nodeWidth, nodeHeight };
+}
+
+// Create SVG with initial viewBox
 const svg = d3.select("#mindmap-svg")
-    .attr("viewBox", [-width / 2, -height / 2, width, height]);
+    .attr("viewBox", [0, 0, containerWidth, containerHeight]);
 
 const g = svg.append("g");
 
-// Add zoom behavior
+// Add zoom behavior with extended range
 const zoom = d3.zoom()
-    .scaleExtent([0.1, 3])
+    .scaleExtent([0.02, 10])
     .on("zoom", (event) => {
         g.attr("transform", event.transform);
     });
 
 svg.call(zoom);
 
-// Create tree layout
+// Create tree layout - will be configured dynamically
 const tree = d3.tree()
-    .size([height - margin.top - margin.bottom, width - margin.left - margin.right]);
+    .separation((a, b) => {
+        // Dynamic separation based on node content
+        const aSize = (a.data.children ? a.data.children.length : 1);
+        const bSize = (b.data.children ? b.data.children.length : 1);
+        return (a.parent === b.parent ? 1 : 2) * Math.max(1, (aSize + bSize) / 10);
+    });
 
 // Create hierarchy
 const root = d3.hierarchy(treeData);
 root.x0 = 0;
 root.y0 = 0;
 
-// Collapse after the second level
+// Collapse after the second level for large trees
+let totalNodes = 0;
 root.descendants().forEach((d, i) => {
     d.id = i;
-    if (d.depth && d.depth > 1) {
-        d._children = d.children;
-        d.children = null;
-    }
+    totalNodes++;
 });
+
+// Only auto-collapse if tree is large
+if (totalNodes > 50) {
+    root.descendants().forEach((d) => {
+        if (d.depth && d.depth > 2) {
+            d._children = d.children;
+            d.children = null;
+        }
+    });
+}
+
+// Update node count
+document.getElementById('node-count').textContent = `Nodes: ${totalNodes} (Visible: ${root.descendants().filter(d => d.children || !d.parent).length})`;
+
+// Create tooltip
+const tooltip = d3.select("body").append("div")
+    .attr("class", "tooltip")
+    .style("opacity", 0);
 
 update(root);
 
@@ -263,27 +513,68 @@ function update(source) {
     const nodes = treeData.descendants();
     const links = treeData.links();
     
-    // Normalize for fixed-depth
+    // Calculate dynamic dimensions
+    const dimensions = calculateTreeDimensions(root);
+    
+    // Update tree size based on content
+    tree.size([dimensions.height, dimensions.width * 0.8]);
+    
+    // Recompute layout with new size
+    tree(root);
+    
+    // Normalize for fixed-depth with dynamic spacing
     nodes.forEach(d => {
-        d.y = d.depth * 180;
+        d.y = d.depth * dimensions.nodeWidth;
     });
+    
+    // Update SVG viewBox to accommodate all content
+    const xExtent = d3.extent(nodes, d => d.x);
+    const yExtent = d3.extent(nodes, d => d.y);
+    const padding = 100;
+    
+    svg.attr("viewBox", [
+        yExtent[0] - padding,
+        xExtent[0] - padding,
+        yExtent[1] - yExtent[0] + padding * 2,
+        xExtent[1] - xExtent[0] + padding * 2
+    ]);
     
     // Update nodes
     const node = g.selectAll("g.node")
         .data(nodes, d => d.id);
     
     const nodeEnter = node.enter().append("g")
-        .attr("class", d => `node level${Math.min(d.depth, 3)}`)
+        .attr("class", d => `node ${d.data.type || ''}`)
         .attr("transform", d => `translate(${source.y0},${source.x0})`)
-        .on("click", click);
+        .on("click", click)
+        .on("mouseover", (event, d) => {
+            if (d.data.fullText) {
+                tooltip.transition()
+                    .duration(200)
+                    .style("opacity", .9);
+                tooltip.html(d.data.fullText)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+            }
+        })
+        .on("mouseout", (d) => {
+            tooltip.transition()
+                .duration(500)
+                .style("opacity", 0);
+        });
     
     // Add rectangles for nodes
     nodeEnter.append("rect")
         .attr("width", 1e-6)
         .attr("height", 1e-6)
         .attr("x", -1)
-        .attr("y", -1)
-        .attr("class", d => d.depth === 0 ? "root" : "");
+        .attr("y", -1);
+    
+    // Add circles for collapse/expand
+    nodeEnter.append("circle")
+        .attr("r", 1e-6)
+        .style("fill", d => d._children ? "#667eea" : "#fff")
+        .style("display", d => d.children || d._children ? null : "none");
     
     // Add text
     nodeEnter.append("text")
@@ -299,18 +590,32 @@ function update(source) {
         .duration(duration)
         .attr("transform", d => `translate(${d.y},${d.x})`);
     
+    // Update rectangles
     nodeUpdate.select("rect")
         .attr("width", d => {
-            const textLength = d.data.name.length * 8 + 20;
-            return Math.max(textLength, 100);
+            // Better text measurement
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            context.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            const metrics = context.measureText(d.data.name);
+            const textLength = metrics.width + 40; // Add padding
+            return Math.max(textLength, 120);
         })
-        .attr("height", 30)
+        .attr("height", 40)
         .attr("x", d => {
-            const textLength = d.data.name.length * 8 + 20;
-            return -Math.max(textLength, 100) / 2;
+            const textLength = d.data.name.length * 8 + 30;
+            return -Math.max(textLength, 120) / 2;
         })
-        .attr("y", -15)
-        .attr("class", d => d._children ? "collapsed" : "");
+        .attr("y", -18);
+    
+    // Update circles
+    nodeUpdate.select("circle")
+        .attr("r", 6)
+        .attr("cx", d => {
+            const textLength = d.data.name.length * 8 + 30;
+            return Math.max(textLength, 120) / 2 + 10;
+        })
+        .style("fill", d => d._children ? "#667eea" : "#fff");
     
     nodeUpdate.select("text")
         .style("fill-opacity", 1);
@@ -324,6 +629,9 @@ function update(source) {
     nodeExit.select("rect")
         .attr("width", 1e-6)
         .attr("height", 1e-6);
+    
+    nodeExit.select("circle")
+        .attr("r", 1e-6);
     
     nodeExit.select("text")
         .style("fill-opacity", 1e-6);
@@ -358,8 +666,20 @@ function update(source) {
         d.x0 = d.x;
         d.y0 = d.y;
     });
+    
+    // Update node count
+    const visibleNodes = root.descendants().filter(d => {
+        let parent = d.parent;
+        while (parent) {
+            if (!parent.children) return false;
+            parent = parent.parent;
+        }
+        return true;
+    }).length;
+    document.getElementById('node-count').textContent = `Nodes: ${totalNodes} (Visible: ${visibleNodes})`;
 }
 
+// Diagonal link generator
 function diagonal(d) {
     return `M ${d.source.y} ${d.source.x}
             C ${(d.source.y + d.target.y) / 2} ${d.source.x},
@@ -367,6 +687,7 @@ function diagonal(d) {
               ${d.target.y} ${d.target.x}`;
 }
 
+// Toggle children on click
 function click(event, d) {
     if (d.children) {
         d._children = d.children;
@@ -378,10 +699,9 @@ function click(event, d) {
     update(d);
 }
 
+// Utility functions
 function resetZoom() {
-    svg.transition()
-        .duration(750)
-        .call(zoom.transform, d3.zoomIdentity);
+    autoFit();
 }
 
 function toggleFullscreen() {
@@ -394,8 +714,53 @@ function toggleFullscreen() {
     svg.attr("viewBox", [-newWidth / 2, -newHeight / 2, newWidth, newHeight]);
 }
 
+// Auto-fit the content initially
+function autoFit() {
+    const bounds = g.node().getBBox();
+    const fullWidth = bounds.width;
+    const fullHeight = bounds.height;
+    const width = containerWidth;
+    const height = containerHeight;
+    
+    const midX = bounds.x + fullWidth / 2;
+    const midY = bounds.y + fullHeight / 2;
+    
+    const scale = 0.9 / Math.max(fullWidth / width, fullHeight / height);
+    const translate = [width / 2 - scale * midX, height / 2 - scale * midY];
+    
+    svg.transition()
+        .duration(750)
+        .call(zoom.transform, d3.zoomIdentity
+            .translate(translate[0], translate[1])
+            .scale(scale));
+}
+
 // Center the tree initially
-svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.8));
+setTimeout(autoFit, 100);
+
+// Expand all nodes
+function expandAll() {
+    root.descendants().forEach(d => {
+        if (d._children) {
+            d.children = d._children;
+            d._children = null;
+        }
+    });
+    update(root);
+    setTimeout(autoFit, 800);
+}
+
+// Collapse all nodes except root
+function collapseAll() {
+    root.descendants().forEach(d => {
+        if (d.depth > 0 && d.children) {
+            d._children = d.children;
+            d.children = null;
+        }
+    });
+    update(root);
+    setTimeout(autoFit, 800);
+}
 </script>
 
 {% endblock %}

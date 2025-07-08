@@ -1,14 +1,27 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="timetrack-container notes-folders-container">
-    <div class="admin-header">
-        <h2>Note Folders</h2>
-        <div class="admin-actions">
-            <button type="button" class="btn btn-sm btn-success" onclick="showCreateFolderModal()">
-                <span>📁</span> Create Folder
-            </button>
-            <a href="{{ url_for('notes.notes_list') }}" class="btn btn-sm btn-secondary">Back to Notes</a>
+<div class="notes-folders-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon">📁</span>
+                    Note Folders
+                </h1>
+                <p class="page-subtitle">Organize your notes with folders</p>
+            </div>
+            <div class="header-actions">
+                <button type="button" class="btn btn-success" onclick="showCreateFolderModal()">
+                    <span class="icon">➕</span>
+                    Create Folder
+                </button>
+                <a href="{{ url_for('notes.notes_list') }}" class="btn btn-secondary">
+                    <span class="icon">←</span>
+                    Back to Notes
+                </a>
+            </div>
         </div>
     </div>
 
@@ -69,10 +82,100 @@
 
 <style>
 .notes-folders-container {
-    max-width: none !important;
-    width: 100% !important;
-    padding: 1rem !important;
-    margin: 0 !important;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Page Header - Time Tracking style */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Button styles */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+    border: none;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border-color: #e5e7eb;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #667eea;
+}
+
+.btn .icon {
+    font-size: 1.1em;
 }
 
 .folders-layout {
@@ -85,9 +188,10 @@
 .folder-tree-panel,
 .folder-details-panel {
     background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
     padding: 1.5rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
 .folder-tree-panel h3,
