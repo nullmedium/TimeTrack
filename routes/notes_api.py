@@ -56,6 +56,7 @@ def api_create_folder():
     
     folder_name = data.get('name', '').strip()
     parent_path = data.get('parent', '').strip()
+    description = data.get('description', '').strip()
     
     if not folder_name:
         return jsonify({'success': False, 'message': 'Folder name is required'}), 400
@@ -81,7 +82,10 @@ def api_create_folder():
     
     # Create folder
     folder = NoteFolder(
+        name=folder_name,
         path=full_path,
+        parent_path=parent_path if parent_path else None,
+        description=description if description else None,
         company_id=g.user.company_id,
         created_by_id=g.user.id
     )
