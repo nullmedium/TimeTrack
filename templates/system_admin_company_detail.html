@@ -3,17 +3,17 @@
 {% block content %}
 <div class="container">
     <div class="header-section">
-        <h1>🏢 {{ company.name }}</h1>
+        <h1><i class="ti ti-building"></i> {{ company.name }}</h1>
         <p class="subtitle">Company Details - System Administrator View</p>
         <div class="header-actions">
-            <a href="{{ url_for('system_admin.system_admin_companies') }}" class="btn btn-secondary">← Back to Companies</a>
+            <a href="{{ url_for('system_admin.system_admin_companies') }}" class="btn btn-secondary"><i class="ti ti-arrow-left"></i> Back to Companies</a>
             <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">Dashboard</a>
         </div>
     </div>
 
     <!-- Company Information -->
     <div class="info-section">
-        <h3>📋 Company Information</h3>
+        <h3><i class="ti ti-clipboard-list"></i> Company Information</h3>
         <div class="info-grid">
             <div class="info-item">
                 <label>Company Name:</label>
@@ -58,7 +58,7 @@
 
     <!-- Statistics Overview -->
     <div class="stats-section">
-        <h3>📊 Company Statistics</h3>
+        <h3><i class="ti ti-chart-bar"></i> Company Statistics</h3>
         <div class="stats-grid">
             <div class="stat-card">
                 <h4>{{ users|length }}</h4>
@@ -83,7 +83,7 @@
     <!-- Role Distribution -->
     {% if role_counts %}
     <div class="role-section">
-        <h3>👥 Role Distribution</h3>
+        <h3><i class="ti ti-users"></i> Role Distribution</h3>
         <div class="role-grid">
             {% for role, count in role_counts.items() %}
             <div class="role-card">
@@ -122,7 +122,7 @@
                     {% if users|length > 10 %}
                     <div class="list-more">
                         <a href="{{ url_for('users.system_admin_users', company=company.id) }}" class="btn btn-sm btn-outline">
-                            View All {{ users|length }} Users →
+                            View All {{ users|length }} Users <i class="ti ti-arrow-right"></i>
                         </a>
                     </div>
                     {% endif %}
@@ -196,7 +196,7 @@
         <h3>🛠️ Management Actions</h3>
         <div class="actions-grid">
             <a href="{{ url_for('users.system_admin_users', company=company.id) }}" class="action-card">
-                <div class="action-icon">👥</div>
+                <div class="action-icon"><i class="ti ti-users"></i></div>
                 <div class="action-content">
                     <h4>Manage Users</h4>
                     <p>View and edit all users in this company</p>
@@ -214,7 +214,7 @@
     
     <!-- Danger Zone -->
     <div class="danger-section">
-        <h3>⚠️ Danger Zone</h3>
+        <h3><i class="ti ti-alert-triangle"></i> Danger Zone</h3>
         <div class="danger-content">
             <p><strong>Delete Company</strong></p>
             <p>Once you delete a company, there is no going back. This will permanently delete:</p>

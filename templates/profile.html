@@ -20,7 +20,7 @@
                     <span class="stat-text">{{ user.company.name if user.company else 'No Company' }}</span>
                 </div>
                 <div class="stat-badge">
-                    <span class="stat-icon">👥</span>
+                    <span class="stat-icon"><i class="ti ti-users"></i></span>
                     <span class="stat-text">{{ user.team.name if user.team else 'No Team' }}</span>
                 </div>
                 <div class="stat-badge">
@@ -81,7 +81,7 @@
                         <!-- Default Avatar Tab -->
                         <div class="tab-content active" id="default-tab">
                             <div class="info-message">
-                                <span class="info-icon">💡</span>
+                                <span class="info-icon"><i class="ti ti-bulb"></i></span>
                                 <p>Your default avatar is automatically generated based on your username.</p>
                             </div>
                             <button type="button" class="btn btn-outline" onclick="resetAvatar()">
@@ -190,7 +190,7 @@
                         
                         {% if user.email and not user.is_verified %}
                         <div class="alert alert-warning">
-                            <span class="alert-icon">⚠️</span>
+                            <span class="alert-icon"><i class="ti ti-alert-triangle"></i></span>
                             <div>
                                 <p>Your email address is not verified.</p>
                                 <a href="{{ url_for('profile') }}" class="btn btn-sm btn-warning">Send Verification Email</a>
@@ -285,7 +285,7 @@
                                 </form>
                             {% else %}
                                 <div class="status-indicator disabled">
-                                    <span class="status-icon">⚠️</span>
+                                    <span class="status-icon"><i class="ti ti-alert-triangle"></i></span>
                                     <div>
                                         <div class="status-text">Disabled</div>
                                         <div class="status-description">Add extra security to your account</div>

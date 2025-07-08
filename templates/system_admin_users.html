@@ -3,9 +3,9 @@
 {% block content %}
 <div class="container">
     <div class="header-section">
-        <h1>👥 System Admin - All Users</h1>
+        <h1><i class="ti ti-users"></i> System Admin - All Users</h1>
         <p class="subtitle">Manage users across all companies</p>
-        <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-md btn-secondary">← Back to Dashboard</a>
+        <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-md btn-secondary"><i class="ti ti-arrow-left"></i> Back to Dashboard</a>
     </div>
 
     <!-- Filter Options -->
@@ -124,7 +124,7 @@
     <div class="pagination-section">
         <div class="pagination">
             {% if users.has_prev %}
-                <a href="{{ url_for('users.system_admin_users', page=users.prev_num, filter=current_filter) }}" class="page-link">← Previous</a>
+                <a href="{{ url_for('users.system_admin_users', page=users.prev_num, filter=current_filter) }}" class="page-link"><i class="ti ti-arrow-left"></i> Previous</a>
             {% endif %}
             
             {% for page_num in users.iter_pages() %}
@@ -140,7 +140,7 @@
             {% endfor %}
             
             {% if users.has_next %}
-                <a href="{{ url_for('users.system_admin_users', page=users.next_num, filter=current_filter) }}" class="page-link">Next →</a>
+                <a href="{{ url_for('users.system_admin_users', page=users.next_num, filter=current_filter) }}" class="page-link">Next <i class="ti ti-arrow-right"></i></a>
             {% endif %}
         </div>
         

@@ -31,12 +31,12 @@
         <h2 class="section-title">Powerful Features for Modern Teams</h2>
         <div class="feature-cards">
             <div class="feature-card">
-                <div class="feature-icon">⚡</div>
+                <div class="feature-icon"><i class="ti ti-bolt"></i></div>
                 <h3>Lightning Fast</h3>
                 <p>Start tracking in seconds with our intuitive one-click interface</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">📊</div>
+                <div class="feature-icon"><i class="ti ti-chart-bar"></i></div>
                 <h3>Advanced Analytics</h3>
                 <p>Gain insights with comprehensive reports and visual dashboards</p>
             </div>
@@ -46,7 +46,7 @@
                 <p>Organize work into sprints with agile project tracking</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">👥</div>
+                <div class="feature-icon"><i class="ti ti-users"></i></div>
                 <h3>Team Collaboration</h3>
                 <p>Manage teams, projects, and resources all in one place</p>
             </div>
@@ -71,7 +71,7 @@
             <div class="stat-label">Free & Open Source</div>
         </div>
         <div class="stat-item">
-            <div class="stat-number">∞</div>
+            <div class="stat-number"><i class="ti ti-infinity"></i></div>
             <div class="stat-label">Unlimited Tracking</div>
         </div>
         <div class="stat-item">
@@ -115,14 +115,14 @@
                 <h3>{{ g.branding.app_name if g.branding else 'TimeTrack' }} Community</h3>
                 <div class="price">$0<span>/forever</span></div>
                 <ul class="pricing-features">
-                    <li>✓ Unlimited users</li>
-                    <li>✓ All features included</li>
-                    <li>✓ Time tracking & analytics</li>
-                    <li>✓ Sprint management</li>
-                    <li>✓ Team collaboration</li>
-                    <li>✓ Project management</li>
-                    <li>✓ Self-hosted option</li>
-                    <li>✓ No restrictions</li>
+                    <li><i class="ti ti-check"></i> Unlimited users</li>
+                    <li><i class="ti ti-check"></i> All features included</li>
+                    <li><i class="ti ti-check"></i> Time tracking & analytics</li>
+                    <li><i class="ti ti-check"></i> Sprint management</li>
+                    <li><i class="ti ti-check"></i> Team collaboration</li>
+                    <li><i class="ti ti-check"></i> Project management</li>
+                    <li><i class="ti ti-check"></i> Self-hosted option</li>
+                    <li><i class="ti ti-check"></i> No restrictions</li>
                 </ul>
                 <a href="{{ url_for('register') }}" class="btn-pricing">Get Started Free</a>
             </div>
@@ -376,7 +376,7 @@
                             <td>
                                 <div class="time-cell">
                                     <span class="time-start">{{ entry.arrival_time|format_time }}</span>
-                                    <span class="time-separator">→</span>
+                                    <span class="time-separator"><i class="ti ti-arrow-right"></i></span>
                                     <span class="time-end">{{ entry.departure_time|format_time if entry.departure_time else 'Active' }}</span>
                                 </div>
                             </td>

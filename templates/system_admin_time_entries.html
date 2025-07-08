@@ -5,7 +5,7 @@
     <div class="header-section">
         <h1>⏱️ System Admin - Time Entries</h1>
         <p class="subtitle">View time entries across all companies</p>
-        <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+        <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary"><i class="ti ti-arrow-left"></i> Back to Dashboard</a>
     </div>
 
     <!-- Filter Section -->
@@ -112,7 +112,7 @@
     <div class="pagination-section">
         <div class="pagination">
             {% if entries.has_prev %}
-                <a href="{{ url_for('system_admin.system_admin_time_entries', page=entries.prev_num, company=current_company) }}" class="page-link">← Previous</a>
+                <a href="{{ url_for('system_admin.system_admin_time_entries', page=entries.prev_num, company=current_company) }}" class="page-link"><i class="ti ti-arrow-left"></i> Previous</a>
             {% endif %}
             
             {% for page_num in entries.iter_pages() %}
@@ -128,7 +128,7 @@
             {% endfor %}
             
             {% if entries.has_next %}
-                <a href="{{ url_for('system_admin.system_admin_time_entries', page=entries.next_num, company=current_company) }}" class="page-link">Next →</a>
+                <a href="{{ url_for('system_admin.system_admin_time_entries', page=entries.next_num, company=current_company) }}" class="page-link">Next <i class="ti ti-arrow-right"></i></a>
             {% endif %}
         </div>
         

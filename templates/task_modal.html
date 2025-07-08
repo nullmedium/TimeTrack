@@ -11,7 +11,7 @@
                 
                 <!-- Basic Information -->
                 <div class="form-section">
-                    <h3>📝 Basic Information</h3>
+                    <h3><i class="ti ti-file-text"></i> Basic Information</h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="task-name">Task Name *</label>
@@ -48,7 +48,7 @@
                 
                 <!-- Assignment & Planning -->
                 <div class="form-section">
-                    <h3>👥 Assignment & Planning</h3>
+                    <h3><i class="ti ti-users"></i> Assignment & Planning</h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="task-project">Project</label>
@@ -89,7 +89,7 @@
                         <div class="hybrid-date-input">
                             <input type="date" id="task-due-date-native" class="date-input-native">
                             <input type="text" id="task-due-date" class="date-input-formatted" placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
-                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('task-due-date')" title="Open calendar">📅</button>
+                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('task-due-date')" title="Open calendar"><i class="ti ti-calendar"></i></button>
                         </div>
                         <div class="date-error" id="task-due-date-error" style="display: none; color: #dc3545; font-size: 0.8rem; margin-top: 0.25rem;"></div>
                     </div>
@@ -97,11 +97,11 @@
                 
                 <!-- Dependencies -->
                 <div class="form-section">
-                    <h3>🔗 Dependencies</h3>
+                    <h3><i class="ti ti-link"></i> Dependencies</h3>
                     <div class="dependencies-grid">
                         <!-- Blocked By -->
                         <div class="dependency-column">
-                            <h4>🚫 Blocked By</h4>
+                            <h4><i class="ti ti-ban"></i> Blocked By</h4>
                             <p class="dependency-help">Tasks that must be completed before this task can start</p>
                             <div id="blocked-by-container" class="dependency-list">
                                 <!-- Blocked by tasks will be populated here -->
@@ -114,7 +114,7 @@
                         
                         <!-- Blocks -->
                         <div class="dependency-column">
-                            <h4>🔒 Blocks</h4>
+                            <h4><i class="ti ti-lock"></i> Blocks</h4>
                             <p class="dependency-help">Tasks that cannot start until this task is completed</p>
                             <div id="blocks-container" class="dependency-list">
                                 <!-- Blocks tasks will be populated here -->
@@ -129,17 +129,17 @@
                 
                 <!-- Subtasks -->
                 <div class="form-section">
-                    <h3>📋 Subtasks</h3>
+                    <h3><i class="ti ti-clipboard-list"></i> Subtasks</h3>
                     <div id="subtasks-container">
                         <!-- Subtasks will be populated here -->
                     </div>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="addSubtask()">+ Add Subtask</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addSubtask()"><i class="ti ti-plus"></i> Add Subtask</button>
                 </div>
             </form>
             
             <!-- Comments Section (outside form) -->
             <div class="form-section" id="comments-section" style="display: none;">
-                <h3>💬 Comments</h3>
+                <h3><i class="ti ti-message-circle"></i> Comments</h3>
                 <div id="comments-container">
                     <!-- Comments will be populated here -->
                 </div>
@@ -147,8 +147,8 @@
                     <textarea id="new-comment" placeholder="Add a comment..." rows="2"></textarea>
                     <div class="comment-form-actions">
                         <select id="comment-visibility" class="comment-visibility-select" style="display: none;">
-                            <option value="COMPANY">🏢 Company</option>
-                            <option value="TEAM">👥 Team Only</option>
+                            <option value="COMPANY"><i class="ti ti-building"></i> Company</option>
+                            <option value="TEAM"><i class="ti ti-users"></i> Team Only</option>
                         </select>
                         <button type="button" class="btn btn-sm btn-primary" onclick="addComment()">Post Comment</button>
                     </div>

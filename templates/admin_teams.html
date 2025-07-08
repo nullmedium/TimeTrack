@@ -7,14 +7,14 @@
         <div class="header-content">
             <div class="header-left">
                 <h1 class="page-title">
-                    <span class="page-icon">👥</span>
+                    <i class="ti ti-users page-icon"></i>
                     Team Management
                 </h1>
                 <p class="page-subtitle">Manage teams and their members across your organization</p>
             </div>
             <div class="header-actions">
                 <a href="{{ url_for('teams.create_team') }}" class="btn btn-primary">
-                    <span class="icon">+</span>
+                    <i class="ti ti-plus"></i>
                     Create New Team
                 </a>
             </div>
@@ -45,7 +45,7 @@
             <!-- Search Bar -->
             <div class="search-section">
                 <div class="search-container">
-                    <span class="search-icon">🔍</span>
+                    <i class="ti ti-search search-icon"></i>
                     <input type="text" 
                            class="search-input" 
                            id="teamSearch" 
@@ -59,7 +59,7 @@
                     <div class="team-card" data-team-name="{{ team.name.lower() }}" data-team-desc="{{ team.description.lower() if team.description else '' }}">
                         <div class="team-header">
                             <div class="team-icon-wrapper">
-                                <span class="team-icon">👥</span>
+                                <i class="ti ti-users team-icon"></i>
                             </div>
                             <div class="team-meta">
                                 <span class="member-count">{{ team.users|length }} members</span>
@@ -74,12 +74,12 @@
                             
                             <div class="team-info">
                                 <div class="info-item">
-                                    <span class="info-icon">📅</span>
+                                    <i class="ti ti-calendar info-icon"></i>
                                     <span class="info-text">Created {{ team.created_at.strftime('%b %d, %Y') }}</span>
                                 </div>
                                 {% if team.users %}
                                 <div class="info-item">
-                                    <span class="info-icon">👤</span>
+                                    <i class="ti ti-user info-icon"></i>
                                     <span class="info-text">Led by {{ team.users[0].username }}</span>
                                 </div>
                                 {% endif %}
@@ -104,7 +104,7 @@
                         
                         <div class="team-actions">
                             <a href="{{ url_for('teams.manage_team', team_id=team.id) }}" class="btn btn-manage">
-                                <span class="icon">⚙️</span>
+                                <i class="ti ti-settings"></i>
                                 Manage Team
                             </a>
                             <form method="POST" 
@@ -112,7 +112,7 @@
                                   class="delete-form"
                                   onsubmit="return confirm('Are you sure you want to delete the team \"{{ team.name }}\"? This action cannot be undone.');">
                                 <button type="submit" class="btn btn-delete" title="Delete Team">
-                                    <span class="icon">🗑️</span>
+                                    <i class="ti ti-trash"></i>
                                 </button>
                             </form>
                         </div>
@@ -122,18 +122,18 @@
             
             <!-- No Results Message -->
             <div class="no-results" id="noResults" style="display: none;">
-                <div class="empty-icon">🔍</div>
+                <div class="empty-icon"><i class="ti ti-search-off" style="font-size: 4rem;"></i></div>
                 <p class="empty-message">No teams found matching your search</p>
                 <p class="empty-hint">Try searching with different keywords</p>
             </div>
         {% else %}
             <!-- Empty State -->
             <div class="empty-state">
-                <div class="empty-icon">👥</div>
+                <div class="empty-icon"><i class="ti ti-users" style="font-size: 4rem;"></i></div>
                 <h2 class="empty-title">No Teams Yet</h2>
                 <p class="empty-message">Create your first team to start organizing your workforce</p>
                 <a href="{{ url_for('teams.create_team') }}" class="btn btn-primary btn-lg">
-                    <span class="icon">+</span>
+                    <i class="ti ti-plus"></i>
                     Create First Team
                 </a>
             </div>

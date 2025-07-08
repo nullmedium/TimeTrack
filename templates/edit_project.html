@@ -103,7 +103,7 @@
     <!-- Danger Zone (only for admins) -->
     {% if g.user.role in [Role.ADMIN, Role.SYSTEM_ADMIN] %}
     <div class="danger-zone">
-        <h3>⚠️ Danger Zone</h3>
+        <h3><i class="ti ti-alert-triangle"></i> Danger Zone</h3>
         <div class="danger-content">
             <p><strong>Delete Project</strong></p>
             <p>Once you delete a project, there is no going back. This will permanently delete:</p>

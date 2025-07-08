@@ -6,7 +6,7 @@
         <h1>{{ "Edit" if announcement else "Create" }} Announcement</h1>
         <p class="subtitle">{{ "Update" if announcement else "Create new" }} system announcement for users</p>
         <a href="{{ url_for('announcements.index') }}" class="btn btn-secondary">
-            ← Back to Announcements
+            <i class="ti ti-arrow-left"></i> Back to Announcements
         </a>
     </div>
 

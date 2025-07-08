@@ -3,11 +3,11 @@
 {% block content %}
 <div class="container">
     <div class="header-section">
-        <h1>🏢 System Admin - All Companies</h1>
+        <h1><i class="ti ti-building"></i> System Admin - All Companies</h1>
         <p class="subtitle">Manage companies across the entire system</p>
         <div class="header-actions">
             <a href="/setup" class="btn btn-md btn-success">+ Add New Company</a>
-            <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-md btn-secondary">← Back to Dashboard</a>
+            <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-md btn-secondary"><i class="ti ti-arrow-left"></i> Back to Dashboard</a>
         </div>
     </div>
 
@@ -75,7 +75,7 @@
     <div class="pagination-section">
         <div class="pagination">
             {% if companies.has_prev %}
-                <a href="{{ url_for('system_admin.system_admin_companies', page=companies.prev_num) }}" class="page-link">← Previous</a>
+                <a href="{{ url_for('system_admin.system_admin_companies', page=companies.prev_num) }}" class="page-link"><i class="ti ti-arrow-left"></i> Previous</a>
             {% endif %}
             
             {% for page_num in companies.iter_pages() %}
@@ -91,7 +91,7 @@
             {% endfor %}
             
             {% if companies.has_next %}
-                <a href="{{ url_for('system_admin.system_admin_companies', page=companies.next_num) }}" class="page-link">Next →</a>
+                <a href="{{ url_for('system_admin.system_admin_companies', page=companies.next_num) }}" class="page-link">Next <i class="ti ti-arrow-right"></i></a>
             {% endif %}
         </div>
         
@@ -111,7 +111,7 @@
 
     <!-- Company Statistics Summary -->
     <div class="summary-section">
-        <h3>📊 Company Summary</h3>
+        <h3><i class="ti ti-chart-bar"></i> Company Summary</h3>
         <div class="summary-grid">
             <div class="summary-card">
                 <h4>Total Companies</h4>

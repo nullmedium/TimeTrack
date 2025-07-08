@@ -2,22 +2,22 @@
 
 {% block content %}
 <div class="container">
-    <h1>🔧 System Administrator Dashboard</h1>
+    <h1><i class="ti ti-tool"></i> System Administrator Dashboard</h1>
     <p class="subtitle">Global system overview and management tools</p>
 
     <!-- System Overview Statistics -->
     <div class="stats-section">
-        <h2>📊 System Overview</h2>
+        <h2><i class="ti ti-chart-bar"></i> System Overview</h2>
         <div class="stats-grid">
             <div class="stat-card">
                 <h3>{{ total_companies }}</h3>
                 <p>Total Companies</p>
-                <a href="{{ url_for('system_admin.system_admin_companies') }}" class="stat-link">Manage →</a>
+                <a href="{{ url_for('system_admin.system_admin_companies') }}" class="stat-link">Manage <i class="ti ti-arrow-right"></i></a>
             </div>
             <div class="stat-card">
                 <h3>{{ total_users }}</h3>
                 <p>Total Users</p>
-                <a href="{{ url_for('users.system_admin_users') }}" class="stat-link">Manage →</a>
+                <a href="{{ url_for('users.system_admin_users') }}" class="stat-link">Manage <i class="ti ti-arrow-right"></i></a>
             </div>
             <div class="stat-card">
                 <h3>{{ total_teams }}</h3>
@@ -30,14 +30,14 @@
             <div class="stat-card">
                 <h3>{{ total_time_entries }}</h3>
                 <p>Time Entries</p>
-                <a href="{{ url_for('system_admin.system_admin_time_entries') }}" class="stat-link">View →</a>
+                <a href="{{ url_for('system_admin.system_admin_time_entries') }}" class="stat-link">View <i class="ti ti-arrow-right"></i></a>
             </div>
         </div>
     </div>
 
     <!-- Administrator Statistics -->
     <div class="stats-section">
-        <h2>👤 Administrator Overview</h2>
+        <h2><i class="ti ti-user"></i> Administrator Overview</h2>
         <div class="stats-grid">
             <div class="stat-card">
                 <h3>{{ system_admins }}</h3>
@@ -51,7 +51,7 @@
                 <h3>{{ blocked_users }}</h3>
                 <p>Blocked Users</p>
                 {% if blocked_users > 0 %}
-                    <a href="{{ url_for('users.system_admin_users', filter='blocked') }}" class="stat-link">Review →</a>
+                    <a href="{{ url_for('users.system_admin_users', filter='blocked') }}" class="stat-link">Review <i class="ti ti-arrow-right"></i></a>
                 {% endif %}
             </div>
         </div>
@@ -59,7 +59,7 @@
 
     <!-- Recent Activity -->
     <div class="stats-section">
-        <h2>📈 Recent Activity (Last 7 Days)</h2>
+        <h2><i class="ti ti-trending-up"></i> Recent Activity (Last 7 Days)</h2>
         <div class="stats-grid">
             <div class="stat-card">
                 <h3>{{ recent_users }}</h3>
@@ -79,7 +79,7 @@
     <!-- System Health -->
     {% if orphaned_users > 0 or orphaned_time_entries > 0 %}
     <div class="stats-section alert-section">
-        <h2>⚠️ System Health Issues</h2>
+        <h2><i class="ti ti-alert-triangle"></i> System Health Issues</h2>
         <div class="stats-grid">
             {% if orphaned_users > 0 %}
             <div class="stat-card alert-card">
@@ -102,7 +102,7 @@
     <div class="dashboard-grid">
         <!-- Top Companies -->
         <div class="dashboard-card">
-            <h3>🏢 Top Companies by Users</h3>
+            <h3><i class="ti ti-building"></i> Top Companies by Users</h3>
             {% if top_companies %}
                 <table class="table">
                     <thead>
@@ -131,7 +131,7 @@
 
         <!-- Recent Companies -->
         <div class="dashboard-card">
-            <h3>🆕 Recent Companies</h3>
+            <h3><i class="ti ti-sparkles"></i> Recent Companies</h3>
             {% if recent_companies_list %}
                 <table class="table">
                     <thead>
@@ -169,25 +169,25 @@
 
     <!-- Management Actions -->
     <div class="admin-panel">
-        <h2>🛠️ System Management</h2>
+        <h2><i class="ti ti-settings"></i> System Management</h2>
         <div class="admin-actions">
             <a href="{{ url_for('users.system_admin_users') }}" class="btn btn-primary">
-                👥 Manage All Users
+                <i class="ti ti-users"></i> Manage All Users
             </a>
             <a href="{{ url_for('system_admin.system_admin_companies') }}" class="btn btn-primary">
-                🏢 Manage Companies
+                <i class="ti ti-building"></i> Manage Companies
             </a>
             <a href="{{ url_for('system_admin.system_admin_time_entries') }}" class="btn btn-primary">
-                ⏱️ View Time Entries
+                <i class="ti ti-clock"></i> View Time Entries
             </a>
             <a href="{{ url_for('system_admin.system_admin_settings') }}" class="btn btn-primary">
-                ⚙️ System Settings
+                <i class="ti ti-settings"></i> System Settings
             </a>
             <a href="{{ url_for('system_admin.branding') }}" class="btn btn-primary">
-                🎨 Branding Settings
+                <i class="ti ti-palette"></i> Branding Settings
             </a>
             <a href="{{ url_for('system_admin.system_admin_health') }}" class="btn btn-primary">
-                🏥 System Health
+                <i class="ti ti-heart-rate-monitor"></i> System Health
             </a>
         </div>
     </div>

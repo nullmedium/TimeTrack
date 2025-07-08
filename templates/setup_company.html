@@ -13,17 +13,17 @@
     <!-- Info Message -->
     {% if is_initial_setup %}
         <div class="info-message">
-            <h3>🎉 Let's Get Started!</h3>
+            <h3><i class="ti ti-confetti"></i> Let's Get Started!</h3>
             <p>Set up your company and create the first administrator account to begin using {{ g.branding.app_name }}.</p>
         </div>
     {% elif is_super_admin %}
         <div class="info-message">
-            <h3>🏢 New Company Setup</h3>
+            <h3><i class="ti ti-building"></i> New Company Setup</h3>
             <p>Create a new company with its own administrator. This will be a separate organization within {{ g.branding.app_name }}.</p>
         </div>
     {% else %}
         <div class="error-message">
-            <h3>⚠️ Access Denied</h3>
+            <h3><i class="ti ti-alert-triangle"></i> Access Denied</h3>
             <p>You do not have permission to create new companies.</p>
             <a href="{{ url_for('home') }}" class="btn btn-secondary">Return Home</a>
         </div>
@@ -102,11 +102,11 @@
             <div class="form-actions">
                 {% if is_super_admin %}
                     <a href="{{ url_for('companies.admin_company') }}" class="btn btn-secondary">
-                        ← Back to Dashboard
+                        <i class="ti ti-arrow-left"></i> Back to Dashboard
                     </a>
                 {% endif %}
                 <button type="submit" class="btn btn-success">
-                    🚀 {% if is_initial_setup %}Create Company & Admin Account{% else %}Create New Company{% endif %}
+                    <i class="ti ti-rocket"></i> {% if is_initial_setup %}Create Company & Admin Account{% else %}Create New Company{% endif %}
                 </button>
             </div>
         </form>

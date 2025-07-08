@@ -7,18 +7,18 @@
         <div class="header-content">
             <div class="header-left">
                 <h1 class="page-title">
-                    <span class="page-icon">📁</span>
+                    <span class="page-icon"><i class="ti ti-folder"></i></span>
                     Note Folders
                 </h1>
                 <p class="page-subtitle">Organize your notes with folders</p>
             </div>
             <div class="header-actions">
                 <button type="button" class="btn btn-success" onclick="showCreateFolderModal()">
-                    <span class="icon">➕</span>
+                    <span class="icon"><i class="ti ti-plus"></i></span>
                     Create Folder
                 </button>
                 <a href="{{ url_for('notes.notes_list') }}" class="btn btn-secondary">
-                    <span class="icon">←</span>
+                    <span class="icon"><i class="ti ti-arrow-left"></i></span>
                     Back to Notes
                 </a>
             </div>
@@ -460,7 +460,7 @@ function loadFolderDetails(folderPath) {
         .then(data => {
             const detailsHtml = `
                 <div class="folder-details">
-                    <h4><span class="folder-icon">📁</span> ${data.name}</h4>
+                    <h4><span class="folder-icon"><i class="ti ti-folder"></i></span> ${data.name}</h4>
                     <div class="folder-path">${data.path}</div>
                     
                     <div class="folder-stats">
@@ -628,7 +628,7 @@ document.getElementById('folderModal').addEventListener('click', function(e) {
                 {% if children %}
                     <span onclick="toggleFolder(event, '{{ folder }}')" style="position: absolute; left: -15px; cursor: pointer;">▶</span>
                 {% endif %}
-                <span class="folder-icon">📁</span>
+                <span class="folder-icon"><i class="ti ti-folder"></i></span>
                 <span class="folder-name">{{ folder.split('/')[-1] }}</span>
                 <span class="folder-count">({{ folder_counts.get(folder, 0) }})</span>
             </div>

@@ -61,7 +61,7 @@
                             <td>
                                 {{ user.username }}
                                 {% if user.two_factor_enabled %}
-                                    <span class="security-badge" title="2FA Enabled">🔒</span>
+                                    <span class="security-badge" title="2FA Enabled"><i class="ti ti-lock"></i></span>
                                 {% endif %}
                             </td>
                             <td>{{ user.email }}</td>
@@ -112,7 +112,7 @@
 
     <!-- Navigation -->
     <div class="admin-section">
-        <a href="{{ url_for('companies.admin_company') }}" class="btn btn-secondary">← Back to Company Management</a>
+        <a href="{{ url_for('companies.admin_company') }}" class="btn btn-secondary"><i class="ti ti-arrow-left"></i> Back to Company Management</a>
     </div>
 </div>
 

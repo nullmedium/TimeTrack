@@ -148,10 +148,10 @@ document.addEventListener('DOMContentLoaded', function() {
             matchIndicator.textContent = '';
             matchIndicator.className = 'password-match-indicator';
         } else if (password === confirmInput.value) {
-            matchIndicator.textContent = '✓ Passwords match';
+            matchIndicator.innerHTML = '<i class="ti ti-check"></i> Passwords match';
             matchIndicator.className = 'password-match-indicator match';
         } else {
-            matchIndicator.textContent = '✗ Passwords do not match';
+            matchIndicator.innerHTML = '<i class="ti ti-x"></i> Passwords do not match';
             matchIndicator.className = 'password-match-indicator no-match';
         }
     }

@@ -3,23 +3,23 @@
 {% block content %}
 <div class="container">
     <div class="header-section">
-        <h1>🏥 System Health Check</h1>
+        <h1><i class="ti ti-heart-rate-monitor"></i> System Health Check</h1>
         <p class="subtitle">System diagnostics and event monitoring</p>
-        <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+        <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary"><i class="ti ti-arrow-left"></i> Back to Dashboard</a>
     </div>
 
     <!-- System Health Status -->
     <div class="health-status-section">
-        <h2>🔍 System Status</h2>
+        <h2><i class="ti ti-search"></i> System Status</h2>
         <div class="health-cards">
             <div class="health-card {% if health_summary.health_status == 'healthy' %}healthy{% elif health_summary.health_status == 'issues' %}warning{% else %}critical{% endif %}">
                 <div class="health-icon">
                     {% if health_summary.health_status == 'healthy' %}
-                        ✅
+                        <i class="ti ti-circle-check" style="font-size: 2rem; color: #10b981;"></i>
                     {% elif health_summary.health_status == 'issues' %}
-                        ⚠️
+                        <i class="ti ti-alert-triangle" style="font-size: 2rem; color: #f59e0b;"></i>
                     {% else %}
-                        ❌
+                        <i class="ti ti-circle-x" style="font-size: 2rem; color: #ef4444;"></i>
                     {% endif %}
                 </div>
                 <div class="health-info">
@@ -39,7 +39,7 @@
 
             <div class="health-card {% if db_healthy %}healthy{% else %}critical{% endif %}">
                 <div class="health-icon">
-                    {% if db_healthy %}✅{% else %}❌{% endif %}
+                    {% if db_healthy %}<i class="ti ti-circle-check" style="font-size: 2rem; color: #10b981;"></i>{% else %}<i class="ti ti-circle-x" style="font-size: 2rem; color: #ef4444;"></i>{% endif %}
                 </div>
                 <div class="health-info">
                     <h3>Database</h3>
@@ -55,7 +55,7 @@
             </div>
 
             <div class="health-card info">
-                <div class="health-icon">⏱️</div>
+                <div class="health-icon"><i class="ti ti-clock" style="font-size: 2rem;"></i></div>
                 <div class="health-info">
                     <h3>Uptime</h3>
                     <p class="health-status">{{ uptime_duration.days }}d {{ uptime_duration.seconds//3600 }}h {{ (uptime_duration.seconds//60)%60 }}m</p>
@@ -67,7 +67,7 @@
 
     <!-- Quick Stats -->
     <div class="stats-section">
-        <h2>📊 Event Statistics</h2>
+        <h2><i class="ti ti-chart-bar"></i> Event Statistics</h2>
         <div class="stats-grid">
             <div class="stat-card {% if health_summary.errors_24h > 0 %}error{% endif %}">
                 <h3>{{ health_summary.errors_24h }}</h3>
@@ -91,7 +91,7 @@
     <!-- Recent Errors -->
     {% if errors %}
     <div class="events-section error-section">
-        <h2>🚨 Recent Errors</h2>
+        <h2><i class="ti ti-alert-circle"></i> Recent Errors</h2>
         <div class="events-list">
             {% for error in errors %}
             <div class="event-item error">
@@ -115,7 +115,7 @@
     <!-- Recent Warnings -->
     {% if warnings %}
     <div class="events-section warning-section">
-        <h2>⚠️ Recent Warnings</h2>
+        <h2><i class="ti ti-alert-triangle"></i> Recent Warnings</h2>
         <div class="events-list">
             {% for warning in warnings %}
             <div class="event-item warning">
@@ -138,7 +138,7 @@
 
     <!-- System Event Log -->
     <div class="events-section">
-        <h2>📋 System Event Log (Last 7 Days)</h2>
+        <h2><i class="ti ti-clipboard-list"></i> System Event Log (Last 7 Days)</h2>
         <div class="events-controls">
             <button class="filter-btn active" data-filter="all">All Events</button>
             <button class="filter-btn" data-filter="auth">Authentication</button>

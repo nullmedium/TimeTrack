@@ -7,7 +7,7 @@
         <div class="header-content">
             <div class="header-left">
                 <h1 class="page-title">
-                    <span class="page-icon">🏢</span>
+                    <span class="page-icon"><i class="ti ti-building"></i></span>
                     Company Management
                 </h1>
                 <p class="page-subtitle">Configure your company settings and policies</p>
@@ -26,22 +26,22 @@
         <div class="stat-card">
             <div class="stat-value">{{ stats.total_users }}</div>
             <div class="stat-label">Total Users</div>
-            <a href="{{ url_for('companies.company_users') }}" class="stat-link">View all →</a>
+            <a href="{{ url_for('companies.company_users') }}" class="stat-link">View all <i class="ti ti-arrow-right"></i></a>
         </div>
         <div class="stat-card">
             <div class="stat-value">{{ stats.total_teams }}</div>
             <div class="stat-label">Teams</div>
-            <a href="{{ url_for('teams.admin_teams') }}" class="stat-link">Manage →</a>
+            <a href="{{ url_for('teams.admin_teams') }}" class="stat-link">Manage <i class="ti ti-arrow-right"></i></a>
         </div>
         <div class="stat-card">
             <div class="stat-value">{{ stats.total_projects }}</div>
             <div class="stat-label">Total Projects</div>
-            <a href="{{ url_for('projects.admin_projects') }}" class="stat-link">View all →</a>
+            <a href="{{ url_for('projects.admin_projects') }}" class="stat-link">View all <i class="ti ti-arrow-right"></i></a>
         </div>
         <div class="stat-card">
             <div class="stat-value">{{ stats.active_projects }}</div>
             <div class="stat-label">Active Projects</div>
-            <a href="{{ url_for('projects.admin_projects') }}" class="stat-link">Manage →</a>
+            <a href="{{ url_for('projects.admin_projects') }}" class="stat-link">Manage <i class="ti ti-arrow-right"></i></a>
         </div>
     </div>
 
@@ -53,7 +53,7 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">
-                        <span class="icon">ℹ️</span>
+                        <span class="icon"><i class="ti ti-info-circle"></i></span>
                         Company Information
                     </h2>
                 </div>
@@ -97,13 +97,13 @@
 
                         <div class="info-panel">
                             <div class="info-item">
-                                <span class="info-icon">🔑</span>
+                                <span class="info-icon"><i class="ti ti-key"></i></span>
                                 <div class="info-content">
                                     <label class="info-label">Company Code</label>
                                     <div class="code-display">
                                         <input type="text" value="{{ company.slug }}" readonly id="companyCode" class="code-input">
                                         <button type="button" class="btn btn-copy" onclick="copyCompanyCode()">
-                                            <span id="copyIcon">📋</span>
+                                            <span id="copyIcon"><i class="ti ti-clipboard"></i></span>
                                             <span id="copyText">Copy</span>
                                         </button>
                                     </div>
@@ -111,7 +111,7 @@
                                 </div>
                             </div>
                             <div class="info-item">
-                                <span class="info-icon">📅</span>
+                                <span class="info-icon"><i class="ti ti-calendar"></i></span>
                                 <div class="info-content">
                                     <label class="info-label">Created</label>
                                     <span class="info-value">{{ company.created_at.strftime('%B %d, %Y at %I:%M %p') }}</span>
@@ -121,7 +121,7 @@
 
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary">
-                                <span class="icon">✓</span>
+                                <span class="icon"><i class="ti ti-check"></i></span>
                                 Save Company Details
                             </button>
                         </div>
@@ -133,14 +133,14 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">
-                        <span class="icon">⚡</span>
+                        <span class="icon"><i class="ti ti-bolt"></i></span>
                         Quick Actions
                     </h2>
                 </div>
                 <div class="card-body">
                     <div class="action-grid">
                         <a href="{{ url_for('users.admin_users') }}" class="action-item">
-                            <div class="action-icon">👥</div>
+                            <div class="action-icon"><i class="ti ti-users"></i></div>
                             <div class="action-content">
                                 <h3>Manage Users</h3>
                                 <p>User accounts & permissions</p>
@@ -148,7 +148,7 @@
                         </a>
                         
                         <a href="{{ url_for('teams.admin_teams') }}" class="action-item">
-                            <div class="action-icon">👨‍👩‍👧‍👦</div>
+                            <div class="action-icon"><i class="ti ti-users-group"></i></div>
                             <div class="action-content">
                                 <h3>Manage Teams</h3>
                                 <p>Organize company structure</p>
@@ -156,7 +156,7 @@
                         </a>
                         
                         <a href="{{ url_for('projects.admin_projects') }}" class="action-item">
-                            <div class="action-icon">📁</div>
+                            <div class="action-icon"><i class="ti ti-folder"></i></div>
                             <div class="action-content">
                                 <h3>Manage Projects</h3>
                                 <p>Time tracking projects</p>
@@ -164,7 +164,7 @@
                         </a>
 
                         <a href="{{ url_for('invitations.send_invitation') }}" class="action-item">
-                            <div class="action-icon">📨</div>
+                            <div class="action-icon"><i class="ti ti-mail"></i></div>
                             <div class="action-content">
                                 <h3>Send Invitation</h3>
                                 <p>Invite team members</p>
@@ -181,7 +181,7 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">
-                        <span class="icon">📋</span>
+                        <span class="icon"><i class="ti ti-clipboard-list"></i></span>
                         Work Policies
                     </h2>
                 </div>
@@ -251,7 +251,7 @@
                             
                             <div class="form-actions">
                                 <button type="submit" class="btn btn-primary">
-                                    <span class="icon">✓</span>
+                                    <span class="icon"><i class="ti ti-check"></i></span>
                                     Update Policies
                                 </button>
                             </div>
@@ -264,7 +264,7 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">
-                        <span class="icon">👤</span>
+                        <span class="icon"><i class="ti ti-user"></i></span>
                         User Registration
                     </h2>
                 </div>
@@ -304,7 +304,7 @@
                         
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary">
-                                <span class="icon">✓</span>
+                                <span class="icon"><i class="ti ti-check"></i></span>
                                 Update Settings
                             </button>
                         </div>
@@ -728,6 +728,11 @@ input:checked + .toggle-slider:before {
     flex-shrink: 0;
 }
 
+.action-icon i {
+    font-size: 2rem;
+    color: #667eea;
+}
+
 .action-content h3 {
     font-size: 1.05rem;
     font-weight: 600;
@@ -874,17 +879,17 @@ function copyCompanyCode() {
         const copyText = document.getElementById('copyText');
         
         // Store original values
-        const originalIcon = copyIcon.textContent;
+        const originalIcon = copyIcon.innerHTML;
         const originalText = copyText.textContent;
         
         // Update to success state
-        copyIcon.textContent = '✓';
+        copyIcon.innerHTML = '<i class="ti ti-check"></i>';
         copyText.textContent = 'Copied!';
         button.classList.add('success');
         
         // Reset after 2 seconds
         setTimeout(() => {
-            copyIcon.textContent = originalIcon;
+            copyIcon.innerHTML = originalIcon;
             copyText.textContent = originalText;
             button.classList.remove('success');
         }, 2000);

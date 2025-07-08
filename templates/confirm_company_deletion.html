@@ -3,10 +3,10 @@
 {% block content %}
 <div class="admin-container">
     <div class="header-section">
-        <h1>⚠️ Confirm Company Deletion</h1>
+        <h1><i class="ti ti-alert-triangle"></i> Confirm Company Deletion</h1>
         <p class="subtitle">Critical Action Required - Review All Data Before Proceeding</p>
         <a href="{{ url_for('users.admin_users') if g.user.role != Role.SYSTEM_ADMIN else url_for('users.system_admin_users') }}" 
-           class="btn btn-md btn-secondary">← Back to User Management</a>
+           class="btn btn-md btn-secondary"><i class="ti ti-arrow-left"></i> Back to User Management</a>
     </div>
     
     <div class="alert alert-danger">
@@ -21,7 +21,7 @@
                     
         <!-- Company Information -->
         <div class="table-section">
-            <h3>🏢 Company Information</h3>
+            <h3><i class="ti ti-building"></i> Company Information</h3>
             <table class="data-table">
                 <tr>
                     <th>Company Name:</th>
@@ -45,7 +45,7 @@
         <!-- Users -->
         {% if users %}
         <div class="table-section">
-            <h3>👥 Users ({{ users|length }})</h3>
+            <h3><i class="ti ti-users"></i> Users ({{ users|length }})</h3>
             <table class="data-table">
                 <thead>
                     <tr>
@@ -83,7 +83,7 @@
         <!-- Teams -->
         {% if teams %}
         <div class="table-section">
-            <h3>🏭 Teams ({{ teams|length }})</h3>
+            <h3><i class="ti ti-users-group"></i> Teams ({{ teams|length }})</h3>
             <table class="data-table">
                 <thead>
                     <tr>
@@ -141,7 +141,7 @@
         <!-- Tasks -->
         {% if tasks %}
         <div class="table-section">
-            <h3>✅ Tasks ({{ tasks|length }})</h3>
+            <h3><i class="ti ti-check"></i> Tasks ({{ tasks|length }})</h3>
             <table class="data-table">
                 <thead>
                     <tr>

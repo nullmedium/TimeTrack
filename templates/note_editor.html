@@ -7,7 +7,7 @@
         <div class="header-content">
             <div class="header-left">
                 <h1 class="page-title">
-                    <span class="page-icon">{% if note %}✏️{% else %}📝{% endif %}</span>
+                    <span class="page-icon">{% if note %}<i class="ti ti-pencil"></i>{% else %}<i class="ti ti-notes"></i>{% endif %}</span>
                     {% if note %}Edit Note{% else %}Create New Note{% endif %}
                 </h1>
                 <p class="page-subtitle">
@@ -20,15 +20,15 @@
             </div>
             <div class="header-actions">
                 <button type="button" class="btn btn-secondary" id="settings-toggle">
-                    <span class="icon">⚙️</span>
+                    <span class="icon"><i class="ti ti-settings"></i></span>
                     Settings
                 </button>
                 <button type="button" class="btn btn-secondary" id="preview-toggle">
-                    <span class="icon">👁️</span>
+                    <span class="icon"><i class="ti ti-eye"></i></span>
                     <span class="toggle-text">Hide Preview</span>
                 </button>
                 <a href="{{ url_for('notes.notes_list') }}" class="btn btn-secondary">
-                    <span class="icon">×</span>
+                    <span class="icon"><i class="ti ti-x"></i></span>
                     Cancel
                 </a>
             </div>
@@ -41,25 +41,25 @@
             <div class="settings-grid">
                 <div class="settings-item">
                     <label for="visibility" class="settings-label">
-                        <span class="icon">👁️</span>
+                        <span class="icon"><i class="ti ti-eye"></i></span>
                         Visibility
                     </label>
                     <select id="visibility" name="visibility" class="form-control">
                         <option value="Private" {% if not note or note.visibility.value == 'Private' %}selected{% endif %}>
-                            🔒 Private - Only you can see this
+                            <i class="ti ti-lock"></i> Private - Only you can see this
                         </option>
                         <option value="Team" {% if note and note.visibility.value == 'Team' %}selected{% endif %}>
-                            👥 Team - Your team members can see this
+                            <i class="ti ti-users"></i> Team - Your team members can see this
                         </option>
                         <option value="Company" {% if note and note.visibility.value == 'Company' %}selected{% endif %}>
-                            🏢 Company - Everyone in your company can see this
+                            <i class="ti ti-building"></i> Company - Everyone in your company can see this
                         </option>
                     </select>
                 </div>
 
                 <div class="settings-item">
                     <label for="folder" class="settings-label">
-                        <span class="icon">📁</span>
+                        <span class="icon"><i class="ti ti-folder"></i></span>
                         Folder
                     </label>
                     <input type="text" id="folder" name="folder" class="form-control" 
@@ -75,7 +75,7 @@
 
                 <div class="settings-item">
                     <label for="tags" class="settings-label">
-                        <span class="icon">🏷️</span>
+                        <span class="icon"><i class="ti ti-tag"></i></span>
                         Tags
                     </label>
                     <input type="text" id="tags" name="tags" class="form-control" 
@@ -86,7 +86,7 @@
 
                 <div class="settings-item">
                     <label for="project_id" class="settings-label">
-                        <span class="icon">📋</span>
+                        <span class="icon"><i class="ti ti-clipboard-list"></i></span>
                         Project
                     </label>
                     <select id="project_id" name="project_id" class="form-control">
@@ -103,7 +103,7 @@
 
                 <div class="settings-item">
                     <label for="task_id" class="settings-label">
-                        <span class="icon">✅</span>
+                        <span class="icon"><i class="ti ti-check"></i></span>
                         Task
                     </label>
                     <select id="task_id" name="task_id" class="form-control">
@@ -119,7 +119,7 @@
 
                 <div class="settings-item">
                     <label class="settings-label">
-                        <span class="icon">📌</span>
+                        <span class="icon"><i class="ti ti-pin"></i></span>
                         Pin Note
                     </label>
                     <label class="toggle-switch">
@@ -150,7 +150,7 @@
                     <div class="editor-toolbar">
                         <div class="toolbar-group">
                             <button type="button" class="toolbar-btn" onclick="toggleFrontmatter()" title="Toggle Frontmatter">
-                                <span class="icon">📄</span>
+                                <span class="icon"><i class="ti ti-file-settings"></i></span>
                                 <span class="btn-text">Frontmatter</span>
                             </button>
                         </div>
@@ -190,16 +190,16 @@
                         
                         <div class="toolbar-group">
                             <button type="button" class="toolbar-btn" onclick="insertMarkdown('- ', '')" title="Bullet List">
-                                <span class="icon">•</span>
+                                <span class="icon"><i class="ti ti-list"></i></span>
                             </button>
                             <button type="button" class="toolbar-btn" onclick="insertMarkdown('1. ', '')" title="Numbered List">
                                 <span class="icon">1.</span>
                             </button>
                             <button type="button" class="toolbar-btn" onclick="insertMarkdown('- [ ] ', '')" title="Checklist">
-                                <span class="icon">☐</span>
+                                <span class="icon"><i class="ti ti-checkbox"></i></span>
                             </button>
                             <button type="button" class="toolbar-btn" onclick="insertMarkdown('> ', '')" title="Quote">
-                                <span class="icon">❝</span>
+                                <i class="ti ti-quote"></i>
                             </button>
                         </div>
                         
@@ -207,19 +207,19 @@
                         
                         <div class="toolbar-group">
                             <button type="button" class="toolbar-btn" onclick="insertMarkdown('[', '](url)')" title="Link (Ctrl+K)">
-                                <span class="icon">🔗</span>
+                                <i class="ti ti-link"></i>
                             </button>
                             <button type="button" class="toolbar-btn" onclick="insertMarkdown('![alt text](', ')')" title="Image">
-                                <span class="icon">🖼️</span>
+                                <i class="ti ti-photo"></i>
                             </button>
                             <button type="button" class="toolbar-btn" onclick="insertTable()" title="Table">
-                                <span class="icon">⊞</span>
+                                <i class="ti ti-table"></i>
                             </button>
                             <button type="button" class="toolbar-btn" onclick="insertMarkdown('```\n', '\n```')" title="Code Block">
-                                <span class="icon">{ }</span>
+                                <i class="ti ti-code"></i>
                             </button>
                             <button type="button" class="toolbar-btn" onclick="insertMarkdown('\n---\n', '')" title="Horizontal Rule">
-                                <span class="icon">—</span>
+                                <i class="ti ti-minus"></i>
                             </button>
                         </div>
                     </div>
@@ -237,7 +237,7 @@
                         </div>
                         <div class="editor-actions">
                             <button type="submit" class="btn btn-primary">
-                                <span class="icon">💾</span>
+                                <i class="ti ti-device-floppy"></i>
                                 {% if note %}Update Note{% else %}Create Note{% endif %}
                             </button>
                         </div>
@@ -250,7 +250,7 @@
                 <div class="preview-card">
                     <div class="preview-header">
                         <h3 class="preview-title">
-                            <span class="icon">👁️</span>
+                            <span class="icon"><i class="ti ti-eye"></i></span>
                             Preview
                         </h3>
                     </div>

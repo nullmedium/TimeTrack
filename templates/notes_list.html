@@ -6,7 +6,7 @@
         {% set folder_name = folder_path.split('/')[-1] %}
         {% set is_active = folder_filter == folder_path %}
         <div class="folder-item {% if is_active %}active{% endif %}" style="padding-left: {{ (folder_path.count('/') + 1) * 20 }}px;">
-            <span class="folder-icon">📁</span>
+            <span class="folder-icon"><i class="ti ti-folder"></i></span>
             <a href="{{ url_for('notes.notes_list', folder=folder_path) }}" class="folder-link">
                 {{ folder_name }}
             </a>
@@ -25,22 +25,22 @@
         <div class="header-content">
             <div class="header-left">
                 <h1 class="page-title">
-                    <span class="page-icon">📝</span>
+                    <span class="page-icon"><i class="ti ti-notes"></i></span>
                     Notes & Documentation
                 </h1>
                 <p class="page-subtitle">Organize your thoughts and documentation</p>
             </div>
             <div class="header-actions">
                 <a href="{{ url_for('notes.create_note') }}" class="btn btn-primary">
-                    <span class="icon">➕</span>
+                    <span class="icon"><i class="ti ti-plus"></i></span>
                     Create New Note
                 </a>
                 <button type="button" class="btn btn-secondary" id="toggle-sidebar">
-                    <span class="icon">📁</span>
+                    <span class="icon"><i class="ti ti-folder"></i></span>
                     Toggle Folders
                 </button>
                 <a href="{{ url_for('notes.notes_folders') }}" class="btn btn-secondary">
-                    <span class="icon">⚙️</span>
+                    <span class="icon"><i class="ti ti-settings"></i></span>
                     Manage Folders
                 </a>
             </div>
@@ -59,7 +59,7 @@
                                class="form-control" 
                                placeholder="Search notes..."
                                value="{{ search_query }}">
-                        <button type="submit" class="search-btn">🔍</button>
+                        <button type="submit" class="search-btn"><i class="ti ti-search"></i></button>
                     </div>
                 </form>
             </div>
@@ -69,7 +69,7 @@
                 <h4>Folders</h4>
                 <div class="folder-tree">
                     <div class="folder-item {% if not folder_filter %}active{% endif %}">
-                        <span class="folder-icon">🏠</span>
+                        <span class="folder-icon"><i class="ti ti-home"></i></span>
                         <a href="{{ url_for('notes.notes_list') }}" class="folder-link">All Notes</a>
                         <span class="folder-count">({{ notes|length }})</span>
                     </div>
@@ -85,7 +85,7 @@
                     {% for tag in all_tags %}
                     <a href="{{ url_for('notes.notes_list', tag=tag) }}" 
                        class="tag-link {% if tag_filter == tag %}active{% endif %}">
-                        <span class="tag-icon">🏷️</span>
+                        <span class="tag-icon"><i class="ti ti-tag"></i></span>
                         {{ tag }}
                         <span class="tag-count">({{ tag_counts.get(tag, 0) }})</span>
                     </a>
@@ -102,19 +102,19 @@
                 <div class="visibility-filters">
                     <a href="{{ url_for('notes.notes_list') }}" 
                        class="visibility-link {% if not visibility_filter %}active{% endif %}">
-                        <span>👁️</span> All Notes
+                        <span><i class="ti ti-eye"></i></span> All Notes
                     </a>
                     <a href="{{ url_for('notes.notes_list', visibility='private') }}" 
                        class="visibility-link {% if visibility_filter == 'private' %}active{% endif %}">
-                        <span>🔒</span> Private
+                        <span><i class="ti ti-lock"></i></span> Private
                     </a>
                     <a href="{{ url_for('notes.notes_list', visibility='team') }}" 
                        class="visibility-link {% if visibility_filter == 'team' %}active{% endif %}">
-                        <span>👥</span> Team
+                        <span><i class="ti ti-users"></i></span> Team
                     </a>
                     <a href="{{ url_for('notes.notes_list', visibility='company') }}" 
                        class="visibility-link {% if visibility_filter == 'company' %}active{% endif %}">
-                        <span>🏢</span> Company
+                        <span><i class="ti ti-building"></i></span> Company
                     </a>
                 </div>
             </div>
@@ -128,25 +128,25 @@
                 <span>Active filters:</span>
                 {% if folder_filter %}
                 <span class="filter-tag">
-                    📁 {{ folder_filter }}
+                    <i class="ti ti-folder"></i> {{ folder_filter }}
                     <a href="{{ url_for('notes.notes_list', tag=tag_filter, visibility=visibility_filter, search=search_query) }}" class="remove-filter">×</a>
                 </span>
                 {% endif %}
                 {% if tag_filter %}
                 <span class="filter-tag">
-                    🏷️ {{ tag_filter }}
+                    <i class="ti ti-tag"></i> {{ tag_filter }}
                     <a href="{{ url_for('notes.notes_list', folder=folder_filter, visibility=visibility_filter, search=search_query) }}" class="remove-filter">×</a>
                 </span>
                 {% endif %}
                 {% if visibility_filter %}
                 <span class="filter-tag">
-                    👁️ {{ visibility_filter|title }}
+                    <i class="ti ti-eye"></i> {{ visibility_filter|title }}
                     <a href="{{ url_for('notes.notes_list', folder=folder_filter, tag=tag_filter, search=search_query) }}" class="remove-filter">×</a>
                 </span>
                 {% endif %}
                 {% if search_query %}
                 <span class="filter-tag">
-                    🔍 "{{ search_query }}"
+                    <i class="ti ti-search"></i> "{{ search_query }}"
                     <a href="{{ url_for('notes.notes_list', folder=folder_filter, tag=tag_filter, visibility=visibility_filter) }}" class="remove-filter">×</a>
                 </span>
                 {% endif %}
@@ -159,10 +159,10 @@
             <div class="view-controls">
                 <div class="view-toggle">
                     <button class="toggle-btn active" data-view="grid" onclick="switchView('grid')">
-                        <span>⊞</span> Grid
+                        <span><i class="ti ti-layout-grid"></i></span> Grid
                     </button>
                     <button class="toggle-btn" data-view="list" onclick="switchView('list')">
-                        <span>☰</span> List
+                        <span><i class="ti ti-list"></i></span> List
                     </button>
                 </div>
             </div>
@@ -176,10 +176,10 @@
                      draggable="true">
                     <div class="note-card-header">
                         {% if note.is_pinned %}
-                        <span class="pin-indicator" title="Pinned">📌</span>
+                        <span class="pin-indicator" title="Pinned"><i class="ti ti-pin"></i></span>
                         {% endif %}
                         <span class="visibility-badge visibility-{{ note.visibility.value.lower() }}">
-                            {% if note.visibility.value == 'Private' %}🔒{% elif note.visibility.value == 'Team' %}👥{% else %}🏢{% endif %}
+                            {% if note.visibility.value == 'Private' %}<i class="ti ti-lock"></i>{% elif note.visibility.value == 'Team' %}<i class="ti ti-users"></i>{% else %}<i class="ti ti-building"></i>{% endif %}
                             {{ note.visibility.value }}
                         </span>
                     </div>
@@ -200,13 +200,13 @@
                     
                     <div class="note-footer">
                         <span class="note-meta">
-                            <span>📁</span> {{ note.folder or 'No folder' }}
+                            <span><i class="ti ti-folder"></i></span> {{ note.folder or 'No folder' }}
                         </span>
                         <span class="note-meta">
-                            <span>👤</span> {{ note.created_by.username }}
+                            <span><i class="ti ti-user"></i></span> {{ note.created_by.username }}
                         </span>
                         <span class="note-meta">
-                            <span>🕒</span> {{ note.updated_at.strftime('%b %d, %Y') }}
+                            <span><i class="ti ti-clock"></i></span> {{ note.updated_at.strftime('%b %d, %Y') }}
                         </span>
                     </div>
                     
@@ -241,7 +241,7 @@
                             data-note-id="{{ note.id }}"
                             draggable="true">
                             <td>
-                                {% if note.is_pinned %}<span class="pin-indicator" title="Pinned">📌</span>{% endif %}
+                                {% if note.is_pinned %}<span class="pin-indicator" title="Pinned"><i class="ti ti-pin"></i></span>{% endif %}
                                 <a href="{{ url_for('notes.view_note', slug=note.slug) }}">{{ note.title }}</a>
                             </td>
                             <td>{{ note.folder or '-' }}</td>
@@ -256,7 +256,7 @@
                             </td>
                             <td>
                                 <span class="visibility-badge visibility-{{ note.visibility.value.lower() }}">
-                                    {% if note.visibility.value == 'Private' %}🔒{% elif note.visibility.value == 'Team' %}👥{% else %}🏢{% endif %}
+                                    {% if note.visibility.value == 'Private' %}<i class="ti ti-lock"></i>{% elif note.visibility.value == 'Team' %}<i class="ti ti-users"></i>{% else %}<i class="ti ti-building"></i>{% endif %}
                                     {{ note.visibility.value }}
                                 </span>
                             </td>
@@ -275,7 +275,7 @@
             </div>
             {% else %}
             <div class="empty-state">
-                <div class="empty-icon">📝</div>
+                <div class="empty-icon"><i class="ti ti-notes"></i></div>
                 <h3>No notes found</h3>
                 <p>
                     {% if folder_filter or tag_filter or visibility_filter or search_query %}
@@ -819,6 +819,22 @@
 .empty-icon {
     font-size: 3rem;
     margin-bottom: 20px;
+}
+
+.empty-icon i {
+    font-size: 3rem;
+    color: #667eea;
+}
+
+/* Icon styling */
+.folder-icon i, .tag-icon i, .visibility-link i, 
+.filter-tag i, .note-meta i, .search-btn i,
+.page-icon i {
+    font-size: 1em;
+}
+
+.btn .icon i {
+    font-size: 1.1em;
 }
 
 /* List View / Table */

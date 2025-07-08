@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-container timetrack-container">
     <div class="page-header analytics-header">
-        <h2>📊 Time Analytics</h2>
+        <h2><i class="ti ti-chart-bar"></i> Time Analytics</h2>
         <div class="mode-switcher">
             <button class="mode-btn {% if mode == 'personal' %}active{% endif %}" 
                     onclick="switchMode('personal')">Personal</button>
@@ -43,10 +43,10 @@
 
     <!-- View Tabs -->
     <div class="view-tabs">
-        <button class="tab-btn active" data-view="table">📋 Table View</button>
-        <button class="tab-btn" data-view="graph">📈 Graph View</button>
+        <button class="tab-btn active" data-view="table"><i class="ti ti-clipboard-list"></i> Table View</button>
+        <button class="tab-btn" data-view="graph"><i class="ti ti-trending-up"></i> Graph View</button>
         {% if mode == 'team' %}
-        <button class="tab-btn" data-view="team">👥 Team Summary</button>
+        <button class="tab-btn" data-view="team"><i class="ti ti-users"></i> Team Summary</button>
         {% endif %}
     </div>
 

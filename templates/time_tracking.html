@@ -7,18 +7,18 @@
         <div class="header-content">
             <div class="header-left">
                 <h1 class="page-title">
-                    <span class="page-icon">⏱️</span>
+                    <i class="ti ti-clock page-icon"></i>
                     Time Tracking
                 </h1>
                 <p class="page-subtitle">Track your work hours efficiently</p>
             </div>
             <div class="header-actions">
                 <button id="manual-entry-btn" class="btn btn-secondary">
-                    <span class="icon">📝</span>
+                    <i class="ti ti-pencil"></i>
                     Manual Entry
                 </button>
                 <a href="{{ url_for('analytics') }}" class="btn btn-secondary">
-                    <span class="icon">📊</span>
+                    <i class="ti ti-chart-bar"></i>
                     View Analytics
                 </a>
             </div>
@@ -96,15 +96,15 @@
                 <button id="pause-btn" class="btn {% if active_entry.is_paused %}btn-success{% else %}btn-warning{% endif %}" 
                         data-id="{{ active_entry.id }}">
                     {% if active_entry.is_paused %}
-                        <span class="icon">▶️</span>
+                        <i class="ti ti-player-play"></i>
                         Resume Work
                     {% else %}
-                        <span class="icon">⏸️</span>
+                        <i class="ti ti-player-pause"></i>
                         Take Break
                     {% endif %}
                 </button>
                 <button id="leave-btn" class="btn btn-danger" data-id="{{ active_entry.id }}">
-                    <span class="icon">⏹️</span>
+                    <i class="ti ti-player-stop"></i>
                     Stop Working
                 </button>
             </div>
@@ -152,7 +152,7 @@
                     
                     <div class="form-actions">
                         <button type="submit" id="arrive-btn" class="btn btn-primary btn-large">
-                            <span class="icon">▶️</span>
+                            <i class="ti ti-player-play"></i>
                             Start Working
                         </button>
                     </div>
@@ -186,16 +186,16 @@
     <div class="entries-section">
         <div class="section-header">
             <h2 class="section-title">
-                <span class="icon">📋</span>
+                <i class="ti ti-clipboard-list"></i>
                 Recent Time Entries
             </h2>
             <div class="view-toggle">
                 <button class="toggle-btn active" data-view="list">
-                    <span class="icon">📝</span>
+                    <i class="ti ti-list"></i>
                     List
                 </button>
                 <button class="toggle-btn" data-view="grid">
-                    <span class="icon">📊</span>
+                    <i class="ti ti-layout-grid"></i>
                     Grid
                 </button>
             </div>
@@ -229,7 +229,7 @@
                             <td>
                                 <div class="time-cell">
                                     <span class="time-start">{{ entry.arrival_time|format_time }}</span>
-                                    <span class="time-separator">→</span>
+                                    <span class="time-separator"><i class="ti ti-arrow-right"></i></span>
                                     <span class="time-end">{{ entry.departure_time|format_time if entry.departure_time else 'Active' }}</span>
                                 </div>
                             </td>
@@ -269,19 +269,19 @@
                                     {% if entry.departure_time and not active_entry %}
                                         {% if entry.arrival_time.date() >= today %}
                                     <button class="btn-icon resume-work-btn" data-id="{{ entry.id }}" title="Resume">
-                                        <span class="icon">🔄</span>
+                                        <i class="ti ti-refresh"></i>
                                     </button>
                                         {% else %}
                                     <button class="btn-icon resume-work-btn" data-id="{{ entry.id }}" title="Cannot resume entries from previous days" disabled style="opacity: 0.5; cursor: not-allowed;">
-                                        <span class="icon">🔄</span>
+                                        <i class="ti ti-refresh"></i>
                                     </button>
                                         {% endif %}
                                     {% endif %}
                                     <button class="btn-icon edit-entry-btn" data-id="{{ entry.id }}" title="Edit">
-                                        <span class="icon">✏️</span>
+                                        <i class="ti ti-pencil"></i>
                                     </button>
                                     <button class="btn-icon delete-entry-btn" data-id="{{ entry.id }}" title="Delete">
-                                        <span class="icon">🗑️</span>
+                                        <i class="ti ti-trash"></i>
                                     </button>
                                 </div>
                             </td>
@@ -292,7 +292,7 @@
             </div>
             {% else %}
             <div class="empty-state">
-                <div class="empty-icon">📭</div>
+                <div class="empty-icon"><i class="ti ti-mail-opened" style="font-size: 4rem;"></i></div>
                 <h3>No time entries yet</h3>
                 <p>Start tracking your time to see entries here</p>
             </div>
@@ -322,18 +322,18 @@
                         
                         {% if entry.task %}
                         <div class="entry-task">
-                            <span class="icon">📋</span> {{ entry.task.title }}
+                            <i class="ti ti-clipboard-list"></i> {{ entry.task.title }}
                         </div>
                         {% endif %}
                         
                         <div class="entry-time">
-                            <span class="icon">🕐</span>
+                            <i class="ti ti-clock"></i>
                             {{ entry.arrival_time|format_time }} - {{ entry.departure_time|format_time if entry.departure_time else 'Active' }}
                         </div>
                         
                         {% if entry.notes %}
                         <div class="entry-notes">
-                            <span class="icon">📝</span>
+                            <i class="ti ti-notes"></i>
                             {{ entry.notes }}
                         </div>
                         {% endif %}
