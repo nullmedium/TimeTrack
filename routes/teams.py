@@ -16,9 +16,8 @@ teams_bp = Blueprint('teams', __name__, url_prefix='/admin/teams')
 @admin_required
 @company_required
 def admin_teams():
-    team_repo = TeamRepository()
-    teams = team_repo.get_with_member_count(g.user.company_id)
-    return render_template('admin_teams.html', title='Team Management', teams=teams)
+    # Redirect to the new unified organization management page
+    return redirect(url_for('organization.admin_organization'))
 
 
 @teams_bp.route('/create', methods=['GET', 'POST'])

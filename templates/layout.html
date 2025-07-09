@@ -135,10 +135,9 @@
                     <!-- Role-based menu items -->
                     {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">Admin</li>
+                    <li><a href="{{ url_for('organization.admin_organization') }}" data-tooltip="Organization"><i class="nav-icon ti ti-sitemap"></i><span class="nav-text">Organization</span></a></li>
                     <li><a href="{{ url_for('companies.admin_company') }}" data-tooltip="Company Settings"><i class="nav-icon ti ti-building"></i><span class="nav-text">Company Settings</span></a></li>
-                    <li><a href="{{ url_for('users.admin_users') }}" data-tooltip="Manage Users"><i class="nav-icon ti ti-users"></i><span class="nav-text">Manage Users</span></a></li>
                     <li><a href="{{ url_for('invitations.list_invitations') }}" data-tooltip="Invitations"><i class="nav-icon ti ti-mail"></i><span class="nav-text">Invitations</span></a></li>
-                    <li><a href="{{ url_for('teams.admin_teams') }}" data-tooltip="Manage Teams"><i class="nav-icon ti ti-users-group"></i><span class="nav-text">Manage Teams</span></a></li>
                     <li><a href="{{ url_for('projects.admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon ti ti-folder"></i><span class="nav-text">Manage Projects</span></a></li>
                     {% if g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">System Admin</li>

@@ -31,7 +31,7 @@
         <div class="stat-card">
             <div class="stat-value">{{ stats.total_teams }}</div>
             <div class="stat-label">Teams</div>
-            <a href="{{ url_for('teams.admin_teams') }}" class="stat-link">Manage <i class="ti ti-arrow-right"></i></a>
+            <a href="{{ url_for('organization.admin_organization') }}" class="stat-link">Manage <i class="ti ti-arrow-right"></i></a>
         </div>
         <div class="stat-card">
             <div class="stat-value">{{ stats.total_projects }}</div>
@@ -139,19 +139,11 @@
                 </div>
                 <div class="card-body">
                     <div class="action-grid">
-                        <a href="{{ url_for('users.admin_users') }}" class="action-item">
-                            <div class="action-icon"><i class="ti ti-users"></i></div>
+                        <a href="{{ url_for('organization.admin_organization') }}" class="action-item">
+                            <div class="action-icon"><i class="ti ti-sitemap"></i></div>
                             <div class="action-content">
-                                <h3>Manage Users</h3>
-                                <p>User accounts & permissions</p>
-                            </div>
-                        </a>
-                        
-                        <a href="{{ url_for('teams.admin_teams') }}" class="action-item">
-                            <div class="action-icon"><i class="ti ti-users-group"></i></div>
-                            <div class="action-content">
-                                <h3>Manage Teams</h3>
-                                <p>Organize company structure</p>
+                                <h3>Manage Organization</h3>
+                                <p>Users, teams & structure</p>
                             </div>
                         </a>
                         

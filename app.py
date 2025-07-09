@@ -40,6 +40,7 @@ from routes.system_admin import system_admin_bp
 from routes.announcements import announcements_bp
 from routes.export import export_bp
 from routes.export_api import export_api_bp
+from routes.organization import organization_bp
 
 # Import auth decorators from routes.auth
 from routes.auth import login_required, admin_required, system_admin_required, role_required, company_required
@@ -105,6 +106,7 @@ app.register_blueprint(system_admin_bp)
 app.register_blueprint(announcements_bp)
 app.register_blueprint(export_bp)
 app.register_blueprint(export_api_bp)
+app.register_blueprint(organization_bp)
 
 # Import and register invitations blueprint
 from routes.invitations import invitations_bp

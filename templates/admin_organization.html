@@ -1,0 +1,1651 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="organization-admin-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-sitemap"></i></span>
+                    Organization Management
+                </h1>
+                <p class="page-subtitle">Manage teams, users, and organizational structure</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="showCreateModal('team')">
+                    <i class="ti ti-users-plus"></i>
+                    New Team
+                </button>
+                <button class="btn btn-primary" onclick="showCreateModal('user')">
+                    <i class="ti ti-user-plus"></i>
+                    New User
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Organization Statistics -->
+    <div class="stats-section">
+        <div class="stat-card">
+            <div class="stat-value">{{ teams|length if teams else 0 }}</div>
+            <div class="stat-label">Teams</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ users|length if users else 0 }}</div>
+            <div class="stat-label">Total Users</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ users|selectattr('is_blocked', 'equalto', false)|list|length if users else 0 }}</div>
+            <div class="stat-label">Active Users</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ users|selectattr('team_id', 'none')|list|length if users else 0 }}</div>
+            <div class="stat-label">Unassigned</div>
+        </div>
+    </div>
+
+    <!-- Search and Filter Section -->
+    <div class="controls-section">
+        <div class="search-container">
+            <i class="ti ti-search search-icon"></i>
+            <input type="text" 
+                   class="search-input" 
+                   id="globalSearch" 
+                   placeholder="Search teams, users, roles...">
+        </div>
+        <div class="view-controls">
+            <button class="view-btn active" data-view="teams" onclick="switchView('teams')">
+                <i class="ti ti-users"></i>
+                Teams View
+            </button>
+            <button class="view-btn" data-view="users" onclick="switchView('users')">
+                <i class="ti ti-list"></i>
+                All Users
+            </button>
+            <button class="view-btn" data-view="org-chart" onclick="switchView('org-chart')">
+                <i class="ti ti-sitemap"></i>
+                Org Chart
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="content-area">
+        <!-- Teams View -->
+        <div id="teams-view" class="view-container active">
+            {% if teams %}
+                <div class="teams-grid">
+                    {% for team in teams %}
+                    <div class="team-card" data-team-id="{{ team.id }}" data-search-text="{{ team.name.lower() }} {{ team.description.lower() if team.description }}">
+                        <div class="team-header">
+                            <div class="team-info">
+                                <h3 class="team-name">{{ team.name }}</h3>
+                                {% if team.description %}
+                                <p class="team-description">{{ team.description }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="team-actions">
+                                <button class="btn-icon" onclick="editTeam({{ team.id }})" title="Edit Team">
+                                    <i class="ti ti-pencil"></i>
+                                </button>
+                                <button class="btn-icon btn-danger" onclick="deleteTeam({{ team.id }}, '{{ team.name }}')" title="Delete Team">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="team-stats">
+                            <div class="team-stat">
+                                <span class="stat-icon"><i class="ti ti-users"></i></span>
+                                <span class="stat-text">{{ team.users|length }} members</span>
+                            </div>
+                            {% if team.lead %}
+                            <div class="team-stat">
+                                <span class="stat-icon"><i class="ti ti-crown"></i></span>
+                                <span class="stat-text">Lead: {{ team.lead.username }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="team-members">
+                            {% if team.users %}
+                                <div class="members-list">
+                                    {% for user in team.users[:5] %}
+                                    <div class="member-item" data-user-id="{{ user.id }}">
+                                        <img src="{{ user.get_avatar_url(32) }}" alt="{{ user.username }}" class="member-avatar">
+                                        <div class="member-info">
+                                            <span class="member-name">{{ user.username }}</span>
+                                            <span class="member-role">{{ user.role.value if user.role else 'Team Member' }}</span>
+                                        </div>
+                                        <div class="member-actions">
+                                            <button class="btn-icon-sm" onclick="editUser({{ user.id }})" title="Edit User">
+                                                <i class="ti ti-pencil"></i>
+                                            </button>
+                                            <button class="btn-icon-sm" onclick="removeFromTeam({{ user.id }}, {{ team.id }})" title="Remove from Team">
+                                                <i class="ti ti-x"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                    {% if team.users|length > 5 %}
+                                    <div class="more-members">
+                                        +{{ team.users|length - 5 }} more members
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <div class="empty-members">
+                                    <i class="ti ti-users-off"></i>
+                                    <p>No members in this team</p>
+                                    <button class="btn btn-sm btn-outline" onclick="showAddMembersModal({{ team.id }})">
+                                        Add Members
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Unassigned Users Section -->
+                {% if users|selectattr('team_id', 'none')|list %}
+                <div class="unassigned-section">
+                    <h2 class="section-title">
+                        <i class="ti ti-user-question"></i>
+                        Unassigned Users
+                    </h2>
+                    <div class="unassigned-users">
+                        {% for user in users|selectattr('team_id', 'none') %}
+                        <div class="unassigned-user" data-user-id="{{ user.id }}">
+                            <img src="{{ user.get_avatar_url(32) }}" alt="{{ user.username }}" class="user-avatar">
+                            <div class="user-info">
+                                <span class="user-name">{{ user.username }}</span>
+                                <span class="user-email">{{ user.email if user.email else 'No email' }}</span>
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="showAssignToTeamModal({{ user.id }})">
+                                Assign to Team
+                            </button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="ti ti-users"></i></div>
+                    <h3>No teams yet</h3>
+                    <p>Create your first team to organize your workforce</p>
+                    <button class="btn btn-primary" onclick="showCreateModal('team')">
+                        <i class="ti ti-plus"></i>
+                        Create First Team
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- All Users View -->
+        <div id="users-view" class="view-container">
+            {% if users %}
+                <div class="users-table-container">
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Email</th>
+                                <th>Team</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr class="user-row" data-search-text="{{ user.username.lower() }} {{ user.email.lower() if user.email }} {{ user.team.name.lower() if user.team }} {{ user.role.value.lower() if user.role }}">
+                                <td>
+                                    <div class="user-cell">
+                                        <img src="{{ user.get_avatar_url(40) }}" alt="{{ user.username }}" class="table-avatar">
+                                        <span class="table-username">{{ user.username }}</span>
+                                    </div>
+                                </td>
+                                <td>{{ user.email if user.email else '-' }}</td>
+                                <td>
+                                    {% if user.team %}
+                                        <span class="team-badge">{{ user.team.name }}</span>
+                                    {% else %}
+                                        <span class="unassigned-badge">Unassigned</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="role-badge role-{{ user.role.name.lower() if user.role else 'team_member' }}">
+                                        {{ user.role.value if user.role else 'Team Member' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="status-badge {% if user.is_blocked %}status-blocked{% else %}status-active{% endif %}">
+                                        {% if user.is_blocked %}Blocked{% else %}Active{% endif %}
+                                    </span>
+                                </td>
+                                <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <div class="table-actions">
+                                        <button class="btn-icon" onclick="editUser({{ user.id }})" title="Edit">
+                                            <i class="ti ti-pencil"></i>
+                                        </button>
+                                        {% if user.id != g.user.id %}
+                                            {% if user.is_blocked %}
+                                                <button class="btn-icon" onclick="toggleUserStatus({{ user.id }}, false)" title="Unblock">
+                                                    <i class="ti ti-lock-open"></i>
+                                                </button>
+                                            {% else %}
+                                                <button class="btn-icon" onclick="toggleUserStatus({{ user.id }}, true)" title="Block">
+                                                    <i class="ti ti-lock"></i>
+                                                </button>
+                                            {% endif %}
+                                            <button class="btn-icon btn-danger" onclick="deleteUser({{ user.id }}, '{{ user.username }}')" title="Delete">
+                                                <i class="ti ti-trash"></i>
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="ti ti-user"></i></div>
+                    <h3>No users yet</h3>
+                    <p>Start by creating user accounts for your team</p>
+                    <button class="btn btn-primary" onclick="showCreateModal('user')">
+                        <i class="ti ti-plus"></i>
+                        Create First User
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Org Chart View -->
+        <div id="org-chart-view" class="view-container">
+            <div class="org-chart">
+                <div class="org-level company-level">
+                    <div class="org-node company-node">
+                        <i class="ti ti-building"></i>
+                        <h3>{{ g.company.name }}</h3>
+                        <p>{{ users|length }} total employees</p>
+                    </div>
+                </div>
+                
+                {% if teams %}
+                <div class="org-level teams-level">
+                    {% for team in teams %}
+                    <div class="org-node team-node">
+                        <div class="node-header">
+                            <i class="ti ti-users"></i>
+                            <h4>{{ team.name }}</h4>
+                        </div>
+                        <div class="node-stats">
+                            <span>{{ team.users|length }} members</span>
+                            {% if team.lead %}
+                            <span>Lead: {{ team.lead.username }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="node-members">
+                            {% for user in team.users[:3] %}
+                            <img src="{{ user.get_avatar_url(24) }}" alt="{{ user.username }}" title="{{ user.username }}">
+                            {% endfor %}
+                            {% if team.users|length > 3 %}
+                            <span class="more-count">+{{ team.users|length - 3 }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if users|selectattr('team_id', 'none')|list %}
+                    <div class="org-node unassigned-node">
+                        <div class="node-header">
+                            <i class="ti ti-user-question"></i>
+                            <h4>Unassigned</h4>
+                        </div>
+                        <div class="node-stats">
+                            <span>{{ users|selectattr('team_id', 'none')|list|length }} users</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modals -->
+<!-- Create/Edit Team Modal -->
+<div id="team-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="team-modal-title">Create New Team</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="team-form" class="modern-form">
+                <input type="hidden" id="team-id">
+                
+                <div class="form-group">
+                    <label for="team-name" class="form-label">Team Name</label>
+                    <input type="text" id="team-name" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="team-description" class="form-label">Description</label>
+                    <textarea id="team-description" class="form-control" rows="3"></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save Team</button>
+                    <button type="button" class="btn btn-ghost modal-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit User Modal -->
+<div id="user-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="user-modal-title">Create New User</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="user-form" class="modern-form">
+                <input type="hidden" id="user-id">
+                
+                <div class="form-group">
+                    <label for="user-username" class="form-label">Username</label>
+                    <input type="text" id="user-username" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="user-email" class="form-label">Email</label>
+                    <input type="email" id="user-email" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label for="user-password" class="form-label">Password</label>
+                    <input type="password" id="user-password" class="form-control">
+                    <span class="form-hint">Leave blank to keep current password (edit mode only)</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="user-role" class="form-label">Role</label>
+                    <select id="user-role" class="form-control">
+                        <option value="TEAM_MEMBER">Team Member</option>
+                        <option value="TEAM_LEADER">Team Leader</option>
+                        <option value="SUPERVISOR">Supervisor</option>
+                        <option value="ADMIN">Admin</option>
+                        {% if g.user.role == Role.SYSTEM_ADMIN %}
+                        <option value="SYSTEM_ADMIN">System Admin</option>
+                        {% endif %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="user-team" class="form-label">Team</label>
+                    <select id="user-team" class="form-control">
+                        <option value="">No team assigned</option>
+                        {% for team in teams %}
+                        <option value="{{ team.id }}">{{ team.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save User</button>
+                    <button type="button" class="btn btn-ghost modal-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Assign to Team Modal -->
+<div id="assign-team-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h3 class="modal-title">Assign User to Team</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="assign-team-form" class="modern-form">
+                <input type="hidden" id="assign-user-id">
+                
+                <div class="form-group">
+                    <label for="assign-team-select" class="form-label">Select Team</label>
+                    <select id="assign-team-select" class="form-control" required>
+                        <option value="">Choose a team...</option>
+                        {% for team in teams %}
+                        <option value="{{ team.id }}">{{ team.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Assign</button>
+                    <button type="button" class="btn btn-ghost modal-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h3 class="modal-title">Confirm Deletion</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="delete-message">Are you sure you want to delete this?</p>
+            <input type="hidden" id="delete-type">
+            <input type="hidden" id="delete-id">
+        </div>
+        <div class="modal-footer">
+            <button id="confirm-delete" class="btn btn-danger">Delete</button>
+            <button class="btn btn-ghost modal-cancel">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Container */
+.organization-admin-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+/* Stats Section */
+.stats-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #667eea;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* Controls Section */
+.controls-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.search-container {
+    position: relative;
+    flex: 1;
+    max-width: 500px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6b7280;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 3rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.view-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.view-btn {
+    padding: 0.75rem 1.25rem;
+    border: 2px solid #e5e7eb;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+.view-btn:hover {
+    background: #f3f4f6;
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.view-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+/* View Containers */
+.view-container {
+    display: none;
+}
+
+.view-container.active {
+    display: block;
+}
+
+/* Teams Grid */
+.teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.team-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.team-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.team-header {
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.team-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+}
+
+.team-description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+.team-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.team-stats {
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.team-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.stat-icon {
+    color: #667eea;
+}
+
+.team-members {
+    padding: 1.5rem;
+}
+
+.members-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.member-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.member-item:hover {
+    background: #f3f4f6;
+}
+
+.member-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+}
+
+.member-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.member-name {
+    font-weight: 500;
+    color: #1f2937;
+    font-size: 0.875rem;
+}
+
+.member-role {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.member-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.member-item:hover .member-actions {
+    opacity: 1;
+}
+
+.more-members {
+    text-align: center;
+    padding: 0.5rem;
+    color: #6b7280;
+    font-size: 0.875rem;
+    font-style: italic;
+}
+
+.empty-members {
+    text-align: center;
+    padding: 2rem;
+    color: #6b7280;
+}
+
+.empty-members i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    display: block;
+    opacity: 0.5;
+}
+
+/* Unassigned Section */
+.unassigned-section {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-top: 3rem;
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 1.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.unassigned-users {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.unassigned-user {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+}
+
+.user-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.user-name {
+    font-weight: 500;
+    color: #1f2937;
+}
+
+.user-email {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* Users Table */
+.users-table-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.users-table thead {
+    background: #f8f9fa;
+}
+
+.users-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.users-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.users-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.user-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.table-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.table-username {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.table-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Badges */
+.team-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 16px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.unassigned-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: #fee2e2;
+    color: #dc2626;
+    border-radius: 16px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.role-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.role-team_member {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.role-team_leader {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.role-supervisor {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.role-admin {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.role-system_admin {
+    background: #fce7f3;
+    color: #be185d;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-active {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.status-blocked {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* Org Chart */
+.org-chart {
+    padding: 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.org-level {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.company-level {
+    margin-bottom: 3rem;
+}
+
+.org-node {
+    background: #f8f9fa;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    min-width: 200px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.org-node:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.company-node {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+}
+
+.company-node i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.company-node h3 {
+    margin: 0 0 0.5rem 0;
+}
+
+.node-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.node-header i {
+    font-size: 1.5rem;
+    color: #667eea;
+}
+
+.node-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #1f2937;
+}
+
+.node-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 1rem;
+}
+
+.node-members {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: -0.5rem;
+}
+
+.node-members img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid white;
+    margin: 0 -0.25rem;
+}
+
+.more-count {
+    margin-left: 0.5rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.unassigned-node {
+    border-color: #ef4444;
+    background: #fee2e2;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #4b5563;
+    border: 2px solid #e5e7eb;
+}
+
+.btn-secondary:hover {
+    background: #f3f4f6;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+.btn-outline:hover {
+    background: #667eea;
+    color: white;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+.btn-ghost {
+    background: transparent;
+    color: #6b7280;
+}
+
+.btn-ghost:hover {
+    color: #374151;
+    background: #f3f4f6;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.btn-icon,
+.btn-icon-sm {
+    padding: 0.5rem;
+    border: 1px solid #e5e7eb;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #6b7280;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon {
+    width: 36px;
+    height: 36px;
+}
+
+.btn-icon-sm {
+    width: 28px;
+    height: 28px;
+    font-size: 0.875rem;
+}
+
+.btn-icon:hover,
+.btn-icon-sm:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.btn-icon.btn-danger:hover,
+.btn-icon-sm.btn-danger:hover {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #dc2626;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 12px;
+    border: 2px dashed #e5e7eb;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.3;
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: #6b7280;
+    margin-bottom: 2rem;
+}
+
+/* Modals */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+}
+
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    position: relative;
+    background: white;
+    border-radius: 16px;
+    max-width: 600px;
+    margin: 5vh auto;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+}
+
+.modal-small {
+    max-width: 400px;
+}
+
+.modal-header {
+    padding: 2rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+    background: #f3f4f6;
+    color: #1f2937;
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+.modal-footer {
+    padding: 1.5rem 2rem;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+/* Forms */
+.modern-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.95rem;
+}
+
+.form-control {
+    padding: 0.75rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    background-color: #f9fafb;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-hint {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .teams-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .organization-admin-container {
+        padding: 1rem;
+    }
+    
+    .controls-section {
+        flex-direction: column;
+    }
+    
+    .search-container {
+        max-width: 100%;
+    }
+    
+    .view-controls {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .view-btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .view-btn span {
+        display: none;
+    }
+    
+    .unassigned-users {
+        grid-template-columns: 1fr;
+    }
+    
+    .users-table {
+        font-size: 0.875rem;
+    }
+    
+    .users-table th,
+    .users-table td {
+        padding: 0.5rem;
+    }
+    
+    .table-actions {
+        flex-direction: column;
+    }
+}
+</style>
+
+<script>
+// View switching
+function switchView(view) {
+    // Update buttons
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-view') === view) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Update view containers
+    document.querySelectorAll('.view-container').forEach(container => {
+        container.classList.remove('active');
+    });
+    document.getElementById(view + '-view').classList.add('active');
+}
+
+// Search functionality
+document.getElementById('globalSearch').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const activeView = document.querySelector('.view-container.active');
+    
+    if (activeView.id === 'teams-view') {
+        // Search in teams view
+        document.querySelectorAll('.team-card').forEach(card => {
+            const searchText = card.getAttribute('data-search-text');
+            card.style.display = searchText.includes(searchTerm) ? '' : 'none';
+        });
+    } else if (activeView.id === 'users-view') {
+        // Search in users table
+        document.querySelectorAll('.user-row').forEach(row => {
+            const searchText = row.getAttribute('data-search-text');
+            row.style.display = searchText.includes(searchTerm) ? '' : 'none';
+        });
+    }
+});
+
+// Modal functions
+function showModal(modalId) {
+    document.getElementById(modalId).style.display = 'block';
+}
+
+function hideModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+// Modal close handlers
+document.querySelectorAll('.modal-close, .modal-cancel').forEach(btn => {
+    btn.addEventListener('click', function() {
+        this.closest('.modal').style.display = 'none';
+    });
+});
+
+// Click outside modal to close
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', function() {
+        this.closest('.modal').style.display = 'none';
+    });
+});
+
+// Create modals
+function showCreateModal(type) {
+    if (type === 'team') {
+        document.getElementById('team-modal-title').textContent = 'Create New Team';
+        document.getElementById('team-form').reset();
+        document.getElementById('team-id').value = '';
+        showModal('team-modal');
+    } else if (type === 'user') {
+        document.getElementById('user-modal-title').textContent = 'Create New User';
+        document.getElementById('user-form').reset();
+        document.getElementById('user-id').value = '';
+        showModal('user-modal');
+    }
+}
+
+// Edit functions
+function editTeam(teamId) {
+    fetch(`/api/organization/teams/${teamId}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('team-modal-title').textContent = 'Edit Team';
+            document.getElementById('team-id').value = data.id;
+            document.getElementById('team-name').value = data.name;
+            document.getElementById('team-description').value = data.description || '';
+            showModal('team-modal');
+        });
+}
+
+function editUser(userId) {
+    fetch(`/api/organization/users/${userId}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('user-modal-title').textContent = 'Edit User';
+            document.getElementById('user-id').value = data.id;
+            document.getElementById('user-username').value = data.username;
+            document.getElementById('user-email').value = data.email || '';
+            document.getElementById('user-role').value = data.role;
+            document.getElementById('user-team').value = data.team_id || '';
+            document.getElementById('user-password').value = '';
+            showModal('user-modal');
+        });
+}
+
+// Delete functions
+function deleteTeam(teamId, teamName) {
+    document.getElementById('delete-message').textContent = `Are you sure you want to delete team "${teamName}"? All members will be unassigned.`;
+    document.getElementById('delete-type').value = 'team';
+    document.getElementById('delete-id').value = teamId;
+    showModal('delete-modal');
+}
+
+function deleteUser(userId, username) {
+    document.getElementById('delete-message').textContent = `Are you sure you want to delete user "${username}"? This action cannot be undone.`;
+    document.getElementById('delete-type').value = 'user';
+    document.getElementById('delete-id').value = userId;
+    showModal('delete-modal');
+}
+
+// Confirm delete
+document.getElementById('confirm-delete').addEventListener('click', function() {
+    const type = document.getElementById('delete-type').value;
+    const id = document.getElementById('delete-id').value;
+    
+    const url = type === 'team' 
+        ? `/api/organization/teams/${id}` 
+        : `/api/organization/users/${id}`;
+    
+    fetch(url, {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+});
+
+// Other functions
+function removeFromTeam(userId, teamId) {
+    if (confirm('Remove this user from the team?')) {
+        // API call to remove user from team
+        window.location.reload();
+    }
+}
+
+function showAssignToTeamModal(userId) {
+    document.getElementById('assign-user-id').value = userId;
+    showModal('assign-team-modal');
+}
+
+function showAddMembersModal(teamId) {
+    // Show modal to add members to team
+    alert('Add members to team ' + teamId);
+}
+
+function toggleUserStatus(userId, block) {
+    const action = block ? 'block' : 'unblock';
+    if (confirm(`Are you sure you want to ${action} this user?`)) {
+        fetch(`/api/organization/users/${userId}/toggle-status`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        });
+    }
+}
+
+// Form submissions
+document.getElementById('team-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const teamId = document.getElementById('team-id').value;
+    const formData = {
+        name: document.getElementById('team-name').value,
+        description: document.getElementById('team-description').value
+    };
+    
+    const url = teamId ? `/api/organization/teams/${teamId}` : '/api/organization/teams';
+    const method = teamId ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+});
+
+document.getElementById('user-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const userId = document.getElementById('user-id').value;
+    const formData = {
+        username: document.getElementById('user-username').value,
+        email: document.getElementById('user-email').value,
+        password: document.getElementById('user-password').value,
+        role: document.getElementById('user-role').value,
+        team_id: document.getElementById('user-team').value || null
+    };
+    
+    const url = userId ? `/api/organization/users/${userId}` : '/api/organization/users';
+    const method = userId ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+});
+
+document.getElementById('assign-team-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const userId = document.getElementById('assign-user-id').value;
+    const teamId = document.getElementById('assign-team-select').value;
+    
+    fetch(`/api/organization/users/${userId}/assign-team`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({team_id: teamId})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+});
+</script>
+{% endblock %}

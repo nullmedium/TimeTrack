@@ -218,27 +218,8 @@ def admin_company():
 @admin_required
 @company_required
 def company_users():
-    """List all users in the company with detailed information"""
-    users = User.query.filter_by(company_id=g.company.id).order_by(User.created_at.desc()).all()
-
-    # Calculate user statistics
-    user_stats = {
-        'total': len(users),
-        'verified': len([u for u in users if u.is_verified]),
-        'unverified': len([u for u in users if not u.is_verified]),
-        'blocked': len([u for u in users if u.is_blocked]),
-        'active': len([u for u in users if not u.is_blocked and u.is_verified]),
-        'admins': len([u for u in users if u.role == Role.ADMIN]),
-        'supervisors': len([u for u in users if u.role == Role.SUPERVISOR]),
-        'team_leaders': len([u for u in users if u.role == Role.TEAM_LEADER]),
-        'team_members': len([u for u in users if u.role == Role.TEAM_MEMBER]),
-    }
-
-    return render_template('company_users.html', 
-                         title='Company Users', 
-                         company=g.company,
-                         users=users,
-                         stats=user_stats)
+    """Redirect to the unified organization management page"""
+    return redirect(url_for('organization.admin_organization'))
 
 
 # Setup company route (separate from company blueprint due to different URL)
