@@ -4,7 +4,7 @@ Project-related models
 
 from datetime import datetime
 from . import db
-from .enums import Role
+from .enums import Role, BillingType
 
 
 class Project(db.Model):
@@ -32,6 +32,11 @@ class Project(db.Model):
     # Project dates
     start_date = db.Column(db.Date, nullable=True)
     end_date = db.Column(db.Date, nullable=True)
+
+    # Billing configuration
+    billing_type = db.Column(db.Enum(BillingType), default=BillingType.NON_BILLABLE, nullable=False)
+    hourly_rate = db.Column(db.Numeric(10, 2), nullable=True)  # Up to 99999999.99
+    billing_notes = db.Column(db.Text, nullable=True)
 
     # Relationships
     created_by = db.relationship('User', foreign_keys=[created_by_id], backref='created_projects')

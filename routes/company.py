@@ -3,8 +3,9 @@ Company management routes
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, g, session
-from models import db, Company, User, Role, Team, Project, SystemSettings, CompanyWorkConfig, WorkRegion
+from models import db, Company, User, Role, Team, Project, SystemSettings, CompanyWorkConfig, WorkRegion, CompanySettings
 from routes.auth import admin_required, company_required, login_required
+from utils.currency import get_currency_choices, get_currency_symbol
 import logging
 import re
 
@@ -76,6 +77,19 @@ def admin_company():
 
             db.session.commit()
             flash('System settings updated successfully!', 'success')
+            return redirect(url_for('companies.admin_company'))
+            
+        elif action == 'update_company_settings':
+            # Get or create company settings
+            company_settings = CompanySettings.get_or_create(g.user.company_id)
+            
+            # Update currency
+            currency = request.form.get('default_currency')
+            if currency:
+                company_settings.default_currency = currency
+                
+            db.session.commit()
+            flash('Company settings updated successfully!', 'success')
             return redirect(url_for('companies.admin_company'))
             
         elif action == 'update_work_policies':
@@ -201,15 +215,24 @@ def admin_company():
             'name': preset['region_name'],
             'description': f"{preset['standard_hours_per_day']}h/day, {preset['break_duration_minutes']}min break after {preset['break_after_hours']}h"
         })
+    
+    # Get or create company settings
+    company_settings = CompanySettings.get_or_create(g.user.company_id)
+    
+    # Get currency choices
+    currency_choices = get_currency_choices()
 
     return render_template('admin_company.html', 
                          title='Company Management', 
                          company=company, 
                          stats=stats,
                          settings=settings,
+                         company_settings=company_settings,
                          work_config=work_config,
                          regional_presets=regional_presets,
-                         WorkRegion=WorkRegion)
+                         WorkRegion=WorkRegion,
+                         currency_choices=currency_choices,
+                         get_currency_symbol=get_currency_symbol)
 
 
 

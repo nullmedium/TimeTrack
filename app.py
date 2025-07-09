@@ -50,6 +50,7 @@ from routes.auth import login_required, admin_required, system_admin_required, r
 from utils.auth import is_system_admin, can_access_system_settings
 from security_headers import init_security
 from utils.settings import get_system_setting
+from utils.template_filters import register_template_filters
 
 # Import analytics data function from export module
 from routes.export_api import get_filtered_analytics_data
@@ -134,6 +135,17 @@ app.register_blueprint(organization_bp)
 # Import and register invitations blueprint
 from routes.invitations import invitations_bp
 app.register_blueprint(invitations_bp)
+
+# Import and register reports blueprint
+from routes.reports_api import reports_api
+app.register_blueprint(reports_api)
+
+# Import and register billing blueprint
+from routes.billing import billing_bp
+app.register_blueprint(billing_bp)
+
+# Register template filters
+register_template_filters(app)
 
 # Migration functions removed - migrations are now handled by startup.sh
 
@@ -2010,6 +2022,13 @@ def analytics_data():
         return jsonify({'error': 'Internal server error'}), 500
 
 # get_filtered_analytics_data moved to routes/export_api.py
+
+
+@app.route('/reports')
+@login_required
+def reports():
+    """Reports builder page."""
+    return render_template('reports.html')
 
 
 @app.route('/api/system-admin/stats')

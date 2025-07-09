@@ -79,6 +79,34 @@
             </div>
         </div>
         
+        <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Billing Configuration</h3>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="billing_type">Billing Type *</label>
+                <select id="billing_type" name="billing_type" required onchange="toggleBillingRate()">
+                    <option value="NON_BILLABLE" {% if (request.form.billing_type == 'NON_BILLABLE') or (not request.form.billing_type and project.billing_type.name == 'NON_BILLABLE') %}selected{% endif %}>Non-Billable</option>
+                    <option value="HOURLY" {% if (request.form.billing_type == 'HOURLY') or (not request.form.billing_type and project.billing_type.name == 'HOURLY') %}selected{% endif %}>Hourly</option>
+                    <option value="FIXED_RATE" {% if (request.form.billing_type == 'FIXED_RATE') or (not request.form.billing_type and project.billing_type.name == 'FIXED_RATE') %}selected{% endif %}>Fixed Rate</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="hourly_rate">Hourly Rate ({{ currency }})</label>
+                <input type="number" id="hourly_rate" name="hourly_rate" 
+                       step="0.01" min="0" max="99999999.99"
+                       value="{{ request.form.hourly_rate if request.form.hourly_rate else (project.hourly_rate if project.hourly_rate else '') }}"
+                       placeholder="0.00">
+                <small class="form-text">Currency: {{ currency_symbol }} ({{ currency }})</small>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="billing_notes">Billing Notes</label>
+            <textarea id="billing_notes" name="billing_notes" rows="2" 
+                      placeholder="Special billing instructions or notes">{{ request.form.billing_notes if request.form.billing_notes else (project.billing_notes or '') }}</textarea>
+        </div>
+        
         <div class="project-info">
             <div class="info-row">
                 <span class="info-label">Created by:</span>
@@ -255,12 +283,49 @@
 .danger-content .btn-danger:hover {
     background-color: #b91c1c;
 }
+
+.form-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+h3 {
+    color: #333;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
 </style>
 
 <script>
 // Auto-uppercase project code
 document.getElementById('code').addEventListener('input', function(e) {
     e.target.value = e.target.value.toUpperCase();
+});
+
+// Toggle hourly rate field based on billing type
+function toggleBillingRate() {
+    const billingType = document.getElementById('billing_type').value;
+    const hourlyRateField = document.getElementById('hourly_rate');
+    const hourlyRateLabel = hourlyRateField.previousElementSibling;
+    const currency = '{{ currency }}';
+    
+    if (billingType === 'HOURLY') {
+        hourlyRateField.required = true;
+        hourlyRateLabel.innerHTML = `Hourly Rate (${currency}) *`;
+    } else {
+        hourlyRateField.required = false;
+        hourlyRateLabel.innerHTML = `Hourly Rate (${currency})`;
+        if (billingType === 'NON_BILLABLE') {
+            hourlyRateField.value = '';
+        }
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleBillingRate();
 });
 </script>
 {% endblock %}

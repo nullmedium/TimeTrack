@@ -5,10 +5,12 @@ Handles all project-related views and operations
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, g, abort
 from datetime import datetime
-from models import db, Project, Team, ProjectCategory, TimeEntry, Role, Task, User
+from models import db, Project, Team, ProjectCategory, TimeEntry, Role, Task, User, CompanySettings
+from models.enums import BillingType
 from routes.auth import role_required, company_required, admin_required
 from utils.validation import FormValidator
 from utils.repository import ProjectRepository
+from utils.currency import get_currency_symbol
 
 projects_bp = Blueprint('projects', __name__, url_prefix='/admin/projects')
 
@@ -20,7 +22,18 @@ def admin_projects():
     project_repo = ProjectRepository()
     projects = project_repo.get_by_company_ordered(g.user.company_id, Project.created_at.desc())
     categories = ProjectCategory.query.filter_by(company_id=g.user.company_id).order_by(ProjectCategory.name).all()
-    return render_template('admin_projects.html', title='Project Management', projects=projects, categories=categories)
+    
+    # Get company currency
+    company_settings = CompanySettings.get_or_create(g.user.company_id)
+    currency = company_settings.default_currency or 'USD'
+    currency_symbol = get_currency_symbol(currency)
+    
+    return render_template('admin_projects.html', 
+                         title='Project Management', 
+                         projects=projects, 
+                         categories=categories,
+                         currency=currency,
+                         currency_symbol=currency_symbol)
 
 
 @projects_bp.route('/create', methods=['GET', 'POST'])
@@ -38,6 +51,13 @@ def create_project():
         category_id = request.form.get('category_id') or None
         start_date_str = request.form.get('start_date')
         end_date_str = request.form.get('end_date')
+        
+        # Billing fields
+        billing_type = request.form.get('billing_type', 'NON_BILLABLE')
+        if not billing_type:
+            billing_type = 'NON_BILLABLE'
+        hourly_rate = request.form.get('hourly_rate')
+        billing_notes = request.form.get('billing_notes')
 
         # Validate required fields
         validator.validate_required(name, 'Project name')
@@ -46,6 +66,25 @@ def create_project():
         # Validate code uniqueness
         if validator.is_valid():
             validator.validate_unique(Project, 'code', code, company_id=g.user.company_id)
+        
+        # Validate billing fields
+        try:
+            # Validate billing type is a valid enum
+            billing_type_enum = BillingType[billing_type]
+        except KeyError:
+            validator.add_error(f'Invalid billing type: {billing_type}')
+            billing_type_enum = BillingType.NON_BILLABLE
+        
+        if billing_type == 'HOURLY' and not hourly_rate:
+            validator.add_error('Hourly rate is required for hourly billing')
+        
+        if hourly_rate:
+            try:
+                hourly_rate = float(hourly_rate)
+                if hourly_rate < 0:
+                    validator.add_error('Hourly rate must be positive')
+            except ValueError:
+                validator.add_error('Invalid hourly rate')
 
         # Parse dates
         start_date = validator.parse_date(start_date_str, 'Start date')
@@ -65,7 +104,10 @@ def create_project():
                 category_id=int(category_id) if category_id else None,
                 start_date=start_date,
                 end_date=end_date,
-                created_by_id=g.user.id
+                created_by_id=g.user.id,
+                billing_type=billing_type_enum,
+                hourly_rate=hourly_rate if hourly_rate else None,
+                billing_notes=billing_notes
             )
             project_repo.save()
             flash(f'Project "{name}" created successfully!', 'success')
@@ -76,7 +118,18 @@ def create_project():
     # Get available teams and categories for the form (company-scoped)
     teams = Team.query.filter_by(company_id=g.user.company_id).order_by(Team.name).all()
     categories = ProjectCategory.query.filter_by(company_id=g.user.company_id).order_by(ProjectCategory.name).all()
-    return render_template('create_project.html', title='Create Project', teams=teams, categories=categories)
+    
+    # Get company currency
+    company_settings = CompanySettings.get_or_create(g.user.company_id)
+    currency = company_settings.default_currency or 'USD'
+    currency_symbol = get_currency_symbol(currency)
+    
+    return render_template('create_project.html', 
+                         title='Create Project', 
+                         teams=teams, 
+                         categories=categories,
+                         currency=currency,
+                         currency_symbol=currency_symbol)
 
 
 @projects_bp.route('/edit/<int:project_id>', methods=['GET', 'POST'])
@@ -100,6 +153,13 @@ def edit_project(project_id):
         is_active = request.form.get('is_active') == 'on'
         start_date_str = request.form.get('start_date')
         end_date_str = request.form.get('end_date')
+        
+        # Billing fields
+        billing_type = request.form.get('billing_type', 'NON_BILLABLE')
+        if not billing_type:
+            billing_type = 'NON_BILLABLE'
+        hourly_rate = request.form.get('hourly_rate')
+        billing_notes = request.form.get('billing_notes')
 
         # Validate required fields
         validator.validate_required(name, 'Project name')
@@ -116,6 +176,25 @@ def edit_project(project_id):
         # Validate date range
         if start_date and end_date:
             validator.validate_date_range(start_date, end_date)
+        
+        # Validate billing fields
+        try:
+            # Validate billing type is a valid enum
+            billing_type_enum = BillingType[billing_type]
+        except KeyError:
+            validator.add_error(f'Invalid billing type: {billing_type}')
+            billing_type_enum = BillingType.NON_BILLABLE
+        
+        if billing_type == 'HOURLY' and not hourly_rate:
+            validator.add_error('Hourly rate is required for hourly billing')
+        
+        if hourly_rate:
+            try:
+                hourly_rate = float(hourly_rate)
+                if hourly_rate < 0:
+                    validator.add_error('Hourly rate must be positive')
+            except ValueError:
+                validator.add_error('Invalid hourly rate')
 
         if validator.is_valid():
             project_repo.update(project,
@@ -126,7 +205,10 @@ def edit_project(project_id):
                 category_id=int(category_id) if category_id else None,
                 is_active=is_active,
                 start_date=start_date,
-                end_date=end_date
+                end_date=end_date,
+                billing_type=billing_type_enum,
+                hourly_rate=hourly_rate if hourly_rate else None,
+                billing_notes=billing_notes
             )
             project_repo.save()
             flash(f'Project "{name}" updated successfully!', 'success')
@@ -137,8 +219,19 @@ def edit_project(project_id):
     # Get available teams and categories for the form (company-scoped)
     teams = Team.query.filter_by(company_id=g.user.company_id).order_by(Team.name).all()
     categories = ProjectCategory.query.filter_by(company_id=g.user.company_id).order_by(ProjectCategory.name).all()
+    
+    # Get company currency
+    company_settings = CompanySettings.get_or_create(g.user.company_id)
+    currency = company_settings.default_currency or 'USD'
+    currency_symbol = get_currency_symbol(currency)
 
-    return render_template('edit_project.html', title='Edit Project', project=project, teams=teams, categories=categories)
+    return render_template('edit_project.html', 
+                         title='Edit Project', 
+                         project=project, 
+                         teams=teams, 
+                         categories=categories,
+                         currency=currency,
+                         currency_symbol=currency_symbol)
 
 
 @projects_bp.route('/delete/<int:project_id>', methods=['POST'])

@@ -1,0 +1,1503 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="page-container reports-container">
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-report"></i></span>
+                    Report Builder
+                </h1>
+                <p class="page-subtitle">Create custom reports and analytics dashboards</p>
+            </div>
+            <div class="header-actions">
+                <button id="new-report-btn" class="btn btn-primary">
+                    <i class="ti ti-plus"></i> New Report
+                </button>
+                <button id="templates-btn" class="btn btn-secondary">
+                    <i class="ti ti-template"></i> Templates
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report List -->
+    <div class="report-list-section">
+        <div class="section-header">
+            <h3>My Reports</h3>
+            <div class="filter-controls">
+                <input type="text" id="report-search" placeholder="Search reports..." class="form-control">
+                <select id="report-filter" class="form-control">
+                    <option value="all">All Reports</option>
+                    <option value="favorites">Favorites</option>
+                    <option value="recent">Recently Used</option>
+                    <option value="shared">Shared With Me</option>
+                </select>
+            </div>
+        </div>
+        
+        <div id="reports-grid" class="reports-grid">
+            <!-- Reports will be loaded here -->
+        </div>
+        
+        <div id="empty-reports" class="empty-state" style="display: none;">
+            <i class="ti ti-report-off"></i>
+            <h3>No reports found</h3>
+            <p>Create your first report or browse templates to get started</p>
+        </div>
+    </div>
+</div>
+
+<!-- New Report Modal -->
+<div id="new-report-modal" class="modal">
+    <div class="modal-content modal-xl">
+        <div class="modal-header">
+            <h2>Create New Report</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="report-creation-wizard">
+                <!-- Step 1: Choose Template -->
+                <div class="wizard-step active" data-step="1">
+                    <h3>Choose a Template</h3>
+                    <div class="template-categories">
+                        <button class="category-btn active" data-category="all">All Templates</button>
+                        <button class="category-btn" data-category="time_tracking">Time Tracking</button>
+                        <button class="category-btn" data-category="projects">Projects</button>
+                        <button class="category-btn" data-category="team">Team</button>
+                        <button class="category-btn" data-category="custom">Custom</button>
+                    </div>
+                    <div id="template-grid" class="template-grid">
+                        <!-- Templates will be loaded here -->
+                    </div>
+                    <div class="custom-report-option">
+                        <button id="blank-report-btn" class="btn btn-outline">
+                            <i class="ti ti-file-plus"></i> Start with Blank Report
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Step 2: Configure Report -->
+                <div class="wizard-step" data-step="2">
+                    <h3>Configure Report</h3>
+                    <form id="report-config-form">
+                        <div class="form-group">
+                            <label for="report-name">Report Name</label>
+                            <input type="text" id="report-name" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="report-description">Description</label>
+                            <textarea id="report-description" class="form-control" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Default Date Range</label>
+                            <select id="date-range-preset" class="form-control">
+                                <option value="last_7_days">Last 7 Days</option>
+                                <option value="last_30_days">Last 30 Days</option>
+                                <option value="this_month">This Month</option>
+                                <option value="last_month">Last Month</option>
+                                <option value="this_quarter">This Quarter</option>
+                                <option value="this_year">This Year</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Step 3: Build Report -->
+                <div class="wizard-step" data-step="3">
+                    <h3>Build Your Report</h3>
+                    <div class="report-builder">
+                        <div class="builder-sidebar">
+                            <h4>Components</h4>
+                            <div class="component-palette">
+                                <div class="component-category">
+                                    <h5>Metrics</h5>
+                                    <div class="draggable-component" data-type="metric" data-id="total_hours">
+                                        <i class="ti ti-clock"></i> Total Hours
+                                    </div>
+                                    <div class="draggable-component" data-type="metric" data-id="tasks_completed">
+                                        <i class="ti ti-check"></i> Tasks Completed
+                                    </div>
+                                    <div class="draggable-component" data-type="metric" data-id="utilization_rate">
+                                        <i class="ti ti-percentage"></i> Utilization Rate
+                                    </div>
+                                </div>
+                                <div class="component-category">
+                                    <h5>Charts</h5>
+                                    <div class="draggable-component" data-type="chart" data-id="time_series">
+                                        <i class="ti ti-chart-line"></i> Time Series
+                                    </div>
+                                    <div class="draggable-component" data-type="chart" data-id="project_dist">
+                                        <i class="ti ti-chart-donut"></i> Project Distribution
+                                    </div>
+                                    <div class="draggable-component" data-type="chart" data-id="burndown">
+                                        <i class="ti ti-trending-down"></i> Burndown Chart
+                                    </div>
+                                </div>
+                                <div class="component-category">
+                                    <h5>Tables</h5>
+                                    <div class="draggable-component" data-type="table" data-id="entries_table">
+                                        <i class="ti ti-table"></i> Time Entries
+                                    </div>
+                                    <div class="draggable-component" data-type="table" data-id="project_summary">
+                                        <i class="ti ti-list"></i> Project Summary
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="builder-canvas">
+                            <div id="report-canvas" class="report-canvas">
+                                <div class="canvas-placeholder">
+                                    <i class="ti ti-drag-drop"></i>
+                                    <p>Drag components here to build your report</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="wizard-back" class="btn btn-secondary" style="display: none;">Back</button>
+            <button id="wizard-next" class="btn btn-primary">Next</button>
+            <button id="wizard-save" class="btn btn-success" style="display: none;">Create Report</button>
+        </div>
+    </div>
+</div>
+
+<!-- Report Viewer Modal -->
+<div id="report-viewer-modal" class="modal">
+    <div class="modal-content modal-xl">
+        <div class="modal-header">
+            <div class="report-header">
+                <h2 id="viewer-report-name"></h2>
+                <p id="viewer-report-description"></p>
+            </div>
+            <div class="report-actions">
+                <button id="refresh-report" class="btn btn-sm btn-secondary">
+                    <i class="ti ti-refresh"></i> Refresh
+                </button>
+                <button id="edit-report" class="btn btn-sm btn-primary">
+                    <i class="ti ti-edit"></i> Edit
+                </button>
+                <button id="delete-report-viewer" class="btn btn-sm btn-danger">
+                    <i class="ti ti-trash"></i> Delete
+                </button>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-secondary dropdown-toggle">
+                        <i class="ti ti-download"></i> Export
+                    </button>
+                    <div class="dropdown-menu">
+                        <a href="#" class="dropdown-item" data-format="pdf">Export as PDF</a>
+                        <a href="#" class="dropdown-item" data-format="excel">Export as Excel</a>
+                        <a href="#" class="dropdown-item" data-format="csv">Export as CSV</a>
+                    </div>
+                </div>
+                <span class="close">&times;</span>
+            </div>
+        </div>
+        <div class="modal-body">
+            <!-- Report Filters -->
+            <div class="report-filters">
+                <div class="filter-group">
+                    <label>Date Range</label>
+                    <input type="date" id="viewer-start-date" class="form-control">
+                    <span>to</span>
+                    <input type="date" id="viewer-end-date" class="form-control">
+                </div>
+                <div class="filter-group">
+                    <label>Project</label>
+                    <select id="viewer-project-filter" class="form-control">
+                        <option value="">All Projects</option>
+                    </select>
+                </div>
+                <button id="apply-viewer-filters" class="btn btn-primary">Apply Filters</button>
+            </div>
+            
+            <!-- Report Content -->
+            <div id="report-content" class="report-content">
+                <div class="loading-spinner">
+                    <i class="ti ti-loader-2"></i>
+                    <p>Loading report...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Report Builder Styles */
+.reports-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.report-list-section {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.filter-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.filter-controls input,
+.filter-controls select {
+    width: 200px;
+}
+
+.reports-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.report-card {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.report-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.report-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 10px;
+}
+
+.report-card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.report-card h4 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.report-card-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    color: #666;
+    margin-top: 10px;
+}
+
+.favorite-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #ccc;
+    font-size: 20px;
+}
+
+.favorite-btn.active {
+    color: #ffc107;
+}
+
+.delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #999;
+    font-size: 18px;
+    padding: 4px;
+    transition: color 0.2s;
+}
+
+.delete-btn:hover {
+    color: #f44336;
+}
+
+/* Wizard Styles */
+.report-creation-wizard {
+    min-height: 400px;
+}
+
+/* Modal size overrides */
+.modal-xl {
+    max-width: 1200px;
+    width: 90%;
+}
+
+.modal-xl .modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.wizard-step {
+    display: none;
+}
+
+.wizard-step.active {
+    display: block;
+}
+
+.template-categories {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.category-btn {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.category-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.template-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.template-card {
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.template-card:hover,
+.template-card.selected {
+    border-color: var(--primary-color);
+    background: #f0f7ff;
+}
+
+.template-card h5 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+}
+
+.template-card p {
+    margin: 0;
+    font-size: 14px;
+    color: #666;
+}
+
+/* Report Builder */
+.report-builder {
+    display: flex;
+    gap: 20px;
+    height: 400px;
+}
+
+.builder-sidebar {
+    width: 250px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.component-category {
+    margin-bottom: 20px;
+}
+
+.component-category h5 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #666;
+}
+
+.draggable-component {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 8px;
+    cursor: move;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.draggable-component:hover {
+    background: #f0f7ff;
+    border-color: var(--primary-color);
+}
+
+.builder-canvas {
+    flex: 1;
+    background: white;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.report-canvas {
+    min-height: 100%;
+}
+
+.canvas-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #999;
+}
+
+.canvas-placeholder i {
+    font-size: 48px;
+    margin-bottom: 10px;
+}
+
+/* Report Components */
+.report-component {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    position: relative;
+}
+
+.component-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 5px;
+}
+
+.component-actions button {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+/* Report Viewer */
+.report-filters {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: end;
+    gap: 15px;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filter-group label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.report-content {
+    min-height: 400px;
+}
+
+.loading-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 400px;
+}
+
+.loading-spinner i {
+    font-size: 48px;
+    animation: spin 1s linear infinite;
+    color: var(--primary-color);
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Report Display Components */
+.metric-component {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+}
+
+.metric-value {
+    font-size: 36px;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-bottom: 5px;
+}
+
+.metric-label {
+    font-size: 14px;
+    color: #666;
+}
+
+.chart-component {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.table-component {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+}
+
+.empty-state i {
+    font-size: 64px;
+    margin-bottom: 20px;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Make controller accessible globally for inline handlers
+let reportController;
+
+document.addEventListener('DOMContentLoaded', function() {
+    reportController = new ReportBuilderController();
+    reportController.init();
+});
+
+class ReportBuilderController {
+    constructor() {
+        this.reports = [];
+        this.templates = [];
+        this.currentReport = null;
+        this.selectedTemplate = null;
+        this.currentStep = 1;
+        this.reportComponents = [];
+        this.charts = {};
+    }
+
+    init() {
+        this.setupEventListeners();
+        this.loadReports();
+        this.loadTemplates();
+    }
+
+    setupEventListeners() {
+        // Report list actions
+        document.getElementById('new-report-btn').addEventListener('click', () => this.showNewReportModal());
+        document.getElementById('templates-btn').addEventListener('click', () => this.showTemplatesModal());
+        document.getElementById('report-search').addEventListener('input', (e) => this.filterReports(e.target.value));
+        document.getElementById('report-filter').addEventListener('change', (e) => this.filterReports(null, e.target.value));
+
+        // Modal controls
+        document.querySelectorAll('.close').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.target.closest('.modal').style.display = 'none';
+            });
+        });
+
+        // Wizard controls
+        document.getElementById('wizard-back').addEventListener('click', () => this.previousStep());
+        document.getElementById('wizard-next').addEventListener('click', () => this.nextStep());
+        document.getElementById('wizard-save').addEventListener('click', () => this.saveReport());
+        document.getElementById('blank-report-btn').addEventListener('click', () => this.selectBlankTemplate());
+
+        // Template categories
+        document.querySelectorAll('.category-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.filterTemplates(e.target.dataset.category));
+        });
+
+        // Report viewer actions
+        document.getElementById('refresh-report').addEventListener('click', () => this.refreshReport());
+        document.getElementById('edit-report').addEventListener('click', () => this.editReport());
+        document.getElementById('delete-report-viewer').addEventListener('click', () => this.deleteCurrentReport());
+        document.getElementById('apply-viewer-filters').addEventListener('click', () => this.applyViewerFilters());
+
+        // Export actions
+        document.querySelectorAll('.dropdown-item[data-format]').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.exportReport(e.target.dataset.format);
+            });
+        });
+
+        // Initialize drag and drop
+        this.initializeDragAndDrop();
+    }
+
+    async loadReports() {
+        try {
+            const response = await fetch('/api/reports?include_shared=true');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.reports = data.reports;
+                console.log('Loaded reports:', this.reports);
+                this.displayReports();
+            } else {
+                console.error('Failed to load reports:', data.error);
+            }
+        } catch (error) {
+            console.error('Error loading reports:', error);
+        }
+    }
+
+    async loadTemplates() {
+        try {
+            const response = await fetch('/api/reports/templates');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.templates = data.templates;
+                console.log('Loaded templates:', this.templates);
+                this.displayTemplates();
+            } else {
+                console.error('Failed to load templates:', data.error);
+            }
+        } catch (error) {
+            console.error('Error loading templates:', error);
+        }
+    }
+
+    displayReports() {
+        const grid = document.getElementById('reports-grid');
+        const emptyState = document.getElementById('empty-reports');
+        
+        console.log('Displaying reports:', this.reports.length, 'reports');
+        
+        if (this.reports.length === 0) {
+            grid.style.display = 'none';
+            emptyState.style.display = 'block';
+            return;
+        }
+        
+        grid.style.display = 'grid';
+        emptyState.style.display = 'none';
+        
+        grid.innerHTML = this.reports.map(report => `
+            <div class="report-card" data-report-id="${report.id}">
+                <div class="report-card-header">
+                    <h4>${this.escapeHtml(report.name)}</h4>
+                    <div class="report-card-actions">
+                        <button class="favorite-btn ${report.is_favorite ? 'active' : ''}" 
+                                onclick="event.stopPropagation(); reportController.toggleFavorite(${report.id})">
+                            <i class="ti ti-star${report.is_favorite ? '-filled' : ''}"></i>
+                        </button>
+                        <button class="delete-btn" 
+                                onclick="event.stopPropagation(); reportController.deleteReport(${report.id})">
+                            <i class="ti ti-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <p>${this.escapeHtml(report.description || 'No description')}</p>
+                <div class="report-card-meta">
+                    <span><i class="ti ti-calendar"></i> ${this.formatDate(report.last_accessed || report.created_at)}</span>
+                    <span><i class="ti ti-eye"></i> ${report.access_count || 0} views</span>
+                    ${report.is_shared ? '<span><i class="ti ti-share"></i> Shared</span>' : ''}
+                </div>
+            </div>
+        `).join('');
+        
+        // Add click handlers
+        grid.querySelectorAll('.report-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (!e.target.closest('.favorite-btn')) {
+                    this.openReport(card.dataset.reportId);
+                }
+            });
+        });
+    }
+    
+    escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    displayTemplates() {
+        const grid = document.getElementById('template-grid');
+        
+        grid.innerHTML = this.templates.map(template => `
+            <div class="template-card" data-template-id="${template.id}">
+                <h5>${template.name}</h5>
+                <p>${template.description}</p>
+            </div>
+        `).join('');
+        
+        // Add click handlers
+        grid.querySelectorAll('.template-card').forEach(card => {
+            card.addEventListener('click', () => this.selectTemplate(card.dataset.templateId));
+        });
+    }
+
+    showNewReportModal() {
+        // Reset state
+        this.currentStep = 1;
+        this.selectedTemplate = null;
+        this.reportComponents = [];
+        
+        // Clear form fields
+        document.getElementById('report-name').value = '';
+        document.getElementById('report-description').value = '';
+        
+        // Reset UI
+        document.querySelectorAll('.template-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        
+        // Show modal
+        document.getElementById('new-report-modal').style.display = 'block';
+        this.showStep(1);
+    }
+
+    selectTemplate(templateId) {
+        document.querySelectorAll('.template-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        
+        const card = document.querySelector(`.template-card[data-template-id="${templateId}"]`);
+        if (card) {
+            card.classList.add('selected');
+            this.selectedTemplate = this.templates.find(t => t.id == templateId);
+        }
+    }
+
+    selectBlankTemplate() {
+        this.selectedTemplate = null;
+        document.querySelectorAll('.template-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+    }
+
+    showStep(step) {
+        document.querySelectorAll('.wizard-step').forEach(s => {
+            s.classList.remove('active');
+        });
+        
+        document.querySelector(`.wizard-step[data-step="${step}"]`).classList.add('active');
+        
+        // Update buttons
+        document.getElementById('wizard-back').style.display = step > 1 ? 'inline-block' : 'none';
+        document.getElementById('wizard-next').style.display = step < 3 ? 'inline-block' : 'none';
+        document.getElementById('wizard-save').style.display = step === 3 ? 'inline-block' : 'none';
+        
+        // Initialize step-specific content
+        if (step === 3) {
+            this.initializeReportBuilder();
+        }
+    }
+
+    previousStep() {
+        if (this.currentStep > 1) {
+            this.currentStep--;
+            this.showStep(this.currentStep);
+        }
+    }
+
+    nextStep() {
+        if (this.currentStep === 1 && !this.selectedTemplate && !confirm('Continue without a template?')) {
+            return;
+        }
+        
+        if (this.currentStep < 3) {
+            this.currentStep++;
+            this.showStep(this.currentStep);
+        }
+    }
+
+    initializeReportBuilder() {
+        const canvas = document.getElementById('report-canvas');
+        
+        // Only initialize if we haven't already
+        if (canvas.children.length > 0 && this.reportComponents.length > 0) {
+            console.log('Report builder already initialized with', this.reportComponents.length, 'components');
+            return;
+        }
+        
+        // Clear canvas
+        canvas.innerHTML = '';
+        this.reportComponents = [];
+        
+        // If template selected, load its components
+        if (this.selectedTemplate) {
+            const components = this.selectedTemplate.template_config.components || [];
+            console.log('Loading template components:', components);
+            components.forEach(comp => {
+                this.addComponentToCanvas(comp);
+            });
+        } else {
+            canvas.innerHTML = `
+                <div class="canvas-placeholder">
+                    <i class="ti ti-drag-drop"></i>
+                    <p>Drag components here to build your report</p>
+                </div>
+            `;
+        }
+    }
+
+    initializeDragAndDrop() {
+        // Make components draggable
+        document.querySelectorAll('.draggable-component').forEach(comp => {
+            comp.draggable = true;
+            comp.addEventListener('dragstart', (e) => {
+                e.dataTransfer.effectAllowed = 'copy';
+                e.dataTransfer.setData('component', JSON.stringify({
+                    type: comp.dataset.type,
+                    id: comp.dataset.id,
+                    config: {}
+                }));
+            });
+        });
+        
+        // Make canvas droppable
+        const canvas = document.getElementById('report-canvas');
+        
+        canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+        
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            
+            try {
+                const component = JSON.parse(e.dataTransfer.getData('component'));
+                this.addComponentToCanvas(component);
+            } catch (error) {
+                console.error('Error adding component:', error);
+            }
+        });
+        
+        // Make canvas sortable
+        new Sortable(canvas, {
+            animation: 150,
+            handle: '.component-handle',
+            onSort: () => {
+                this.updateComponentOrder();
+            }
+        });
+    }
+
+    addComponentToCanvas(component) {
+        const canvas = document.getElementById('report-canvas');
+        
+        // Remove placeholder if exists
+        const placeholder = canvas.querySelector('.canvas-placeholder');
+        if (placeholder) {
+            placeholder.remove();
+        }
+        
+        // Create component element
+        const componentEl = document.createElement('div');
+        componentEl.className = 'report-component';
+        componentEl.dataset.componentType = component.type;
+        componentEl.dataset.componentId = component.id;
+        
+        componentEl.innerHTML = `
+            <div class="component-handle" style="cursor: move;">
+                <i class="ti ti-grip-vertical"></i>
+            </div>
+            <div class="component-actions">
+                <button onclick="reportController.configureComponent('${component.id}')">
+                    <i class="ti ti-settings"></i>
+                </button>
+                <button onclick="reportController.removeComponent('${component.id}')">
+                    <i class="ti ti-x"></i>
+                </button>
+            </div>
+            <div class="component-content">
+                ${this.getComponentPreview(component)}
+            </div>
+        `;
+        
+        canvas.appendChild(componentEl);
+        this.reportComponents.push(component);
+    }
+
+    getComponentPreview(component) {
+        const typeIcons = {
+            metric: 'ti-number',
+            chart: 'ti-chart-bar',
+            table: 'ti-table',
+            text: 'ti-text'
+        };
+        
+        const icon = typeIcons[component.type] || 'ti-component';
+        const label = component.config?.label || component.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        
+        return `
+            <div style="text-align: center; padding: 20px;">
+                <i class="ti ${icon}" style="font-size: 32px; color: #666;"></i>
+                <p style="margin-top: 10px; font-weight: 500;">${label}</p>
+                <p style="font-size: 12px; color: #999;">Preview in report viewer</p>
+            </div>
+        `;
+    }
+
+    removeComponent(componentId) {
+        const element = document.querySelector(`[data-component-id="${componentId}"]`);
+        if (element) {
+            element.remove();
+        }
+        
+        this.reportComponents = this.reportComponents.filter(c => c.id !== componentId);
+        
+        // Show placeholder if no components
+        if (this.reportComponents.length === 0) {
+            const canvas = document.getElementById('report-canvas');
+            canvas.innerHTML = `
+                <div class="canvas-placeholder">
+                    <i class="ti ti-drag-drop"></i>
+                    <p>Drag components here to build your report</p>
+                </div>
+            `;
+        }
+    }
+
+    updateComponentOrder() {
+        const canvas = document.getElementById('report-canvas');
+        const components = canvas.querySelectorAll('.report-component');
+        
+        this.reportComponents = Array.from(components).map(el => {
+            return this.reportComponents.find(c => c.id === el.dataset.componentId);
+        }).filter(Boolean);
+    }
+
+    async saveReport() {
+        const name = document.getElementById('report-name').value;
+        const description = document.getElementById('report-description').value;
+        
+        if (!name) {
+            alert('Please enter a report name');
+            return;
+        }
+        
+        console.log('Saving report with components:', this.reportComponents);
+        
+        const reportData = {
+            name: name,
+            description: description,
+            template_id: this.selectedTemplate?.id,
+            config: {
+                components: this.reportComponents
+            }
+        };
+        
+        try {
+            const response = await fetch('/api/reports', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(reportData)
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                console.log('Report created successfully:', data.report);
+                document.getElementById('new-report-modal').style.display = 'none';
+                // Reset wizard state
+                this.currentStep = 1;
+                this.selectedTemplate = null;
+                this.reportComponents = [];
+                // Clear form
+                document.getElementById('report-name').value = '';
+                document.getElementById('report-description').value = '';
+                // Reload reports
+                await this.loadReports();
+                this.openReport(data.report.id);
+            } else {
+                alert('Error creating report: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error saving report:', error);
+            alert('Error saving report: ' + error.message);
+        }
+    }
+
+    async openReport(reportId) {
+        this.currentReport = reportId;
+        document.getElementById('report-viewer-modal').style.display = 'block';
+        
+        // Load report details
+        try {
+            const response = await fetch(`/api/reports/${reportId}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                document.getElementById('viewer-report-name').textContent = data.report.name;
+                document.getElementById('viewer-report-description').textContent = data.report.description || '';
+                
+                // Load and execute report
+                this.executeReport();
+            }
+        } catch (error) {
+            console.error('Error loading report:', error);
+        }
+    }
+
+    async executeReport() {
+        const reportContent = document.getElementById('report-content');
+        reportContent.innerHTML = `
+            <div class="loading-spinner">
+                <i class="ti ti-loader-2"></i>
+                <p>Loading report...</p>
+            </div>
+        `;
+        
+        const filters = {
+            start_date: document.getElementById('viewer-start-date').value,
+            end_date: document.getElementById('viewer-end-date').value,
+            project_id: document.getElementById('viewer-project-filter').value
+        };
+        
+        try {
+            const response = await fetch(`/api/reports/${this.currentReport}/execute`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(filters)
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.renderReport(data.result);
+            } else {
+                reportContent.innerHTML = `
+                    <div class="empty-state">
+                        <i class="ti ti-alert-circle"></i>
+                        <h3>Error loading report</h3>
+                        <p>${data.error}</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error executing report:', error);
+            reportContent.innerHTML = `
+                <div class="empty-state">
+                    <i class="ti ti-alert-circle"></i>
+                    <h3>Error loading report</h3>
+                    <p>Failed to execute report: ${error.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    renderReport(result) {
+        const reportContent = document.getElementById('report-content');
+        reportContent.innerHTML = '';
+        
+        // Destroy existing charts
+        Object.values(this.charts).forEach(chart => {
+            try {
+                chart.destroy();
+            } catch (e) {
+                console.error('Error destroying chart:', e);
+            }
+        });
+        this.charts = {};
+        
+        // Check if result has components
+        if (!result || !result.components || result.components.length === 0) {
+            reportContent.innerHTML = `
+                <div class="empty-state">
+                    <i class="ti ti-report-off"></i>
+                    <h3>No report data</h3>
+                    <p>This report has no components to display.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Create grid layout
+        const grid = document.createElement('div');
+        grid.className = 'report-grid';
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(300px, 1fr))';
+        grid.style.gap = '20px';
+        
+        // Render each component
+        result.components.forEach((component, index) => {
+            const componentEl = this.renderComponent(component, index);
+            grid.appendChild(componentEl);
+        });
+        
+        reportContent.appendChild(grid);
+    }
+
+    renderComponent(component, index) {
+        const wrapper = document.createElement('div');
+        wrapper.className = `${component.type}-component`;
+        
+        try {
+            switch (component.type) {
+                case 'metric':
+                    wrapper.innerHTML = this.renderMetric(component.data);
+                    break;
+                case 'chart':
+                    wrapper.innerHTML = '<canvas id="chart-' + index + '"></canvas>';
+                    // Render chart after DOM update
+                    setTimeout(() => this.renderChart(component.data, 'chart-' + index), 100);
+                    break;
+                case 'table':
+                    wrapper.innerHTML = this.renderTable(component.data);
+                    break;
+                case 'text':
+                    wrapper.innerHTML = this.renderText(component.data);
+                    break;
+                default:
+                    wrapper.innerHTML = `<p>Unknown component type: ${component.type}</p>`;
+            }
+        } catch (error) {
+            console.error('Error rendering component:', component, error);
+            wrapper.innerHTML = `<div class="error-message">Error rendering ${component.type} component: ${error.message}</div>`;
+        }
+        
+        return wrapper;
+    }
+
+    renderMetric(data) {
+        if (!data) {
+            return '<div class="metric-component"><p>No data available</p></div>';
+        }
+        
+        const value = this.formatValue(data.value, data.format);
+        const label = data.label || 'Unknown Metric';
+        
+        return `
+            <div class="metric-component">
+                <div class="metric-value">${value}</div>
+                <div class="metric-label">${label}</div>
+            </div>
+        `;
+    }
+
+    renderChart(data, canvasId) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Debug logging
+        console.log('Rendering chart with data:', data);
+        console.log('Chart type:', data.chart_type);
+        
+        // Fix donut to doughnut on the client side as a safety measure
+        let chartType = data.chart_type || 'line';
+        if (chartType === 'donut') {
+            console.warn('Found donut chart type, converting to doughnut');
+            chartType = 'doughnut';
+        }
+        
+        const config = {
+            type: chartType,
+            data: {
+                labels: data.labels || [],
+                datasets: data.datasets || []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: !!data.title,
+                        text: data.title
+                    }
+                }
+            }
+        };
+        
+        try {
+            this.charts[canvasId] = new Chart(ctx, config);
+        } catch (error) {
+            console.error('Chart.js error:', error);
+            console.error('Config that caused error:', config);
+        }
+    }
+
+    renderTable(data) {
+        if (!data.rows || data.rows.length === 0) {
+            return '<p style="text-align: center; color: #999;">No data available</p>';
+        }
+        
+        const columns = data.columns || Object.keys(data.rows[0]);
+        
+        return `
+            <div class="table-component">
+                <table class="data-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            ${columns.map(col => `<th>${this.formatColumnName(col)}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.rows.map(row => `
+                            <tr>
+                                ${columns.map(col => `<td>${row[col] || ''}</td>`).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                ${data.total_pages > 1 ? `
+                    <div class="table-pagination">
+                        Page ${data.page} of ${data.total_pages}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    renderText(data) {
+        return `
+            <div class="text-component">
+                ${data.title ? `<h4>${data.title}</h4>` : ''}
+                <div>${data.content}</div>
+            </div>
+        `;
+    }
+
+    formatValue(value, format) {
+        // Handle null/undefined values
+        if (value === null || value === undefined) {
+            return '0';
+        }
+        
+        switch (format) {
+            case 'hours':
+                return Number(value).toFixed(1) + 'h';
+            case 'percentage':
+                return Number(value).toFixed(1) + '%';
+            case 'currency':
+                return '$' + Number(value).toFixed(2);
+            default:
+                return String(value);
+        }
+    }
+
+    formatColumnName(col) {
+        return col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+    formatDate(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        
+        return date.toLocaleDateString();
+    }
+
+    async toggleFavorite(reportId) {
+        try {
+            const report = this.reports.find(r => r.id == reportId);
+            const response = await fetch(`/api/reports/${reportId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    is_favorite: !report.is_favorite
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                this.loadReports();
+            }
+        } catch (error) {
+            console.error('Error toggling favorite:', error);
+        }
+    }
+    
+    async deleteReport(reportId) {
+        const report = this.reports.find(r => r.id == reportId);
+        if (!report) return;
+        
+        if (!confirm(`Are you sure you want to delete the report "${report.name}"? This action cannot be undone.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/reports/${reportId}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                // Remove from local array
+                this.reports = this.reports.filter(r => r.id != reportId);
+                // Refresh display
+                this.displayReports();
+            } else {
+                alert('Error deleting report: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error deleting report:', error);
+            alert('Error deleting report: ' + error.message);
+        }
+    }
+
+    filterReports(searchTerm, filterType) {
+        // Implementation for filtering reports
+        console.log('Filter reports:', searchTerm, filterType);
+    }
+
+    filterTemplates(category) {
+        document.querySelectorAll('.category-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        event.target.classList.add('active');
+        
+        // Filter template display
+        const filtered = category === 'all' 
+            ? this.templates 
+            : this.templates.filter(t => t.category === category);
+            
+        // Re-display filtered templates
+        const grid = document.getElementById('template-grid');
+        grid.innerHTML = filtered.map(template => `
+            <div class="template-card" data-template-id="${template.id}">
+                <h5>${template.name}</h5>
+                <p>${template.description}</p>
+            </div>
+        `).join('');
+        
+        // Re-add click handlers
+        grid.querySelectorAll('.template-card').forEach(card => {
+            card.addEventListener('click', () => this.selectTemplate(card.dataset.templateId));
+        });
+    }
+
+    refreshReport() {
+        this.executeReport();
+    }
+
+    editReport() {
+        // Implementation for editing report
+        console.log('Edit report:', this.currentReport);
+    }
+    
+    async deleteCurrentReport() {
+        if (!this.currentReport) return;
+        
+        const report = this.reports.find(r => r.id == this.currentReport);
+        if (!report) return;
+        
+        if (!confirm(`Are you sure you want to delete the report "${report.name}"? This action cannot be undone.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/reports/${this.currentReport}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                // Close the viewer modal
+                document.getElementById('report-viewer-modal').style.display = 'none';
+                // Reload reports
+                await this.loadReports();
+            } else {
+                alert('Error deleting report: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error deleting report:', error);
+            alert('Error deleting report: ' + error.message);
+        }
+    }
+
+    applyViewerFilters() {
+        this.executeReport();
+    }
+
+    async exportReport(format) {
+        try {
+            const filters = {
+                start_date: document.getElementById('viewer-start-date').value,
+                end_date: document.getElementById('viewer-end-date').value,
+                project_id: document.getElementById('viewer-project-filter').value
+            };
+            
+            const response = await fetch(`/api/reports/${this.currentReport}/export/${format}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(filters)
+            });
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `report_${this.currentReport}_${new Date().toISOString().split('T')[0]}.${format}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                const data = await response.json();
+                alert('Export failed: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error exporting report:', error);
+            alert('Error exporting report');
+        }
+    }
+}
+</script>
+{% endblock %}

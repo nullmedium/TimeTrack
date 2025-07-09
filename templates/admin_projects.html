@@ -152,6 +152,18 @@
                                         <span class="info-text">{{ project.team.name if project.team else 'All Teams' }}</span>
                                     </div>
                                     <div class="info-item">
+                                        {% if project.billing_type.name == 'NON_BILLABLE' %}
+                                            <i class="ti ti-receipt-off info-icon"></i>
+                                            <span class="info-text">Non-Billable</span>
+                                        {% elif project.billing_type.name == 'HOURLY' %}
+                                            <i class="ti ti-clock-dollar info-icon"></i>
+                                            <span class="info-text">{% if project.hourly_rate %}{{ currency_symbol }}{{ "%.2f"|format(project.hourly_rate) }}/hr{% else %}Hourly{% endif %}</span>
+                                        {% else %}
+                                            <i class="ti ti-receipt info-icon"></i>
+                                            <span class="info-text">Fixed Rate</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="info-item">
                                         <i class="ti ti-calendar info-icon"></i>
                                         <span class="info-text">
                                             {% if project.start_date %}
@@ -207,6 +219,7 @@
                                 <th>Category</th>
                                 <th>Team</th>
                                 <th>Status</th>
+                                <th>Billing</th>
                                 <th>Duration</th>
                                 <th>Created By</th>
                                 <th>Entries</th>
@@ -237,6 +250,21 @@
                                         <span class="status-badge {% if project.is_active %}status-active{% else %}status-inactive{% endif %}">
                                             {{ 'Active' if project.is_active else 'Inactive' }}
                                         </span>
+                                    </td>
+                                    <td>
+                                        {% if project.billing_type.name == 'NON_BILLABLE' %}
+                                            <span class="text-muted">Non-Billable</span>
+                                        {% elif project.billing_type.name == 'HOURLY' %}
+                                            <span class="billing-badge hourly">
+                                                <i class="ti ti-clock-dollar"></i>
+                                                {% if project.hourly_rate %}{{ currency_symbol }}{{ "%.2f"|format(project.hourly_rate) }}/hr{% else %}Hourly{% endif %}
+                                            </span>
+                                        {% else %}
+                                            <span class="billing-badge fixed">
+                                                <i class="ti ti-receipt"></i>
+                                                Fixed Rate
+                                            </span>
+                                        {% endif %}
                                     </td>
                                     <td class="date-cell">
                                         {% if project.start_date %}
@@ -811,6 +839,31 @@
 .status-inactive {
     background: #fee2e2;
     color: #dc2626;
+}
+
+/* Billing Badges */
+.billing-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.billing-badge.hourly {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.billing-badge.fixed {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.billing-badge i {
+    font-size: 0.875rem;
 }
 
 /* Buttons */

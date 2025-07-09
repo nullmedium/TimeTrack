@@ -48,18 +48,31 @@ def clean_migration_state():
             db.session.rollback()
             return False
 
+def check_migration_exists(version):
+    """Check if a migration file exists for the given version"""
+    import os
+    migrations_dir = os.path.join(os.path.dirname(__file__), 'migrations', 'versions')
+    if os.path.exists(migrations_dir):
+        for filename in os.listdir(migrations_dir):
+            if filename.startswith(version) and filename.endswith('.py'):
+                return True
+    return False
+
 if __name__ == '__main__':
     print("Checking migration state...")
     version = check_alembic_version()
     
     if version:
-        print(f"\nThe database references migration '{version}' which doesn't exist in files.")
-        response = input("Do you want to clean the migration state? (yes/no): ")
-        
-        if response.lower() == 'yes':
-            if clean_migration_state():
-                print("\nYou can now create a fresh initial migration.")
-            else:
-                print("\nFailed to clean migration state.")
+        if check_migration_exists(version):
+            print(f"\n✓ Migration '{version}' exists and is properly applied.")
+        else:
+            print(f"\n✗ The database references migration '{version}' which doesn't exist in files.")
+            response = input("Do you want to clean the migration state? (yes/no): ")
+            
+            if response.lower() == 'yes':
+                if clean_migration_state():
+                    print("\nYou can now create a fresh initial migration.")
+                else:
+                    print("\nFailed to clean migration state.")
     else:
         print("\nNo migration issues found. You can create a fresh initial migration.")

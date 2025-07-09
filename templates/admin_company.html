@@ -129,6 +129,48 @@
                 </div>
             </div>
 
+            <!-- Company Settings Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon"><i class="ti ti-settings"></i></span>
+                        Company Settings
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST" class="modern-form">
+                        <input type="hidden" name="action" value="update_company_settings">
+                        
+                        <div class="form-group">
+                            <label for="default_currency" class="form-label">Default Currency</label>
+                            <select id="default_currency" name="default_currency" class="form-control">
+                                {% for code, label in currency_choices %}
+                                    {% if code != '---' %}
+                                        <option value="{{ code }}" {% if company_settings.default_currency == code %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% else %}
+                                        <option disabled>{{ label }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                            <span class="form-hint">This currency will be used for all billing and financial displays</span>
+                            <div class="currency-preview">
+                                <i class="ti ti-currency-dollar"></i>
+                                Current: <strong>{{ get_currency_symbol(company_settings.default_currency) }} ({{ company_settings.default_currency }})</strong>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <span class="icon"><i class="ti ti-check"></i></span>
+                                Update Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <!-- Quick Actions Card -->
             <div class="card">
                 <div class="card-header">
@@ -523,6 +565,27 @@
     color: #6b7280;
 }
 
+.currency-preview {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: #f3f4f6;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    color: #4b5563;
+}
+
+.currency-preview i {
+    color: #667eea;
+    font-size: 1.25rem;
+}
+
+.currency-preview strong {
+    color: #1f2937;
+}
+
 .form-actions {
     display: flex;
     gap: 1rem;
@@ -889,6 +952,28 @@ function copyCompanyCode() {
         alert('Failed to copy code. Please select and copy manually.');
     }
 }
+
+// Currency preview update
+document.addEventListener('DOMContentLoaded', function() {
+    const currencySelect = document.getElementById('default_currency');
+    if (currencySelect) {
+        currencySelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const selectedText = selectedOption.text;
+            const currencyCode = this.value;
+            
+            // Extract symbol from the option text (format: "USD - US Dollar ($)")
+            const symbolMatch = selectedText.match(/\(([^)]+)\)$/);
+            const symbol = symbolMatch ? symbolMatch[1] : currencyCode;
+            
+            // Update preview
+            const preview = document.querySelector('.currency-preview strong');
+            if (preview) {
+                preview.textContent = `${symbol} (${currencyCode})`;
+            }
+        });
+    }
+});
 </script>
 
 {% endblock %}

@@ -1,0 +1,780 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="billing-report-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <i class="ti ti-report-money page-icon"></i>
+                    Billing Report
+                </h1>
+                <p class="page-subtitle">Track billable hours and revenue</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="exportReport('csv')">
+                    <i class="ti ti-file-export"></i> Export CSV
+                </button>
+                <button class="btn btn-secondary" onclick="exportReport('excel')">
+                    <i class="ti ti-file-spreadsheet"></i> Export Excel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="filters-card">
+        <form method="GET" action="{{ url_for('billing.billing_report') }}" id="filterForm">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label for="month-select">Period</label>
+                    <select id="month-select" name="month" class="form-control" onchange="updateDateFilter()">
+                        {% for month_option in months %}
+                        <option value="{{ month_option.month }}" 
+                                data-year="{{ month_option.year }}"
+                                {% if month_option.year == selected_year and month_option.month == selected_month %}selected{% endif %}>
+                            {{ month_option.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="year" id="year-input" value="{{ selected_year }}">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="project-filter">Project</label>
+                    <select id="project-filter" name="project_id" class="form-control" onchange="this.form.submit()">
+                        <option value="">All Projects</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}" {% if project.id == selected_project_id %}selected{% endif %}>
+                            {{ project.name }} ({{ project.code }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="user-filter">User</label>
+                    <select id="user-filter" name="user_id" class="form-control" onchange="this.form.submit()">
+                        <option value="">All Users</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}" {% if user.id == selected_user_id %}selected{% endif %}>
+                            {{ user.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-section">
+        <div class="summary-card">
+            <div class="summary-icon">
+                <i class="ti ti-clock"></i>
+            </div>
+            <div class="summary-content">
+                <div class="summary-value">{{ "%.2f"|format(billing_data.total_hours) }}</div>
+                <div class="summary-label">Total Hours</div>
+            </div>
+        </div>
+        
+        <div class="summary-card billable">
+            <div class="summary-icon">
+                <i class="ti ti-currency-dollar"></i>
+            </div>
+            <div class="summary-content">
+                <div class="summary-value">{{ "%.2f"|format(billing_data.billable_hours) }}</div>
+                <div class="summary-label">Billable Hours</div>
+                <div class="summary-percentage">
+                    {% if billing_data.total_hours > 0 %}
+                        {{ "%.1f"|format((billing_data.billable_hours / billing_data.total_hours) * 100) }}% of total
+                    {% else %}
+                        0%
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="summary-card non-billable">
+            <div class="summary-icon">
+                <i class="ti ti-clock-x"></i>
+            </div>
+            <div class="summary-content">
+                <div class="summary-value">{{ "%.2f"|format(billing_data.non_billable_hours) }}</div>
+                <div class="summary-label">Non-Billable Hours</div>
+            </div>
+        </div>
+        
+        <div class="summary-card revenue">
+            <div class="summary-icon">
+                <i class="ti ti-businessplan"></i>
+            </div>
+            <div class="summary-content">
+                <div class="summary-value">{{ currency_symbol }}{{ "%.2f"|format(billing_data.total_amount) }}</div>
+                <div class="summary-label">Total Revenue</div>
+                <div class="summary-sublabel">{{ currency }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs for different views -->
+    <div class="report-tabs">
+        <button class="tab-button active" onclick="showTab('by-project')">By Project</button>
+        <button class="tab-button" onclick="showTab('by-user')">By User</button>
+        <button class="tab-button" onclick="showTab('daily')">Daily Breakdown</button>
+        <button class="tab-button" onclick="showTab('detailed')">Detailed Entries</button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- By Project Tab -->
+        <div id="by-project" class="tab-pane active">
+            <div class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Project</th>
+                            <th>Code</th>
+                            <th>Total Hours</th>
+                            <th>Billable Hours</th>
+                            <th>Non-Billable</th>
+                            <th>Billing Rate</th>
+                            <th>Revenue</th>
+                            <th>Team Members</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for proj_id, proj_data in billing_data.by_project.items() %}
+                        <tr>
+                            <td class="project-name">{{ proj_data.project.name }}</td>
+                            <td class="project-code">{{ proj_data.project.code }}</td>
+                            <td class="hours">{{ "%.2f"|format(proj_data.total_hours) }}</td>
+                            <td class="hours billable">{{ "%.2f"|format(proj_data.billable_hours) }}</td>
+                            <td class="hours non-billable">{{ "%.2f"|format(proj_data.non_billable_hours) }}</td>
+                            <td class="rate">
+                                {% if proj_data.project.billing_type.name == 'HOURLY' and proj_data.project.hourly_rate %}
+                                    {{ currency_symbol }}{{ "%.2f"|format(proj_data.project.hourly_rate) }}/hr
+                                {% elif proj_data.project.billing_type.name == 'FIXED_RATE' %}
+                                    Fixed Rate
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="amount">{{ currency_symbol }}{{ "%.2f"|format(proj_data.total_amount) }}</td>
+                            <td class="users">{{ proj_data.users|length }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td colspan="2"><strong>Total</strong></td>
+                            <td class="hours"><strong>{{ "%.2f"|format(billing_data.total_hours) }}</strong></td>
+                            <td class="hours billable"><strong>{{ "%.2f"|format(billing_data.billable_hours) }}</strong></td>
+                            <td class="hours non-billable"><strong>{{ "%.2f"|format(billing_data.non_billable_hours) }}</strong></td>
+                            <td></td>
+                            <td class="amount"><strong>{{ currency_symbol }}{{ "%.2f"|format(billing_data.total_amount) }}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- By User Tab -->
+        <div id="by-user" class="tab-pane">
+            <div class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Total Hours</th>
+                            <th>Billable Hours</th>
+                            <th>Non-Billable</th>
+                            <th>Revenue Generated</th>
+                            <th>Projects Worked On</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user_id, user_data in billing_data.by_user.items() %}
+                        <tr>
+                            <td class="user-name">{{ user_data.user.username }}</td>
+                            <td class="hours">{{ "%.2f"|format(user_data.total_hours) }}</td>
+                            <td class="hours billable">{{ "%.2f"|format(user_data.billable_hours) }}</td>
+                            <td class="hours non-billable">{{ "%.2f"|format(user_data.non_billable_hours) }}</td>
+                            <td class="amount">{{ currency_symbol }}{{ "%.2f"|format(user_data.total_amount) }}</td>
+                            <td class="projects">{{ user_data.projects|length }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td><strong>Total</strong></td>
+                            <td class="hours"><strong>{{ "%.2f"|format(billing_data.total_hours) }}</strong></td>
+                            <td class="hours billable"><strong>{{ "%.2f"|format(billing_data.billable_hours) }}</strong></td>
+                            <td class="hours non-billable"><strong>{{ "%.2f"|format(billing_data.non_billable_hours) }}</strong></td>
+                            <td class="amount"><strong>{{ currency_symbol }}{{ "%.2f"|format(billing_data.total_amount) }}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- Daily Breakdown Tab -->
+        <div id="daily" class="tab-pane">
+            <div class="chart-container">
+                <canvas id="dailyChart"></canvas>
+            </div>
+            <div class="data-table-container" style="margin-top: 2rem;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Day</th>
+                            <th>Total Hours</th>
+                            <th>Billable Hours</th>
+                            <th>Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for date_key, date_data in billing_data.by_date.items()|sort %}
+                        <tr>
+                            <td>{{ date_data.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ date_data.date.strftime('%A') }}</td>
+                            <td class="hours">{{ "%.2f"|format(date_data.total_hours) }}</td>
+                            <td class="hours billable">{{ "%.2f"|format(date_data.billable_hours) }}</td>
+                            <td class="amount">{{ currency_symbol }}{{ "%.2f"|format(date_data.total_amount) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Detailed Entries Tab -->
+        <div id="detailed" class="tab-pane">
+            <div class="data-table-container">
+                <table class="data-table detailed">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>User</th>
+                            <th>Project</th>
+                            <th>Hours</th>
+                            <th>Type</th>
+                            <th>Rate</th>
+                            <th>Amount</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in billing_data.entries %}
+                        <tr>
+                            <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ entry.user.username }}</td>
+                            <td>{{ entry.project.name }}</td>
+                            <td class="hours">{{ "%.2f"|format(entry.hours) }}</td>
+                            <td>
+                                {% if entry.is_billable %}
+                                    <span class="badge badge-billable">Billable</span>
+                                {% else %}
+                                    <span class="badge badge-non-billable">Non-Billable</span>
+                                {% endif %}
+                            </td>
+                            <td class="rate">
+                                {% if entry.is_billable and entry.rate %}
+                                    {{ currency_symbol }}{{ "%.2f"|format(entry.rate) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="amount">
+                                {% if entry.is_billable %}
+                                    {{ currency_symbol }}{{ "%.2f"|format(entry.amount) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="notes">{{ entry.notes or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.billing-report-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+}
+
+.page-subtitle {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Filters */
+.filters-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.filter-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.filter-group label {
+    font-weight: 600;
+    color: #4b5563;
+    font-size: 0.875rem;
+}
+
+/* Summary Cards */
+.summary-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.summary-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: transform 0.2s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.summary-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.summary-card.billable .summary-icon {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.summary-card.non-billable .summary-icon {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.summary-card.revenue .summary-icon {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.summary-content {
+    flex: 1;
+}
+
+.summary-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    line-height: 1;
+}
+
+.summary-label {
+    color: #6b7280;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.summary-percentage,
+.summary-sublabel {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 0.25rem;
+}
+
+/* Tabs */
+.report-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.tab-button {
+    padding: 0.75rem 1.5rem;
+    background: none;
+    border: none;
+    font-weight: 600;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.tab-button:hover {
+    color: #4b5563;
+}
+
+.tab-button.active {
+    color: #667eea;
+}
+
+.tab-button.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #667eea;
+}
+
+.tab-content {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+/* Data Tables */
+.data-table-container {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th {
+    background: #f9fafb;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #4b5563;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.data-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.data-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.total-row {
+    background: #f3f4f6;
+    font-weight: 600;
+}
+
+.hours {
+    text-align: right;
+    font-family: monospace;
+}
+
+.amount {
+    text-align: right;
+    font-weight: 600;
+    color: #059669;
+}
+
+.rate {
+    text-align: right;
+}
+
+.hours.billable {
+    color: #1e40af;
+}
+
+.hours.non-billable {
+    color: #dc2626;
+}
+
+.project-code {
+    font-family: monospace;
+    background: #f3f4f6;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-billable {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.badge-non-billable {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* Chart Container */
+.chart-container {
+    max-height: 400px;
+    position: relative;
+}
+
+/* Detailed table */
+.data-table.detailed td {
+    font-size: 0.875rem;
+}
+
+.notes {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .summary-section {
+        grid-template-columns: 1fr;
+    }
+    
+    .filter-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .data-table {
+        font-size: 0.875rem;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 0.5rem;
+    }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Tab switching
+function showTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.remove('active');
+    });
+    
+    // Remove active class from all buttons
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Show selected tab
+    document.getElementById(tabName).classList.add('active');
+    
+    // Mark button as active
+    event.target.classList.add('active');
+    
+    // Initialize chart if daily tab
+    if (tabName === 'daily') {
+        initializeDailyChart();
+    }
+}
+
+// Update date filter
+function updateDateFilter() {
+    const select = document.getElementById('month-select');
+    const selectedOption = select.options[select.selectedIndex];
+    const year = selectedOption.getAttribute('data-year');
+    document.getElementById('year-input').value = year;
+    document.getElementById('filterForm').submit();
+}
+
+// Initialize daily chart
+let dailyChart = null;
+
+function initializeDailyChart() {
+    const ctx = document.getElementById('dailyChart');
+    if (!ctx) return;
+    
+    // Destroy existing chart
+    if (dailyChart) {
+        dailyChart.destroy();
+    }
+    
+    // Prepare data
+    const dates = [];
+    const billableHours = [];
+    const nonBillableHours = [];
+    const revenue = [];
+    
+    {% for date_key, date_data in billing_data.by_date.items()|sort %}
+    dates.push('{{ date_data.date.strftime("%b %d") }}');
+    billableHours.push({{ "%.2f"|format(date_data.billable_hours) }});
+    nonBillableHours.push({{ "%.2f"|format(date_data.total_hours - date_data.billable_hours) }});
+    revenue.push({{ "%.2f"|format(date_data.total_amount) }});
+    {% endfor %}
+    
+    dailyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: 'Billable Hours',
+                    data: billableHours,
+                    backgroundColor: '#3b82f6',
+                    stack: 'hours'
+                },
+                {
+                    label: 'Non-Billable Hours',
+                    data: nonBillableHours,
+                    backgroundColor: '#ef4444',
+                    stack: 'hours'
+                },
+                {
+                    label: 'Revenue ({{ currency }})',
+                    data: revenue,
+                    backgroundColor: '#10b981',
+                    type: 'line',
+                    yAxisID: 'revenue',
+                    borderColor: '#10b981',
+                    borderWidth: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Hours'
+                    }
+                },
+                revenue: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Revenue ({{ currency }})'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.dataset.yAxisID === 'revenue') {
+                                label += '{{ currency_symbol }}' + context.parsed.y.toFixed(2);
+                            } else {
+                                label += context.parsed.y.toFixed(2) + ' hours';
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Export functions
+function exportReport(format) {
+    const params = new URLSearchParams(window.location.search);
+    params.append('format', format);
+    params.append('export', 'true');
+    
+    window.location.href = `{{ url_for('billing.billing_report') }}?${params.toString()}`;
+}
+</script>
+{% endblock %}

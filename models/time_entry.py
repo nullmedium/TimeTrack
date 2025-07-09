@@ -4,6 +4,7 @@ Time entry model for tracking work hours
 
 from datetime import datetime
 from . import db
+from .enums import BillingType
 
 
 class TimeEntry(db.Model):
@@ -27,6 +28,38 @@ class TimeEntry(db.Model):
     # Optional notes/description for the time entry
     notes = db.Column(db.Text, nullable=True)
 
+    # Billing override fields
+    is_billable = db.Column(db.Boolean, nullable=True)  # None = inherit from project
+    billing_rate = db.Column(db.Numeric(10, 2), nullable=True)  # Override project rate
+    billing_amount = db.Column(db.Numeric(10, 2), nullable=True)  # Calculated amount
+
     def __repr__(self):
         project_info = f" (Project: {self.project.code})" if self.project else ""
         return f'<TimeEntry {self.id}: {self.arrival_time} - {self.departure_time}{project_info}>'
+
+    @property
+    def effective_is_billable(self):
+        """Get the effective billable status (considering project default)"""
+        if self.is_billable is not None:
+            return self.is_billable
+        if self.project:
+            return self.project.billing_type != BillingType.NON_BILLABLE
+        return False
+
+    @property
+    def effective_billing_rate(self):
+        """Get the effective billing rate (considering project default)"""
+        if self.billing_rate is not None:
+            return float(self.billing_rate)
+        if self.project and self.project.hourly_rate:
+            return float(self.project.hourly_rate)
+        return 0.0
+
+    def calculate_billing_amount(self):
+        """Calculate the billing amount for this time entry"""
+        if not self.effective_is_billable or not self.duration:
+            return 0.0
+        
+        hours = self.duration / 3600.0  # Convert seconds to hours
+        rate = self.effective_billing_rate
+        return round(hours * rate, 2)

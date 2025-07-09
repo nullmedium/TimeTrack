@@ -64,6 +64,9 @@ class CompanySettings(db.Model):
     overtime_threshold_daily = db.Column(db.Float, default=8.0)
     overtime_threshold_weekly = db.Column(db.Float, default=40.0)
     
+    # Currency settings
+    default_currency = db.Column(db.String(3), default='USD')
+    
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     

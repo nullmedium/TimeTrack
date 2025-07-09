@@ -28,6 +28,7 @@ from .work_config import WorkConfig
 from .invitation import CompanyInvitation
 from .note import Note, NoteVisibility, NoteLink, NoteFolder
 from .note_share import NoteShare
+from .reports import ReportTemplate, SavedReport, ReportComponent, ReportShare, ReportExportHistory
 
 # Make all models available at package level
 __all__ = [
@@ -48,5 +49,6 @@ __all__ = [
     'DashboardWidget', 'WidgetTemplate',
     'WorkConfig',
     'CompanyInvitation',
-    'Note', 'NoteVisibility', 'NoteLink', 'NoteFolder', 'NoteShare'
+    'Note', 'NoteVisibility', 'NoteLink', 'NoteFolder', 'NoteShare',
+    'ReportTemplate', 'SavedReport', 'ReportComponent', 'ReportShare', 'ReportExportHistory'
 ]

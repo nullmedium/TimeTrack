@@ -113,3 +113,10 @@ class WidgetSize(enum.Enum):
     MEDIUM = "medium"  # 2x1
     LARGE = "large"    # 2x2
     WIDE = "wide"      # 3x1 or full width
+
+
+class BillingType(enum.Enum):
+    """Billing type enumeration"""
+    NON_BILLABLE = "Non-Billable"
+    HOURLY = "Hourly"
+    FIXED_RATE = "Fixed Rate"
