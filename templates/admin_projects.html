@@ -65,7 +65,7 @@
             <div class="category-card" data-category-id="{{ category.id }}">
                 <div class="category-header" style="background: linear-gradient(135deg, {{ category.color }}20 0%, {{ category.color }}10 100%); border-left: 4px solid {{ category.color }};">
                     <div class="category-title">
-                        <span class="category-icon">{{ category.icon or '<i class="ti ti-folder"></i>' }}</span>
+                        <span class="category-icon">{{ category.icon|safe if category.icon else '<i class="ti ti-folder"></i>'|safe }}</span>
                         <span class="category-name">{{ category.name }}</span>
                     </div>
                     <div class="category-stats">
@@ -141,7 +141,7 @@
                                 {% if project.category %}
                                 <div class="project-category">
                                     <span class="category-badge" style="background-color: {{ project.category.color }}20; color: {{ project.category.color }};">
-                                        {{ project.category.icon or '<i class="ti ti-folder"></i>' }} {{ project.category.name }}
+                                        {{ project.category.icon|safe if project.category.icon else '<i class="ti ti-folder"></i>'|safe }} {{ project.category.name }}
                                     </span>
                                 </div>
                                 {% endif %}
@@ -226,7 +226,7 @@
                                     <td>
                                         {% if project.category %}
                                             <span class="category-badge" style="background-color: {{ project.category.color }}20; color: {{ project.category.color }};">
-                                                {{ project.category.icon or '<i class="ti ti-folder"></i>' }} {{ project.category.name }}
+                                                {{ project.category.icon|safe if project.category.icon else '<i class="ti ti-folder"></i>'|safe }} {{ project.category.name }}
                                             </span>
                                         {% else %}
                                             <span class="text-muted">-</span>

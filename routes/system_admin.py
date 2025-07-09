@@ -6,7 +6,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from models import (db, Company, User, Role, Team, Project, TimeEntry, SystemSettings, 
                    SystemEvent, BrandingSettings, Task, SubTask, TaskDependency, Sprint, 
                    Comment, UserPreferences, UserDashboard, WorkConfig, CompanySettings, 
-                   CompanyWorkConfig, ProjectCategory)
+                   CompanyWorkConfig, ProjectCategory, Note, NoteFolder, NoteShare, 
+                   Announcement, CompanyInvitation)
 from routes.auth import system_admin_required
 from flask import session
 from sqlalchemy import func
@@ -225,6 +226,34 @@ def delete_company(company_id):
         WorkConfig.query.filter(WorkConfig.user_id.in_(
             db.session.query(User.id).filter(User.company_id == company_id)
         )).delete(synchronize_session=False)
+        
+        # Delete notes and note-related data
+        user_ids_subquery = db.session.query(User.id).filter(User.company_id == company_id).subquery()
+        
+        # Delete note shares
+        NoteShare.query.filter(NoteShare.created_by_id.in_(user_ids_subquery)).delete(synchronize_session=False)
+        
+        # Delete notes
+        Note.query.filter(Note.created_by_id.in_(user_ids_subquery)).delete(synchronize_session=False)
+        
+        # Delete note folders
+        NoteFolder.query.filter(NoteFolder.created_by_id.in_(user_ids_subquery)).delete(synchronize_session=False)
+        
+        # Delete announcements
+        Announcement.query.filter(Announcement.created_by_id.in_(user_ids_subquery)).delete(synchronize_session=False)
+        
+        # Delete invitations
+        CompanyInvitation.query.filter(
+            (CompanyInvitation.invited_by_id.in_(user_ids_subquery)) | 
+            (CompanyInvitation.accepted_by_user_id.in_(user_ids_subquery))
+        ).delete(synchronize_session=False)
+        
+        # Delete system events associated with users from this company
+        SystemEvent.query.filter(SystemEvent.user_id.in_(user_ids_subquery)).delete(synchronize_session=False)
+        
+        # Clear branding settings updated_by references
+        BrandingSettings.query.filter(BrandingSettings.updated_by_id.in_(user_ids_subquery)).update(
+            {BrandingSettings.updated_by_id: None}, synchronize_session=False)
         
         # Delete users
         User.query.filter_by(company_id=company_id).delete()

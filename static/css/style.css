@@ -530,8 +530,8 @@ button {
 
 /* Button Outline Variants */
 .btn-outline {
-    border: 1px solid #007bff;
-    color: #007bff;
+    border: 1px solid #6c757d;
+    color: #495057;
     background: transparent;
 }
 

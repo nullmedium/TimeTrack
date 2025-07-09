@@ -2,15 +2,25 @@
 
 {% block content %}
 <div class="page-container timetrack-container">
-    <div class="page-header analytics-header">
-        <h2><i class="ti ti-chart-bar"></i> Time Analytics</h2>
-        <div class="mode-switcher">
-            <button class="mode-btn {% if mode == 'personal' %}active{% endif %}" 
-                    onclick="switchMode('personal')">Personal</button>
-            {% if g.user.team_id and g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN] %}
-            <button class="mode-btn {% if mode == 'team' %}active{% endif %}" 
-                    onclick="switchMode('team')">Team</button>
-            {% endif %}
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-chart-bar"></i></span>
+                    Time Analytics
+                </h1>
+                <p class="page-subtitle">Analyze time tracking data and generate insights</p>
+            </div>
+            <div class="header-actions">
+                <div class="mode-switcher">
+                    <button class="mode-btn {% if mode == 'personal' %}active{% endif %}" 
+                            onclick="switchMode('personal')">Personal</button>
+                    {% if g.user.team_id and g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR, Role.ADMIN] %}
+                    <button class="mode-btn {% if mode == 'team' %}active{% endif %}" 
+                            onclick="switchMode('team')">Team</button>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 

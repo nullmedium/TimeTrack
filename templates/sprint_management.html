@@ -1,43 +1,56 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="management-container sprint-management-container">
+<div class="page-container">
     <!-- Header Section -->
-    <div class="management-header sprint-header">
-        <h1>🏃‍♂️ Sprint Management</h1>
-        <div class="management-controls sprint-controls">
-            <!-- View Switcher -->
-            <div class="view-switcher">
-                <button class="view-btn active" data-view="active">Active Sprints</button>
-                <button class="view-btn" data-view="all">All Sprints</button>
-                <button class="view-btn" data-view="planning">Planning</button>
-                <button class="view-btn" data-view="completed">Completed</button>
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-run"></i></span>
+                    Sprint Management
+                </h1>
+                <p class="page-subtitle">Manage sprints and track progress</p>
             </div>
-            
-            <!-- Actions -->
-            <div class="management-actions sprint-actions">
-                <button id="add-sprint-btn" class="btn btn-primary">+ New Sprint</button>
-                <button id="refresh-sprints" class="btn btn-secondary">🔄 Refresh</button>
+            <div class="header-actions">
+                <button id="refresh-sprints" class="btn btn-secondary">
+                    <i class="ti ti-refresh"></i>
+                    Refresh
+                </button>
+                <button id="add-sprint-btn" class="btn btn-primary">
+                    <i class="ti ti-plus"></i>
+                    New Sprint
+                </button>
             </div>
         </div>
     </div>
 
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <div class="view-switcher">
+            <button class="view-btn active" data-view="active">Active Sprints</button>
+            <button class="view-btn" data-view="all">All Sprints</button>
+            <button class="view-btn" data-view="planning">Planning</button>
+            <button class="view-btn" data-view="completed">Completed</button>
+        </div>
+    </div>
+
     <!-- Sprint Statistics -->
-    <div class="management-stats sprint-stats">
+    <div class="stats-section">
         <div class="stat-card">
-            <div class="stat-number" id="total-sprints">0</div>
+            <div class="stat-value" id="total-sprints">0</div>
             <div class="stat-label">Total Sprints</div>
         </div>
         <div class="stat-card">
-            <div class="stat-number" id="active-sprints">0</div>
+            <div class="stat-value" id="active-sprints">0</div>
             <div class="stat-label">Active</div>
         </div>
         <div class="stat-card">
-            <div class="stat-number" id="completed-sprints">0</div>
+            <div class="stat-value" id="completed-sprints">0</div>
             <div class="stat-label">Completed</div>
         </div>
         <div class="stat-card">
-            <div class="stat-number" id="total-tasks">0</div>
+            <div class="stat-value" id="total-tasks">0</div>
             <div class="stat-label">Total Tasks</div>
         </div>
     </div>
@@ -112,7 +125,7 @@
                         <div class="hybrid-date-input">
                             <input type="date" id="sprint-start-date-native" class="date-input-native" required>
                             <input type="text" id="sprint-start-date" class="date-input-formatted" required placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
-                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('sprint-start-date')" title="Open calendar">📅</button>
+                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('sprint-start-date')" title="Open calendar"><i class="ti ti-calendar"></i></button>
                         </div>
                         <div class="date-error" id="sprint-start-date-error" style="display: none; color: #dc3545; font-size: 0.8rem; margin-top: 0.25rem;"></div>
                     </div>
@@ -121,7 +134,7 @@
                         <div class="hybrid-date-input">
                             <input type="date" id="sprint-end-date-native" class="date-input-native" required>
                             <input type="text" id="sprint-end-date" class="date-input-formatted" required placeholder="{{ "YYYY-MM-DD" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "ISO" else "MM/DD/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") == "US" else "DD/MM/YYYY" if (g.user.preferences.date_format if g.user.preferences else "ISO") in ["EU", "UK"] else "Mon, Dec 25, 2024" }}">
-                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('sprint-end-date')" title="Open calendar">📅</button>
+                            <button type="button" class="calendar-picker-btn" onclick="openCalendarPicker('sprint-end-date')" title="Open calendar"><i class="ti ti-calendar"></i></button>
                         </div>
                         <div class="date-error" id="sprint-end-date-error" style="display: none; color: #dc3545; font-size: 0.8rem; margin-top: 0.25rem;"></div>
                     </div>
@@ -143,38 +156,23 @@
 
 <!-- Styles -->
 <style>
-.sprint-management-container {
-    padding: 1rem;
-    max-width: 100%;
-    margin: 0 auto;
-}
+/* Container styles - using default page spacing */
 
-.sprint-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* Header styles handled by common page-header classes */
+
+.filter-section {
     margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.sprint-header h1 {
-    margin: 0;
-    color: #333;
-}
-
-.sprint-controls {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
 }
 
 .view-switcher {
     display: flex;
-    background: #f8f9fa;
+    background: white;
     border-radius: 6px;
     padding: 2px;
+    width: fit-content;
 }
 
 .view-btn {
@@ -198,37 +196,7 @@
     color: #212529;
 }
 
-.sprint-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.sprint-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.stat-card {
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 1rem;
-    text-align: center;
-}
-
-.stat-number {
-    font-size: 2rem;
-    font-weight: bold;
-    color: #007bff;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    color: #666;
-    margin-top: 0.25rem;
-}
+/* Statistics styles handled by common stats-section classes */
 
 .sprint-grid {
     display: grid;
@@ -731,7 +699,7 @@ class SprintManager {
             </div>
             
             <div class="sprint-dates">
-                📅 ${formatUserDate(sprint.start_date)} - ${formatUserDate(sprint.end_date)}
+                <i class="ti ti-calendar"></i> ${formatUserDate(sprint.start_date)} - ${formatUserDate(sprint.end_date)}
                 ${sprint.days_remaining > 0 ? `(${sprint.days_remaining} days left)` : ''}
             </div>
             
