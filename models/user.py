@@ -156,11 +156,6 @@ class UserPreferences(db.Model):
     date_format = db.Column(db.String(20), default='YYYY-MM-DD')
     time_format = db.Column(db.String(10), default='24h')
     
-    # Notification preferences
-    email_notifications = db.Column(db.Boolean, default=True)
-    email_daily_summary = db.Column(db.Boolean, default=False)
-    email_weekly_summary = db.Column(db.Boolean, default=True)
-    
     # Time tracking preferences
     default_project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
     timer_reminder_enabled = db.Column(db.Boolean, default=True)

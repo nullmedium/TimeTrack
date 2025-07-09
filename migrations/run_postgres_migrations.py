@@ -18,6 +18,7 @@ MIGRATION_STATE_FILE = '/data/postgres_migrations_state.json'
 POSTGRES_MIGRATIONS = [
     'postgres_only_migration.py',  # Main migration from commit 4214e88 onward
     'add_note_sharing.sql',  # Add note sharing functionality
+    'remove_email_preferences.sql',  # Remove unused email preference columns
 ]
 
 
