@@ -126,7 +126,8 @@
                 {% if g.user %}
                     <li><a href="{{ url_for('home') }}" data-tooltip="Home"><i class="nav-icon ti ti-home"></i><span class="nav-text">Home</span></a></li>
                     <li><a href="{{ url_for('time_tracking') }}" data-tooltip="Time Tracking"><i class="nav-icon ti ti-clock"></i><span class="nav-text">Time Tracking</span></a></li>
-                    <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon ti ti-dashboard"></i><span class="nav-text">Dashboard</span></a></li>
+                    <!-- Dashboard disabled due to widget issues -->
+                    <!-- <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon ti ti-dashboard"></i><span class="nav-text">Dashboard</span></a></li> -->
                     <li><a href="{{ url_for('tasks.unified_task_management') }}" data-tooltip="Task Management"><i class="nav-icon ti ti-clipboard-list"></i><span class="nav-text">Task Management</span></a></li>
                     <li><a href="{{ url_for('sprints.sprint_management') }}" data-tooltip="Sprint Management"><i class="nav-icon ti ti-run"></i><span class="nav-text">Sprints</span></a></li>
                     <li><a href="{{ url_for('notes.notes_list') }}" data-tooltip="Notes"><i class="nav-icon ti ti-notes"></i><span class="nav-text">Notes</span></a></li>
@@ -146,7 +147,8 @@
                     {% endif %}
                     {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
                     <li class="nav-divider">Team</li>
-                    <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon ti ti-chart-line"></i><span class="nav-text">Dashboard</span></a></li>
+                    <!-- Dashboard disabled due to widget issues -->
+                    <!-- <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon ti ti-chart-line"></i><span class="nav-text">Dashboard</span></a></li> -->
                     {% if g.user.role == Role.SUPERVISOR %}
                     <li><a href="{{ url_for('projects.admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon ti ti-folder"></i><span class="nav-text">Manage Projects</span></a></li>
                     {% endif %}

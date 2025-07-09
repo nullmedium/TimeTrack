@@ -833,8 +833,10 @@ def verify_email(token):
 @role_required(Role.TEAM_MEMBER)
 @company_required
 def dashboard():
-    """User dashboard with configurable widgets."""
-    return render_template('dashboard.html', title='Dashboard')
+    """User dashboard with configurable widgets - DISABLED due to widget issues."""
+    # Redirect to home page instead of dashboard
+    flash('Dashboard is temporarily disabled. Redirecting to home page.', 'info')
+    return redirect(url_for('index'))
 
 
 @app.route('/profile', methods=['GET', 'POST'])
