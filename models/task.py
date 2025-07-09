@@ -5,7 +5,7 @@ Task-related models
 from datetime import datetime
 from . import db
 from .enums import TaskStatus, TaskPriority, CommentVisibility, Role
-
+from .project import Project
 
 class Task(db.Model):
     """Task model for project management"""
