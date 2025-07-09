@@ -43,9 +43,14 @@ def main():
                 db_values = [row[0] for row in result]
                 print(f"  Database values: {db_values}")
                 
-                # Get model values
+                # Get model values - use the actual enum values, not names
                 model_values = [item.value for item in enum_class]
                 print(f"  Model values: {model_values}")
+                
+                # Debug: also show enum names vs values
+                print(f"  Model enum mapping:")
+                for item in enum_class:
+                    print(f"    {item.name} = '{item.value}'")
                 
                 # Check for mismatches
                 missing_in_db = set(model_values) - set(db_values)

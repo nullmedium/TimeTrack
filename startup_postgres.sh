@@ -58,6 +58,14 @@ with app.app_context():
     rm -f /tmp/db_check.txt
 fi
 
+# Sync PostgreSQL enums with Python models
+echo ""
+echo "=== Syncing PostgreSQL Enums ==="
+python sync_postgres_enums.py
+if [ $? -ne 0 ]; then
+    echo "⚠️  Enum sync failed, but continuing..."
+fi
+
 # Legacy migration support (can be removed after full transition)
 if [ -f "migrations_old/run_postgres_migrations.py" ]; then
     echo ""
