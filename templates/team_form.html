@@ -72,7 +72,7 @@
                         
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary">
-                                <span class="icon">✓</span>
+                                <span class="icon"><i class="ti ti-check"></i></span>
                                 {% if team %}Save Changes{% else %}Create Team{% endif %}
                             </button>
                             {% if not team %}
@@ -149,7 +149,7 @@
                                                     class="btn-icon btn-danger" 
                                                     onclick="return confirm('Remove {{ member.username }} from the team?')"
                                                     title="Remove from team">
-                                                <span class="icon">×</span>
+                                                <span class="icon"><i class="ti ti-x"></i></span>
                                             </button>
                                         </form>
                                     </div>
@@ -170,7 +170,7 @@
             <div class="card add-member-card">
                 <div class="card-header">
                     <h2 class="card-title">
-                        <span class="icon">➕</span>
+                        <span class="icon"><i class="ti ti-plus"></i></span>
                         Add Team Member
                     </h2>
                 </div>
@@ -202,7 +202,7 @@
                         </form>
                     {% else %}
                         <div class="empty-state">
-                            <div class="empty-icon">✓</div>
+                            <div class="empty-icon"><i class="ti ti-check"></i></div>
                             <p class="empty-message">All users are assigned</p>
                             <p class="empty-hint">No available users to add to this team</p>
                         </div>
@@ -216,7 +216,7 @@
             <div class="card info-card">
                 <div class="card-body">
                     <div class="info-content">
-                        <div class="info-icon">💡</div>
+                        <div class="info-icon"><i class="ti ti-bulb"></i></div>
                         <h3>Team Members</h3>
                         <p>After creating the team, you'll be able to add members and manage team composition from this page.</p>
                     </div>

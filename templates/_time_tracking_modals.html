@@ -1,0 +1,146 @@
+<!-- Time Tracking Modals -->
+
+<!-- Edit Entry Modal -->
+<div id="edit-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Edit Time Entry</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="edit-entry-form" class="modern-form">
+                <input type="hidden" id="edit-entry-id">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-arrival-date" class="form-label">Start Date</label>
+                        <input type="date" id="edit-arrival-date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-arrival-time" class="form-label">Start Time</label>
+                        <input type="time" id="edit-arrival-time" class="form-control" required step="60">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-departure-date" class="form-label">End Date</label>
+                        <input type="date" id="edit-departure-date" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-departure-time" class="form-label">End Time</label>
+                        <input type="time" id="edit-departure-time" class="form-control" step="60">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-project" class="form-label">Project</label>
+                    <select id="edit-project" class="form-control">
+                        <option value="">No specific project</option>
+                        {% for project in available_projects %}
+                        <option value="{{ project.id }}">{{ project.code }} - {{ project.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-notes" class="form-label">Notes</label>
+                    <textarea id="edit-notes" class="form-control" rows="3"></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="button" class="btn btn-ghost modal-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Entry Modal -->
+<div id="manual-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Add Manual Time Entry</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="manual-entry-form" class="modern-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="manual-start-date" class="form-label">Start Date</label>
+                        <input type="date" id="manual-start-date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="manual-start-time" class="form-label">Start Time</label>
+                        <input type="time" id="manual-start-time" class="form-control" required step="60">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="manual-end-date" class="form-label">End Date</label>
+                        <input type="date" id="manual-end-date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="manual-end-time" class="form-label">End Time</label>
+                        <input type="time" id="manual-end-time" class="form-control" required step="60">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="manual-project" class="form-label">Project</label>
+                    <select id="manual-project" name="project_id" class="form-control">
+                        <option value="">No specific project</option>
+                        {% for project in available_projects %}
+                        <option value="{{ project.id }}">{{ project.code }} - {{ project.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="manual-task" class="form-label">Task</label>
+                    <select id="manual-task" name="task_id" class="form-control" disabled>
+                        <option value="">Select a project first</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="manual-break" class="form-label">Break Duration (minutes)</label>
+                    <input type="number" id="manual-break" class="form-control" min="0" value="0">
+                </div>
+                
+                <div class="form-group">
+                    <label for="manual-notes" class="form-label">Notes</label>
+                    <textarea id="manual-notes" class="form-control" rows="3" placeholder="Description of work performed"></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Add Entry</button>
+                    <button type="button" class="btn btn-ghost modal-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h3 class="modal-title">Confirm Deletion</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete this time entry? This action cannot be undone.</p>
+            <input type="hidden" id="delete-entry-id">
+        </div>
+        <div class="modal-footer">
+            <button id="confirm-delete" class="btn btn-danger">Delete Entry</button>
+            <button class="btn btn-ghost modal-cancel">Cancel</button>
+        </div>
+    </div>
+</div>

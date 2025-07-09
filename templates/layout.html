@@ -6,7 +6,11 @@
     <title>{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% if g.company %} - {{ g.company.name }}{% endif %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/hover-standards.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/iconfont/tabler-icons.min.css">
+    {% if g.user %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/time-tracking.css') }}">
+    {% endif %}
     {% if not g.user %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/splash.css') }}">
     {% endif %}
@@ -15,21 +19,12 @@
     {% endif %}
     <style>
         :root {
-            --primary-color: {{ g.branding.primary_color if g.branding else '#007bff' }};
-        }
-        .btn-primary {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
-        }
-        .btn-primary:hover {
-            background-color: {{ (g.branding.primary_color if g.branding else '#007bff') + 'dd' }};
-            border-color: {{ (g.branding.primary_color if g.branding else '#007bff') + 'dd' }};
+            --primary-color: {{ g.branding.primary_color if g.branding else '#667eea' }};
+            --primary-gradient-start: {{ g.branding.primary_color if g.branding else '#667eea' }};
+            --primary-gradient-end: #764ba2;
         }
         .nav-icon {
-            color: rgb(116, 85, 175) /* var(--primary-color); */
-        }
-        a:hover {
-            color: var(--primary-color);
+            color: var(--primary-gradient-end);
         }
         .mobile-logo {
             max-height: 30px;
@@ -216,7 +211,7 @@
                         <strong>Add your email address</strong> to enable account recovery and receive important notifications.
                     </span>
                     <a href="{{ url_for('profile') }}" class="btn btn-sm btn-primary">Add Email</a>
-                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session">×</button>
+                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session"><i class="ti ti-x"></i></button>
                 </div>
             </div>
         {% elif g.show_email_verification_nag %}
@@ -227,7 +222,7 @@
                         <strong>Please verify your email address</strong> to ensure you can recover your account if needed.
                     </span>
                     <a href="{{ url_for('profile') }}" class="btn btn-sm btn-warning">Verify Email</a>
-                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session">×</button>
+                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session"><i class="ti ti-x"></i></button>
                 </div>
             </div>
         {% endif %}

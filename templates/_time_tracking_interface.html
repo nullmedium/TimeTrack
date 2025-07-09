@@ -1,0 +1,356 @@
+<!-- Time Tracking Interface - Shared Component -->
+<div class="time-tracking-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <i class="ti ti-clock page-icon"></i>
+                    Time Tracking
+                </h1>
+                <p class="page-subtitle">Track your work hours efficiently</p>
+            </div>
+            <div class="header-actions">
+                <button id="manual-entry-btn" class="btn btn-secondary">
+                    <i class="ti ti-pencil"></i>
+                    Manual Entry
+                </button>
+                <a href="{{ url_for('analytics') }}" class="btn btn-secondary">
+                    <i class="ti ti-chart-bar"></i>
+                    View Analytics
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timer Section -->
+    <div class="timer-section">
+        {% if active_entry %}
+        <!-- Active Timer -->
+        <div class="timer-card active">
+            <div class="timer-display">
+                <div class="timer-value" id="timer"
+                     data-start="{{ active_entry.arrival_time.timestamp() }}"
+                     data-breaks="{{ active_entry.total_break_duration }}"
+                     data-paused="{{ 'true' if active_entry.is_paused else 'false' }}">
+                    00:00:00
+                </div>
+                <div class="timer-status">
+                    {% if active_entry.is_paused %}
+                        <span class="status-badge paused">On Break</span>
+                    {% else %}
+                        <span class="status-badge active">Working</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="timer-info">
+                <div class="info-row">
+                    <span class="info-label">Started:</span>
+                    <span class="info-value">{{ active_entry.arrival_time|format_datetime }}</span>
+                </div>
+                
+                {% if active_entry.project %}
+                <div class="info-row">
+                    <span class="info-label">Project:</span>
+                    <span class="info-value project-badge" style="background-color: {{ active_entry.project.color or '#667eea' }}">
+                        {{ active_entry.project.code }} - {{ active_entry.project.name }}
+                    </span>
+                </div>
+                {% endif %}
+                
+                {% if active_entry.task %}
+                <div class="info-row">
+                    <span class="info-label">Task:</span>
+                    <span class="info-value task-badge">
+                        {{ active_entry.task.title }}
+                    </span>
+                </div>
+                {% endif %}
+                
+                {% if active_entry.notes %}
+                <div class="info-row">
+                    <span class="info-label">Notes:</span>
+                    <span class="info-value">{{ active_entry.notes }}</span>
+                </div>
+                {% endif %}
+                
+                {% if active_entry.is_paused %}
+                <div class="info-row">
+                    <span class="info-label">Break started:</span>
+                    <span class="info-value">{{ active_entry.pause_start_time|format_time }}</span>
+                </div>
+                {% endif %}
+                
+                {% if active_entry.total_break_duration > 0 %}
+                <div class="info-row">
+                    <span class="info-label">Total breaks:</span>
+                    <span class="info-value">{{ active_entry.total_break_duration|format_duration }}</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="timer-actions">
+                <button id="pause-btn" class="btn {% if active_entry.is_paused %}btn-success{% else %}btn-warning{% endif %}" 
+                        data-id="{{ active_entry.id }}">
+                    {% if active_entry.is_paused %}
+                        <i class="ti ti-player-play"></i>
+                        Resume Work
+                    {% else %}
+                        <i class="ti ti-player-pause"></i>
+                        Take Break
+                    {% endif %}
+                </button>
+                <button id="leave-btn" class="btn btn-danger" data-id="{{ active_entry.id }}">
+                    <i class="ti ti-player-stop"></i>
+                    Stop Working
+                </button>
+            </div>
+        </div>
+        {% else %}
+        <!-- Inactive Timer -->
+        <div class="timer-card inactive">
+            <div class="start-work-container">
+                <h2>Start Tracking Time</h2>
+                <p>Select a project and task to begin tracking your work</p>
+                
+                <form id="start-work-form" class="modern-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="project-select" class="form-label">
+                                Project <span class="optional-badge">Optional</span>
+                            </label>
+                            <select id="project-select" name="project_id" class="form-control">
+                                <option value="">No specific project</option>
+                                {% for project in available_projects %}
+                                <option value="{{ project.id }}" data-color="{{ project.color or '#667eea' }}">
+                                    {{ project.code }} - {{ project.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="task-select" class="form-label">
+                                Task <span class="optional-badge">Optional</span>
+                            </label>
+                            <select id="task-select" name="task_id" class="form-control" disabled>
+                                <option value="">Select a project first</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="work-notes" class="form-label">
+                            Notes <span class="optional-badge">Optional</span>
+                        </label>
+                        <textarea id="work-notes" name="notes" class="form-control" 
+                                  rows="2" placeholder="What are you working on?"></textarea>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" id="arrive-btn" class="btn btn-primary btn-large">
+                            <i class="ti ti-player-play"></i>
+                            Start Working
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-section">
+        <div class="stat-card">
+            <div class="stat-value">{{ today_hours|format_duration }}</div>
+            <div class="stat-label">Today</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ week_hours|format_duration }}</div>
+            <div class="stat-label">This Week</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ month_hours|format_duration }}</div>
+            <div class="stat-label">This Month</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ active_projects|length }}</div>
+            <div class="stat-label">Active Projects</div>
+        </div>
+    </div>
+
+    <!-- Recent Entries -->
+    <div class="entries-section">
+        <div class="section-header">
+            <h2 class="section-title">
+                <i class="ti ti-clipboard-list"></i>
+                Recent Time Entries
+            </h2>
+            <div class="view-toggle">
+                <button class="toggle-btn active" data-view="list">
+                    <i class="ti ti-list"></i>
+                    List
+                </button>
+                <button class="toggle-btn" data-view="grid">
+                    <i class="ti ti-layout-grid"></i>
+                    Grid
+                </button>
+            </div>
+        </div>
+
+        <!-- List View -->
+        <div id="list-view" class="view-container active">
+            {% if history %}
+            <div class="entries-table-container">
+                <table class="entries-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Project / Task</th>
+                            <th>Duration</th>
+                            <th>Break</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in history %}
+                        <tr data-entry-id="{{ entry.id }}" class="entry-row">
+                            <td>
+                                <div class="date-cell">
+                                    <span class="date-day">{{ entry.arrival_time.strftime('%d') }}</span>
+                                    <span class="date-month">{{ entry.arrival_time.strftime('%b') }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="time-cell">
+                                    <span class="time-start">{{ entry.arrival_time|format_time }}</span>
+                                    <span class="time-separator"><i class="ti ti-arrow-right"></i></span>
+                                    <span class="time-end">{{ entry.departure_time|format_time if entry.departure_time else 'Active' }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="project-task-cell">
+                                    {% if entry.project %}
+                                    <span class="project-tag" style="background-color: {{ entry.project.color or '#667eea' }}">
+                                        {{ entry.project.code }}
+                                    </span>
+                                    {% endif %}
+                                    {% if entry.task %}
+                                    <span class="task-name">{{ entry.task.title }}</span>
+                                    {% elif entry.project %}
+                                    <span class="project-name">{{ entry.project.name }}</span>
+                                    {% else %}
+                                    <span class="no-project">No project</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="duration-badge">
+                                    {{ entry.duration|format_duration if entry.duration is not none else 'In progress' }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="break-duration">
+                                    {{ entry.total_break_duration|format_duration if entry.total_break_duration else '-' }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="notes-preview" title="{{ entry.notes or '' }}">
+                                    {{ entry.notes[:30] + '...' if entry.notes and entry.notes|length > 30 else entry.notes or '-' }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="actions-cell">
+                                    {% if entry.departure_time and not active_entry %}
+                                        {% if entry.arrival_time.date() >= today %}
+                                    <button class="btn-icon resume-work-btn" data-id="{{ entry.id }}" title="Resume">
+                                        <i class="ti ti-refresh"></i>
+                                    </button>
+                                        {% else %}
+                                    <button class="btn-icon resume-work-btn" data-id="{{ entry.id }}" title="Cannot resume entries from previous days" disabled style="opacity: 0.5; cursor: not-allowed;">
+                                        <i class="ti ti-refresh"></i>
+                                    </button>
+                                        {% endif %}
+                                    {% endif %}
+                                    <button class="btn-icon edit-entry-btn" data-id="{{ entry.id }}" title="Edit">
+                                        <i class="ti ti-pencil"></i>
+                                    </button>
+                                    <button class="btn-icon delete-entry-btn" data-id="{{ entry.id }}" title="Delete">
+                                        <i class="ti ti-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon"><i class="ti ti-mail-opened" style="font-size: 4rem;"></i></div>
+                <h3>No time entries yet</h3>
+                <p>Start tracking your time to see entries here</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Grid View -->
+        <div id="grid-view" class="view-container">
+            <div class="entries-grid">
+                {% for entry in history %}
+                <div class="entry-card" data-entry-id="{{ entry.id }}">
+                    <div class="entry-header">
+                        <div class="entry-date">
+                            {{ entry.arrival_time.strftime('%d %b %Y') }}
+                        </div>
+                        <div class="entry-duration">
+                            {{ entry.duration|format_duration if entry.duration is not none else 'Active' }}
+                        </div>
+                    </div>
+                    
+                    <div class="entry-body">
+                        {% if entry.project %}
+                        <div class="entry-project" style="border-left-color: {{ entry.project.color or '#667eea' }}">
+                            <strong>{{ entry.project.code }}</strong> - {{ entry.project.name }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if entry.task %}
+                        <div class="entry-task">
+                            <i class="ti ti-clipboard-list"></i> {{ entry.task.title }}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="entry-time">
+                            <i class="ti ti-clock"></i>
+                            {{ entry.arrival_time|format_time }} - {{ entry.departure_time|format_time if entry.departure_time else 'Active' }}
+                        </div>
+                        
+                        {% if entry.notes %}
+                        <div class="entry-notes">
+                            <i class="ti ti-notes"></i>
+                            {{ entry.notes }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="entry-footer">
+                        <button class="btn-sm edit-entry-btn" data-id="{{ entry.id }}">Edit</button>
+                        <button class="btn-sm btn-danger delete-entry-btn" data-id="{{ entry.id }}">Delete</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modals -->
+{% include '_time_tracking_modals.html' %}
+
+<!-- Scripts -->
+<script src="{{ url_for('static', filename='js/timer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/time-tracking.js') }}"></script>

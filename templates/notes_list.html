@@ -129,25 +129,25 @@
                 {% if folder_filter %}
                 <span class="filter-tag">
                     <i class="ti ti-folder"></i> {{ folder_filter }}
-                    <a href="{{ url_for('notes.notes_list', tag=tag_filter, visibility=visibility_filter, search=search_query) }}" class="remove-filter">×</a>
+                    <a href="{{ url_for('notes.notes_list', tag=tag_filter, visibility=visibility_filter, search=search_query) }}" class="remove-filter"><i class="ti ti-x"></i></a>
                 </span>
                 {% endif %}
                 {% if tag_filter %}
                 <span class="filter-tag">
                     <i class="ti ti-tag"></i> {{ tag_filter }}
-                    <a href="{{ url_for('notes.notes_list', folder=folder_filter, visibility=visibility_filter, search=search_query) }}" class="remove-filter">×</a>
+                    <a href="{{ url_for('notes.notes_list', folder=folder_filter, visibility=visibility_filter, search=search_query) }}" class="remove-filter"><i class="ti ti-x"></i></a>
                 </span>
                 {% endif %}
                 {% if visibility_filter %}
                 <span class="filter-tag">
                     <i class="ti ti-eye"></i> {{ visibility_filter|title }}
-                    <a href="{{ url_for('notes.notes_list', folder=folder_filter, tag=tag_filter, search=search_query) }}" class="remove-filter">×</a>
+                    <a href="{{ url_for('notes.notes_list', folder=folder_filter, tag=tag_filter, search=search_query) }}" class="remove-filter"><i class="ti ti-x"></i></a>
                 </span>
                 {% endif %}
                 {% if search_query %}
                 <span class="filter-tag">
                     <i class="ti ti-search"></i> "{{ search_query }}"
-                    <a href="{{ url_for('notes.notes_list', folder=folder_filter, tag=tag_filter, visibility=visibility_filter) }}" class="remove-filter">×</a>
+                    <a href="{{ url_for('notes.notes_list', folder=folder_filter, tag=tag_filter, visibility=visibility_filter) }}" class="remove-filter"><i class="ti ti-x"></i></a>
                 </span>
                 {% endif %}
                 <a href="{{ url_for('notes.notes_list') }}" class="clear-all">Clear all</a>
