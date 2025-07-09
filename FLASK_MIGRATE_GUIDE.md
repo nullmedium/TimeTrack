@@ -6,6 +6,8 @@ TimeTrack has been refactored to use Flask-Migrate (which wraps Alembic) for dat
 
 **IMPORTANT**: The baseline for Flask-Migrate is set at git commit `4214e88d18fce7a9c75927753b8d4e9222771e14`. All schema changes after this commit need to be recreated as Flask-Migrate migrations.
 
+**For Docker Deployments**: See `DOCKER_MIGRATIONS_GUIDE.md` for Docker-specific instructions (no Git required).
+
 ## Migration from Old System
 
 ### For Existing Deployments

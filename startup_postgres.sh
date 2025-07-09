@@ -27,16 +27,35 @@ if [ -d "migrations" ]; then
     echo "✅ Database migrations completed successfully"
 else
     echo "⚠️  No migrations directory found. Initializing Flask-Migrate..."
-    echo "Using baseline from commit 4214e88..."
-    python establish_baseline_4214e88.py
+    
+    # Use Docker-friendly initialization (no Git required)
+    python docker_migrate_init.py
     if [ $? -ne 0 ]; then
         echo "❌ Migration initialization failed!"
-        echo "Please run manually: python establish_baseline_4214e88.py"
         exit 1
     fi
-    # Stamp the database as being at baseline
-    flask db stamp head
-    echo "✅ Database marked at baseline commit 4214e88"
+    
+    # Check if database has existing tables
+    python -c "
+from app import app, db
+with app.app_context():
+    inspector = db.inspect(db.engine)
+    tables = [t for t in inspector.get_table_names() if t != 'alembic_version']
+    if tables:
+        print('has_tables')
+" > /tmp/db_check.txt
+    
+    if grep -q "has_tables" /tmp/db_check.txt 2>/dev/null; then
+        echo "📊 Existing database detected. Marking as current..."
+        flask db stamp head
+        echo "✅ Database marked as current"
+    else
+        echo "🆕 Empty database detected. Creating tables..."
+        flask db upgrade
+        echo "✅ Database tables created"
+    fi
+    
+    rm -f /tmp/db_check.txt
 fi
 
 # Legacy migration support (can be removed after full transition)

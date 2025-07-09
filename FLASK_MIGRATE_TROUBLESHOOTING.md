@@ -14,10 +14,11 @@
 
 **Solution**:
 ```bash
-# Use the simplified baseline script instead
+# For local development with Git:
 python simple_baseline_4214e88.py
 
-# This properly handles the models.py → models/ transition
+# For Docker deployments (no Git):
+python docker_migrate_init.py
 ```
 
 ### 1. "Target database is not up to date"
