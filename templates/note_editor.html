@@ -1,0 +1,1136 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="note-editor-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon">{% if note %}<i class="ti ti-pencil"></i>{% else %}<i class="ti ti-notes"></i>{% endif %}</span>
+                    {% if note %}Edit Note{% else %}Create New Note{% endif %}
+                </h1>
+                <p class="page-subtitle">
+                    {% if note %}
+                        Editing: {{ note.title }}
+                    {% else %}
+                        Write markdown notes with live preview
+                    {% endif %}
+                </p>
+            </div>
+            <div class="header-actions">
+                <button type="button" class="btn btn-secondary" id="settings-toggle">
+                    <span class="icon"><i class="ti ti-settings"></i></span>
+                    Settings
+                </button>
+                <button type="button" class="btn btn-secondary" id="preview-toggle">
+                    <span class="icon"><i class="ti ti-eye"></i></span>
+                    <span class="toggle-text">Hide Preview</span>
+                </button>
+                <a href="{{ url_for('notes.notes_list') }}" class="btn btn-secondary">
+                    <span class="icon"><i class="ti ti-x"></i></span>
+                    Cancel
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settings-panel" style="display: none;">
+        <div class="settings-card">
+            <div class="settings-grid">
+                <div class="settings-item">
+                    <label for="visibility" class="settings-label">
+                        <span class="icon"><i class="ti ti-eye"></i></span>
+                        Visibility
+                    </label>
+                    <select id="visibility" name="visibility" class="form-control">
+                        <option value="Private" {% if not note or note.visibility.value == 'Private' %}selected{% endif %}>
+                            <i class="ti ti-lock"></i> Private - Only you can see this
+                        </option>
+                        <option value="Team" {% if note and note.visibility.value == 'Team' %}selected{% endif %}>
+                            <i class="ti ti-users"></i> Team - Your team members can see this
+                        </option>
+                        <option value="Company" {% if note and note.visibility.value == 'Company' %}selected{% endif %}>
+                            <i class="ti ti-building"></i> Company - Everyone in your company can see this
+                        </option>
+                    </select>
+                </div>
+
+                <div class="settings-item">
+                    <label for="folder" class="settings-label">
+                        <span class="icon"><i class="ti ti-folder"></i></span>
+                        Folder
+                    </label>
+                    <input type="text" id="folder" name="folder" class="form-control" 
+                           placeholder="e.g., Work/Projects or Personal"
+                           value="{{ note.folder if note and note.folder else '' }}"
+                           list="folder-suggestions">
+                    <datalist id="folder-suggestions">
+                        {% for folder in folders %}
+                        <option value="{{ folder.path }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <div class="settings-item">
+                    <label for="tags" class="settings-label">
+                        <span class="icon"><i class="ti ti-tag"></i></span>
+                        Tags
+                    </label>
+                    <input type="text" id="tags" name="tags" class="form-control" 
+                           placeholder="documentation, meeting-notes, technical"
+                           value="{{ note.tags if note and note.tags else '' }}">
+                    <small class="form-text">Separate tags with commas</small>
+                </div>
+
+                <div class="settings-item">
+                    <label for="project_id" class="settings-label">
+                        <span class="icon"><i class="ti ti-clipboard-list"></i></span>
+                        Project
+                    </label>
+                    <select id="project_id" name="project_id" class="form-control">
+                        <option value="">No project</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}" 
+                                {% if note and note.project_id == project.id %}selected{% endif %}
+                                {% if task and task.project_id == project.id %}selected{% endif %}>
+                            {{ project.code }} - {{ project.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="settings-item">
+                    <label for="task_id" class="settings-label">
+                        <span class="icon"><i class="ti ti-check"></i></span>
+                        Task
+                    </label>
+                    <select id="task_id" name="task_id" class="form-control">
+                        <option value="">No task</option>
+                        <!-- Tasks will be populated dynamically based on project selection -->
+                        {% if task %}
+                        <option value="{{ task.id }}" selected>
+                            #{{ task.id }} - {{ task.title }}
+                        </option>
+                        {% endif %}
+                    </select>
+                </div>
+
+                <div class="settings-item">
+                    <label class="settings-label">
+                        <span class="icon"><i class="ti ti-pin"></i></span>
+                        Pin Note
+                    </label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="is_pinned" name="is_pinned" 
+                               {% if note and note.is_pinned %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Editor Form -->
+    <form method="POST" id="note-form">
+        <input type="hidden" id="title" name="title" value="{{ note.title if note else '' }}" required>
+        <input type="hidden" id="hidden-folder" name="folder" value="{{ note.folder if note and note.folder else '' }}">
+        <input type="hidden" id="hidden-visibility" name="visibility" value="{{ note.visibility.value if note else 'Private' }}">
+        <input type="hidden" id="hidden-tags" name="tags" value="{{ note.tags if note and note.tags else '' }}">
+        <input type="hidden" id="hidden-project-id" name="project_id" value="{{ note.project_id if note and note.project_id else '' }}">
+        <input type="hidden" id="hidden-task-id" name="task_id" value="{{ note.task_id if note and note.task_id else '' }}">
+        <input type="hidden" id="hidden-is-pinned" name="is_pinned" value="{{ '1' if note and note.is_pinned else '0' }}">
+        
+        <div class="editor-layout" id="editor-layout">
+            <!-- Editor Panel -->
+            <div class="editor-panel">
+                <div class="editor-card">
+                    <!-- Toolbar -->
+                    <div class="editor-toolbar">
+                        <div class="toolbar-group">
+                            <button type="button" class="toolbar-btn" onclick="toggleFrontmatter()" title="Toggle Frontmatter">
+                                <span class="icon"><i class="ti ti-file-settings"></i></span>
+                                <span class="btn-text">Frontmatter</span>
+                            </button>
+                        </div>
+                        
+                        <div class="toolbar-divider"></div>
+                        
+                        <div class="toolbar-group">
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('**', '**')" title="Bold (Ctrl+B)">
+                                <strong>B</strong>
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('*', '*')" title="Italic (Ctrl+I)">
+                                <em>I</em>
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('~~', '~~')" title="Strikethrough">
+                                <s>S</s>
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('`', '`')" title="Inline Code">
+                                <code>&lt;/&gt;</code>
+                            </button>
+                        </div>
+                        
+                        <div class="toolbar-divider"></div>
+                        
+                        <div class="toolbar-group">
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('# ', '')" title="Heading 1">
+                                H1
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('## ', '')" title="Heading 2">
+                                H2
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('### ', '')" title="Heading 3">
+                                H3
+                            </button>
+                        </div>
+                        
+                        <div class="toolbar-divider"></div>
+                        
+                        <div class="toolbar-group">
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('- ', '')" title="Bullet List">
+                                <span class="icon"><i class="ti ti-list"></i></span>
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('1. ', '')" title="Numbered List">
+                                <span class="icon">1.</span>
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('- [ ] ', '')" title="Checklist">
+                                <span class="icon"><i class="ti ti-checkbox"></i></span>
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('> ', '')" title="Quote">
+                                <i class="ti ti-quote"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="toolbar-divider"></div>
+                        
+                        <div class="toolbar-group">
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('[', '](url)')" title="Link (Ctrl+K)">
+                                <i class="ti ti-link"></i>
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('![alt text](', ')')" title="Image">
+                                <i class="ti ti-photo"></i>
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertTable()" title="Table">
+                                <i class="ti ti-table"></i>
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('```\n', '\n```')" title="Code Block">
+                                <i class="ti ti-code"></i>
+                            </button>
+                            <button type="button" class="toolbar-btn" onclick="insertMarkdown('\n---\n', '')" title="Horizontal Rule">
+                                <i class="ti ti-minus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Ace Editor Container -->
+                    <div id="ace-editor" class="ace-editor-container">{{ note.content if note else '# New Note\n\nStart writing here...' }}</div>
+                    <textarea id="content" name="content" style="display: none;" required>{{ note.content if note else '# New Note\n\nStart writing here...' }}</textarea>
+                    
+                    <!-- Editor Footer -->
+                    <div class="editor-footer">
+                        <div class="editor-stats">
+                            <span id="word-count">0 words</span>
+                            <span class="stat-divider">•</span>
+                            <span id="char-count">0 characters</span>
+                        </div>
+                        <div class="editor-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ti ti-device-floppy"></i>
+                                {% if note %}Update Note{% else %}Create Note{% endif %}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Preview Panel -->
+            <div class="preview-panel" id="preview-panel">
+                <div class="preview-card">
+                    <div class="preview-header">
+                        <h3 class="preview-title">
+                            <span class="icon"><i class="ti ti-eye"></i></span>
+                            Preview
+                        </h3>
+                    </div>
+                    <div id="preview-content" class="preview-content markdown-content">
+                        <p class="preview-placeholder">Start typing to see the preview...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Include Ace Editor -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-markdown.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/theme-github.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ext-language_tools.js"></script>
+
+<style>
+/* Note Editor Styles following the new design system */
+.note-editor-container {
+    padding: 2rem;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+/* Page Header - Time Tracking style */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Button styles */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border-color: #e5e7eb;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #667eea;
+}
+
+.btn .icon {
+    font-size: 1.1em;
+}
+
+/* Settings Panel */
+.settings-panel {
+    margin-bottom: 2rem;
+    animation: slideDown 0.3s ease-out;
+}
+
+.settings-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.settings-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.settings-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: #667eea;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+}
+
+/* Editor Layout */
+.editor-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    min-height: 600px;
+}
+
+.editor-layout.preview-hidden {
+    grid-template-columns: 1fr;
+}
+
+/* Editor Panel */
+.editor-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Toolbar */
+.editor-toolbar {
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.toolbar-group {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background: #dee2e6;
+    margin: 0 0.5rem;
+}
+
+.toolbar-btn {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    min-width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.875rem;
+    color: #495057;
+}
+
+.toolbar-btn:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+    transform: translateY(-1px);
+}
+
+.toolbar-btn:active {
+    transform: translateY(0);
+}
+
+.toolbar-btn code {
+    font-size: 0.75rem;
+}
+
+.btn-text {
+    margin-left: 0.25rem;
+    font-size: 0.75rem;
+}
+
+/* Ace Editor */
+.ace-editor-container {
+    flex: 1;
+    min-height: 500px;
+    font-size: 14px;
+}
+
+/* Editor Footer */
+.editor-footer {
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.editor-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.stat-divider {
+    color: #dee2e6;
+}
+
+/* Preview Panel */
+.preview-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.preview-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    padding: 1rem 1.5rem;
+}
+
+.preview-title {
+    margin: 0;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.preview-content {
+    flex: 1;
+    padding: 2rem;
+    overflow-y: auto;
+}
+
+.preview-placeholder {
+    color: #6c757d;
+    font-style: italic;
+    text-align: center;
+    margin-top: 2rem;
+}
+
+/* Animations */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .editor-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .preview-panel {
+        display: none;
+    }
+    
+    .editor-layout:not(.preview-hidden) .preview-panel {
+        display: block;
+    }
+}
+
+@media (max-width: 768px) {
+    .note-editor-container {
+        padding: 1rem;
+    }
+    
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .page-header .header-content {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .header-actions {
+        width: 100%;
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .editor-toolbar {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+    
+    .toolbar-group {
+        flex-shrink: 0;
+    }
+}
+</style>
+
+<script>
+// Global variables
+let aceEditor;
+let previewTimer;
+let frontmatterUpdateTimer;
+
+// Function to toggle frontmatter visibility
+function toggleFrontmatter() {
+    if (!aceEditor) return;
+    
+    const content = aceEditor.getValue();
+    const frontmatterRegex = /^---\n[\s\S]*?\n---\n/;
+    const hasFrontmatter = frontmatterRegex.test(content);
+    
+    if (hasFrontmatter) {
+        // Find the end of frontmatter
+        const match = content.match(frontmatterRegex);
+        if (match) {
+            const endPos = aceEditor.getSession().getDocument().indexToPosition(match[0].length);
+            
+            // Check if frontmatter is folded
+            const foldLine = aceEditor.getSession().getFoldLine(0);
+            if (foldLine) {
+                // Unfold
+                aceEditor.getSession().unfold(foldLine.range);
+            } else {
+                // Fold
+                aceEditor.getSession().foldAll(0, endPos.row);
+            }
+        }
+    } else {
+        // Add frontmatter if it doesn't exist
+        const newContent = updateContentFrontmatter(content);
+        aceEditor.setValue(newContent, -1);
+    }
+}
+
+// Extract title from content
+function extractTitleFromContent(content) {
+    // First try to get title from frontmatter
+    const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    if (frontmatterMatch) {
+        const titleMatch = frontmatterMatch[1].match(/^title:\s*(.+)$/m);
+        if (titleMatch) {
+            return titleMatch[1].trim();
+        }
+    }
+    
+    // Otherwise, get first heading
+    const headingMatch = content.match(/^#+\s+(.+)$/m);
+    if (headingMatch) {
+        return headingMatch[1].trim();
+    }
+    
+    // Default
+    return 'Untitled Note';
+}
+
+// Update content with frontmatter
+function updateContentFrontmatter(content) {
+    const title = extractTitleFromContent(content);
+    const visibility = document.getElementById('visibility').value.toLowerCase();
+    const folder = document.getElementById('folder').value;
+    const tags = document.getElementById('tags').value;
+    const projectSelect = document.getElementById('project_id');
+    const taskSelect = document.getElementById('task_id');
+    const isPinned = document.getElementById('is_pinned').checked;
+    
+    let frontmatter = `---\nvisibility: ${visibility}\n`;
+    
+    if (projectSelect.value) {
+        const projectText = projectSelect.options[projectSelect.selectedIndex].text;
+        const projectCode = projectText.split(' - ')[0];
+        frontmatter += `project: ${projectCode}\n`;
+    } else {
+        frontmatter += `project: No project\n`;
+    }
+    
+    if (taskSelect.value) {
+        frontmatter += `task_id: ${taskSelect.value}\n`;
+    }
+    
+    if (folder) {
+        frontmatter += `folder: ${folder}\n`;
+    }
+    
+    if (tags) {
+        const tagList = tags.split(',').map(t => t.trim()).filter(t => t);
+        if (tagList.length > 0) {
+            frontmatter += `tags: [${tagList.map(t => `"${t}"`).join(', ')}]\n`;
+        }
+    }
+    
+    frontmatter += `pinned: ${isPinned}\n`;
+    frontmatter += `title: ${title}\n`;
+    frontmatter += `---\n\n`;
+    
+    // Remove existing frontmatter if present
+    const existingFrontmatterRegex = /^---\n[\s\S]*?\n---\n\n?/;
+    const cleanContent = content.replace(existingFrontmatterRegex, '');
+    
+    return frontmatter + cleanContent;
+}
+
+// Sync content and update preview
+function syncContentAndUpdatePreview(updateFrontmatter = true) {
+    if (!aceEditor) return;
+    
+    let content = aceEditor.getValue();
+    
+    // Only update frontmatter when settings change, not on every keystroke
+    if (updateFrontmatter) {
+        clearTimeout(frontmatterUpdateTimer);
+        frontmatterUpdateTimer = setTimeout(() => {
+            const newContent = updateContentFrontmatter(aceEditor.getValue());
+            if (aceEditor.getValue() !== newContent) {
+                const currentPosition = aceEditor.getCursorPosition();
+                aceEditor.setValue(newContent, -1);
+                aceEditor.moveCursorToPosition(currentPosition);
+            }
+        }, 2000); // Wait 2 seconds after typing stops
+    }
+    
+    // Update the hidden textarea first
+    document.getElementById('content').value = content;
+    
+    // Update title from content
+    const title = extractTitleFromContent(content);
+    document.getElementById('title').value = title;
+    
+    // Update the page header to show current title
+    const headerTitle = document.querySelector('.page-subtitle');
+    if (headerTitle) {
+        const isEdit = headerTitle.textContent.includes('Editing');
+        headerTitle.textContent = title ? (isEdit ? `Editing: ${title}` : title) : (isEdit ? 'Edit Note' : 'Create Note');
+    }
+    
+    // Sync settings from frontmatter
+    syncSettingsFromFrontmatter(content);
+    
+    // Update preview after everything else is synced
+    updatePreview();
+}
+
+// Sync settings UI from frontmatter
+function syncSettingsFromFrontmatter(content) {
+    if (!content.trim().startsWith('---')) return;
+    
+    const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    if (!frontmatterMatch) return;
+    
+    const frontmatter = frontmatterMatch[1];
+    const lines = frontmatter.split('\n');
+    
+    lines.forEach(line => {
+        const [key, ...valueParts] = line.split(':');
+        if (!key) return;
+        
+        const value = valueParts.join(':').trim();
+        
+        switch (key.trim()) {
+            case 'visibility':
+                const visibilitySelect = document.getElementById('visibility');
+                const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
+                for (let option of visibilitySelect.options) {
+                    if (option.value === capitalizedValue) {
+                        visibilitySelect.value = capitalizedValue;
+                        break;
+                    }
+                }
+                break;
+                
+            case 'folder':
+                document.getElementById('folder').value = value;
+                break;
+                
+            case 'tags':
+                // Handle both array format and comma-separated format
+                let tags = value;
+                if (tags.startsWith('[') && tags.endsWith(']')) {
+                    // Parse array format
+                    tags = tags.slice(1, -1).split(',').map(t => t.trim().replace(/^["']|["']$/g, '')).join(', ');
+                }
+                document.getElementById('tags').value = tags;
+                break;
+                
+            case 'pinned':
+                document.getElementById('is_pinned').checked = value === 'true';
+                break;
+        }
+    });
+}
+
+// Update preview
+function updatePreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+        const content = aceEditor ? aceEditor.getValue() : document.getElementById('content').value;
+        const preview = document.getElementById('preview-content');
+        
+        if (content.trim() === '') {
+            preview.innerHTML = '<p class="preview-placeholder">Start typing to see the preview...</p>';
+            return;
+        }
+        
+        // Send content to server for markdown rendering
+        fetch('/api/render-markdown', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ content: content })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.html) {
+                preview.innerHTML = data.html;
+            }
+        })
+        .catch(error => {
+            console.error('Error rendering markdown:', error);
+        });
+    }, 300);
+}
+
+// Insert markdown
+function insertMarkdown(before, after) {
+    if (!aceEditor) return;
+    
+    const session = aceEditor.getSession();
+    const selection = aceEditor.getSelection();
+    const selectedText = session.getTextRange(selection.getRange());
+    const newText = before + (selectedText || 'text') + after;
+    
+    if (selectedText) {
+        // Replace selection
+        session.replace(selection.getRange(), newText);
+    } else {
+        // Insert at cursor
+        aceEditor.insert(newText);
+        // Move cursor between markers
+        const pos = aceEditor.getCursorPosition();
+        aceEditor.moveCursorTo(pos.row, pos.column - after.length);
+    }
+    
+    aceEditor.focus();
+}
+
+// Insert table
+function insertTable() {
+    if (!aceEditor) return;
+    
+    const table = '\n| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |\n\n';
+    aceEditor.insert(table);
+    aceEditor.focus();
+}
+
+// Update word and character count
+function updateStats() {
+    if (!aceEditor) return;
+    
+    const content = aceEditor.getValue();
+    const words = content.trim().split(/\s+/).filter(w => w.length > 0).length;
+    const chars = content.length;
+    
+    document.getElementById('word-count').textContent = `${words} words`;
+    document.getElementById('char-count').textContent = `${chars} characters`;
+}
+
+// Initialize Ace Editor
+function initializeAceEditor() {
+    // Create Ace Editor instance
+    aceEditor = ace.edit("ace-editor");
+    
+    // Set theme (use github theme for light mode)
+    aceEditor.setTheme("ace/theme/github");
+    
+    // Set markdown mode (which includes YAML frontmatter highlighting)
+    aceEditor.session.setMode("ace/mode/markdown");
+    
+    // Configure editor options
+    aceEditor.setOptions({
+        fontSize: "14px",
+        showPrintMargin: false,
+        showGutter: true,
+        highlightActiveLine: true,
+        enableBasicAutocompletion: true,
+        enableLiveAutocompletion: true,
+        enableSnippets: true,
+        tabSize: 2,
+        useSoftTabs: true,
+        wrap: true,
+        showInvisibles: false,
+        scrollPastEnd: 0.5
+    });
+    
+    // Set initial content from hidden textarea
+    const initialContent = document.getElementById('content').value;
+    aceEditor.setValue(initialContent, -1); // -1 moves cursor to start
+    
+    // If editing and has content, sync from frontmatter
+    if (initialContent) {
+        // If editing existing note without frontmatter, add it
+        if (!initialContent.trim().startsWith('---')) {
+            const newContent = updateContentFrontmatter(initialContent);
+            aceEditor.setValue(newContent, -1);
+        }
+        syncSettingsFromFrontmatter(aceEditor.getValue());
+        const title = extractTitleFromContent(aceEditor.getValue());
+        document.getElementById('title').value = title;
+    }
+    
+    // Listen for changes in Ace Editor
+    aceEditor.on('change', function() {
+        syncContentAndUpdatePreview(false); // Don't update frontmatter on every keystroke
+        updateStats();
+    });
+    
+    // If this is a new note, add initial frontmatter
+    if (!initialContent || initialContent.trim() === '') {
+        const newContent = updateContentFrontmatter('# New Note\n\nStart writing here...');
+        aceEditor.setValue(newContent, -1);
+        syncContentAndUpdatePreview(false);
+    }
+    
+    // Function to sync settings to hidden fields
+    function syncSettingsToHiddenFields() {
+        document.getElementById('hidden-folder').value = document.getElementById('folder').value;
+        document.getElementById('hidden-visibility').value = document.getElementById('visibility').value;
+        document.getElementById('hidden-tags').value = document.getElementById('tags').value;
+        document.getElementById('hidden-project-id').value = document.getElementById('project_id').value;
+        document.getElementById('hidden-task-id').value = document.getElementById('task_id').value;
+        document.getElementById('hidden-is-pinned').value = document.getElementById('is_pinned').checked ? '1' : '0';
+    }
+    
+    // Listen for changes in settings to update frontmatter
+    ['visibility', 'folder', 'tags', 'project_id', 'task_id'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', function() {
+                // Force immediate frontmatter update when settings change
+                const content = updateContentFrontmatter(aceEditor.getValue());
+                const currentPosition = aceEditor.getCursorPosition();
+                aceEditor.setValue(content, -1);
+                aceEditor.moveCursorToPosition(currentPosition);
+                syncContentAndUpdatePreview(false);
+                // Sync to hidden fields
+                syncSettingsToHiddenFields();
+            });
+        }
+    });
+    
+    // Handle form submission - ensure content is synced
+    document.getElementById('note-form').addEventListener('submit', function(e) {
+        syncContentAndUpdatePreview();
+        syncSettingsToHiddenFields();  // Sync all settings to hidden fields
+        const submitBtn = this.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+    });
+    
+    // Set focus to ace editor
+    aceEditor.focus();
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Ace Editor
+    initializeAceEditor();
+    
+    // Initial preview
+    updatePreview();
+    updateStats();
+    
+    // Add keyboard shortcuts
+    if (aceEditor) {
+        aceEditor.commands.addCommand({
+            name: 'bold',
+            bindKey: {win: 'Ctrl-B', mac: 'Command-B'},
+            exec: function() { insertMarkdown('**', '**'); }
+        });
+        
+        aceEditor.commands.addCommand({
+            name: 'italic',
+            bindKey: {win: 'Ctrl-I', mac: 'Command-I'},
+            exec: function() { insertMarkdown('*', '*'); }
+        });
+        
+        aceEditor.commands.addCommand({
+            name: 'link',
+            bindKey: {win: 'Ctrl-K', mac: 'Command-K'},
+            exec: function() { insertMarkdown('[', '](url)'); }
+        });
+    }
+    
+    // Settings toggle
+    const settingsBtn = document.getElementById('settings-toggle');
+    const settingsPanel = document.getElementById('settings-panel');
+    
+    settingsBtn.addEventListener('click', function() {
+        if (settingsPanel.style.display === 'none' || !settingsPanel.style.display) {
+            settingsPanel.style.display = 'block';
+            this.classList.add('active');
+        } else {
+            settingsPanel.style.display = 'none';
+            this.classList.remove('active');
+        }
+    });
+    
+    // Preview toggle
+    const previewToggle = document.getElementById('preview-toggle');
+    const previewPanel = document.getElementById('preview-panel');
+    const editorLayout = document.getElementById('editor-layout');
+    
+    previewToggle.addEventListener('click', function() {
+        if (editorLayout.classList.contains('preview-hidden')) {
+            editorLayout.classList.remove('preview-hidden');
+            previewPanel.style.display = 'block';
+            this.querySelector('.toggle-text').textContent = 'Hide Preview';
+        } else {
+            editorLayout.classList.add('preview-hidden');
+            previewPanel.style.display = 'none';
+            this.querySelector('.toggle-text').textContent = 'Show Preview';
+        }
+        
+        // Resize Ace Editor after layout change
+        setTimeout(function() {
+            if (aceEditor) {
+                aceEditor.resize();
+            }
+        }, 300);
+    });
+    
+    // Project change handler - load tasks
+    document.getElementById('project_id').addEventListener('change', function() {
+        const projectId = this.value;
+        const taskSelect = document.getElementById('task_id');
+        
+        // Clear current tasks
+        taskSelect.innerHTML = '<option value="">No task</option>';
+        
+        if (projectId) {
+            // Fetch tasks for the selected project
+            fetch(`/api/projects/${projectId}/tasks`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.tasks) {
+                        data.tasks.forEach(task => {
+                            const option = document.createElement('option');
+                            option.value = task.id;
+                            option.textContent = `#${task.id} - ${task.title}`;
+                            taskSelect.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading tasks:', error);
+                });
+        }
+    });
+    
+    // Pin toggle handler
+    document.getElementById('is_pinned').addEventListener('change', function() {
+        // Update frontmatter when pin status changes
+        const content = updateContentFrontmatter(aceEditor.getValue());
+        const currentPosition = aceEditor.getCursorPosition();
+        aceEditor.setValue(content, -1);
+        aceEditor.moveCursorToPosition(currentPosition);
+        syncContentAndUpdatePreview(false);
+        syncSettingsToHiddenFields();  // Sync to hidden fields
+    });
+});
+</script>
+
+{% endblock %}

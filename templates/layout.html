@@ -6,6 +6,11 @@
     <title>{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% if g.company %} - {{ g.company.name }}{% endif %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/hover-standards.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/iconfont/tabler-icons.min.css">
+    {% if g.user %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/time-tracking.css') }}">
+    {% endif %}
     {% if not g.user %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/splash.css') }}">
     {% endif %}
@@ -14,21 +19,12 @@
     {% endif %}
     <style>
         :root {
-            --primary-color: {{ g.branding.primary_color if g.branding else '#007bff' }};
-        }
-        .btn-primary {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
-        }
-        .btn-primary:hover {
-            background-color: {{ (g.branding.primary_color if g.branding else '#007bff') + 'dd' }};
-            border-color: {{ (g.branding.primary_color if g.branding else '#007bff') + 'dd' }};
+            --primary-color: {{ g.branding.primary_color if g.branding else '#667eea' }};
+            --primary-gradient-start: {{ g.branding.primary_color if g.branding else '#667eea' }};
+            --primary-gradient-end: #764ba2;
         }
         .nav-icon {
-            color: var(--primary-color);
-        }
-        a:hover {
-            color: var(--primary-color);
+            color: var(--primary-gradient-end);
         }
         .mobile-logo {
             max-height: 30px;
@@ -116,10 +112,10 @@
                 </div>
                 <div class="user-dropdown-menu">
                     <ul>
-                        <li><a href="{{ url_for('profile') }}"><i class="nav-icon">👤</i>Profile</a></li>
-                        <li><a href="{{ url_for('config') }}"><i class="nav-icon">⚙️</i>Settings</a></li>
+                        <li><a href="{{ url_for('profile') }}"><i class="nav-icon ti ti-user"></i>Profile</a></li>
+                        <li><a href="{{ url_for('config') }}"><i class="nav-icon ti ti-settings"></i>Settings</a></li>
                         <li class="user-dropdown-divider"></li>
-                        <li><a href="{{ url_for('logout') }}"><i class="nav-icon">🚪</i>Logout</a></li>
+                        <li><a href="{{ url_for('logout') }}"><i class="nav-icon ti ti-logout"></i>Logout</a></li>
                     </ul>
                 </div>
             </div>
@@ -128,37 +124,39 @@
         <nav class="sidebar-nav">
             <ul>
                 {% if g.user %}
-                    <li><a href="{{ url_for('home') }}" data-tooltip="Home"><i class="nav-icon">🏠</i><span class="nav-text">Home</span></a></li>
-                    <li><a href="{{ url_for('time_tracking') }}" data-tooltip="Time Tracking"><i class="nav-icon">⏱️</i><span class="nav-text">Time Tracking</span></a></li>
-                    <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📊</i><span class="nav-text">Dashboard</span></a></li>
-                    <li><a href="{{ url_for('tasks.unified_task_management') }}" data-tooltip="Task Management"><i class="nav-icon">📋</i><span class="nav-text">Task Management</span></a></li>
-                    <li><a href="{{ url_for('sprints.sprint_management') }}" data-tooltip="Sprint Management"><i class="nav-icon">🏃‍♂️</i><span class="nav-text">Sprints</span></a></li>
-                    <li><a href="{{ url_for('analytics') }}" data-tooltip="Time Analytics"><i class="nav-icon">📊</i><span class="nav-text">Analytics</span></a></li>
+                    <li><a href="{{ url_for('home') }}" data-tooltip="Home"><i class="nav-icon ti ti-home"></i><span class="nav-text">Home</span></a></li>
+                    <li><a href="{{ url_for('time_tracking') }}" data-tooltip="Time Tracking"><i class="nav-icon ti ti-clock"></i><span class="nav-text">Time Tracking</span></a></li>
+                    <!-- Dashboard disabled due to widget issues -->
+                    <!-- <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon ti ti-dashboard"></i><span class="nav-text">Dashboard</span></a></li> -->
+                    <li><a href="{{ url_for('tasks.unified_task_management') }}" data-tooltip="Task Management"><i class="nav-icon ti ti-clipboard-list"></i><span class="nav-text">Task Management</span></a></li>
+                    <li><a href="{{ url_for('sprints.sprint_management') }}" data-tooltip="Sprint Management"><i class="nav-icon ti ti-run"></i><span class="nav-text">Sprints</span></a></li>
+                    <li><a href="{{ url_for('notes.notes_list') }}" data-tooltip="Notes"><i class="nav-icon ti ti-notes"></i><span class="nav-text">Notes</span></a></li>
+                    <li><a href="{{ url_for('analytics') }}" data-tooltip="Time Analytics"><i class="nav-icon ti ti-chart-bar"></i><span class="nav-text">Analytics</span></a></li>
                     
                     <!-- Role-based menu items -->
                     {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">Admin</li>
-                    <li><a href="{{ url_for('companies.admin_company') }}" data-tooltip="Company Settings"><i class="nav-icon">🏢</i><span class="nav-text">Company Settings</span></a></li>
-                    <li><a href="{{ url_for('users.admin_users') }}" data-tooltip="Manage Users"><i class="nav-icon">👥</i><span class="nav-text">Manage Users</span></a></li>
-                    <li><a href="{{ url_for('invitations.list_invitations') }}" data-tooltip="Invitations"><i class="nav-icon">📨</i><span class="nav-text">Invitations</span></a></li>
-                    <li><a href="{{ url_for('teams.admin_teams') }}" data-tooltip="Manage Teams"><i class="nav-icon">🏭</i><span class="nav-text">Manage Teams</span></a></li>
-                    <li><a href="{{ url_for('projects.admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
+                    <li><a href="{{ url_for('organization.admin_organization') }}" data-tooltip="Organization"><i class="nav-icon ti ti-sitemap"></i><span class="nav-text">Organization</span></a></li>
+                    <li><a href="{{ url_for('companies.admin_company') }}" data-tooltip="Company Settings"><i class="nav-icon ti ti-building"></i><span class="nav-text">Company Settings</span></a></li>
+                    <li><a href="{{ url_for('invitations.list_invitations') }}" data-tooltip="Invitations"><i class="nav-icon ti ti-mail"></i><span class="nav-text">Invitations</span></a></li>
+                    <li><a href="{{ url_for('projects.admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon ti ti-folder"></i><span class="nav-text">Manage Projects</span></a></li>
                     {% if g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">System Admin</li>
-                    <li><a href="{{ url_for('system_admin.system_admin_dashboard') }}" data-tooltip="System Dashboard"><i class="nav-icon">🌐</i><span class="nav-text">System Dashboard</span></a></li>
-                    <li><a href="{{ url_for('announcements.index') }}" data-tooltip="Announcements"><i class="nav-icon">📢</i><span class="nav-text">Announcements</span></a></li>
+                    <li><a href="{{ url_for('system_admin.system_admin_dashboard') }}" data-tooltip="System Dashboard"><i class="nav-icon ti ti-world"></i><span class="nav-text">System Dashboard</span></a></li>
+                    <li><a href="{{ url_for('announcements.index') }}" data-tooltip="Announcements"><i class="nav-icon ti ti-speakerphone"></i><span class="nav-text">Announcements</span></a></li>
                     {% endif %}
                     {% elif g.user.role in [Role.TEAM_LEADER, Role.SUPERVISOR] %}
                     <li class="nav-divider">Team</li>
-                    <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon">📈</i><span class="nav-text">Dashboard</span></a></li>
+                    <!-- Dashboard disabled due to widget issues -->
+                    <!-- <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon ti ti-chart-line"></i><span class="nav-text">Dashboard</span></a></li> -->
                     {% if g.user.role == Role.SUPERVISOR %}
-                    <li><a href="{{ url_for('projects.admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon">📝</i><span class="nav-text">Manage Projects</span></a></li>
+                    <li><a href="{{ url_for('projects.admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon ti ti-folder"></i><span class="nav-text">Manage Projects</span></a></li>
                     {% endif %}
                     {% endif %}
                 {% else %}
-                    <li><a href="{{ url_for('about') }}" data-tooltip="About"><i class="nav-icon">ℹ️</i><span class="nav-text">About</span></a></li>
-                    <li><a href="{{ url_for('login') }}" data-tooltip="Login"><i class="nav-icon">🔑</i><span class="nav-text">Login</span></a></li>
-                    <li><a href="{{ url_for('register') }}" data-tooltip="Register"><i class="nav-icon">📝</i><span class="nav-text">Register</span></a></li>
+                    <li><a href="{{ url_for('about') }}" data-tooltip="About"><i class="nav-icon ti ti-info-circle"></i><span class="nav-text">About</span></a></li>
+                    <li><a href="{{ url_for('login') }}" data-tooltip="Login"><i class="nav-icon ti ti-key"></i><span class="nav-text">Login</span></a></li>
+                    <li><a href="{{ url_for('register') }}" data-tooltip="Register"><i class="nav-icon ti ti-user-plus"></i><span class="nav-text">Register</span></a></li>
                 {% endif %}
             </ul>
         </nav>
@@ -209,23 +207,23 @@
         {% if g.show_email_nag %}
             <div class="email-nag-banner">
                 <div class="email-nag-content">
-                    <span class="email-nag-icon">📧</span>
+                    <span class="email-nag-icon"><i class="ti ti-mail"></i></span>
                     <span class="email-nag-text">
                         <strong>Add your email address</strong> to enable account recovery and receive important notifications.
                     </span>
                     <a href="{{ url_for('profile') }}" class="btn btn-sm btn-primary">Add Email</a>
-                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session">×</button>
+                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session"><i class="ti ti-x"></i></button>
                 </div>
             </div>
         {% elif g.show_email_verification_nag %}
             <div class="email-nag-banner email-verify">
                 <div class="email-nag-content">
-                    <span class="email-nag-icon">✉️</span>
+                    <span class="email-nag-icon"><i class="ti ti-mail-opened"></i></span>
                     <span class="email-nag-text">
                         <strong>Please verify your email address</strong> to ensure you can recover your account if needed.
                     </span>
                     <a href="{{ url_for('profile') }}" class="btn btn-sm btn-warning">Verify Email</a>
-                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session">×</button>
+                    <button class="email-nag-dismiss" onclick="dismissEmailNag()" title="Dismiss for this session"><i class="ti ti-x"></i></button>
                 </div>
             </div>
         {% endif %}

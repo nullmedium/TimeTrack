@@ -1,0 +1,766 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="note-mindmap-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon">🧠</span>
+                    Mind Map View
+                </h1>
+                <p class="page-subtitle">{{ note.title }}</p>
+            </div>
+            <div class="header-actions">
+                <button type="button" class="btn btn-secondary" onclick="resetZoom()">
+                    <span class="icon">🔍</span>
+                    Reset Zoom
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="expandAll()">
+                    <span class="icon">➕</span>
+                    Expand All
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="collapseAll()">
+                    <span class="icon">➖</span>
+                    Collapse All
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="toggleFullscreen()">
+                    <span class="icon">🗖️</span>
+                    Fullscreen
+                </button>
+                <a href="{{ url_for('notes.view_note', slug=note.slug) }}" class="btn btn-secondary">
+                    <i class="ti ti-arrow-left"></i>
+                    Back to Note
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div id="mindmap-container" class="mindmap-container">
+        <svg id="mindmap-svg"></svg>
+        <div class="node-count" id="node-count"></div>
+    </div>
+</div>
+
+<style>
+.note-mindmap-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 2rem;
+    height: calc(100vh - 100px);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Page Header - Time Tracking style */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Button styles */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border-color: #e5e7eb;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #667eea;
+}
+
+.btn .icon {
+    font-size: 1.1em;
+}
+
+.mindmap-container {
+    flex: 1;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    position: relative;
+    min-height: 600px;
+}
+
+#mindmap-svg {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+
+#mindmap-svg.grabbing {
+    cursor: grabbing;
+}
+
+.node {
+    cursor: pointer;
+}
+
+.node circle {
+    fill: #fff;
+    stroke: #667eea;
+    stroke-width: 3px;
+}
+
+.node rect {
+    fill: #f9f9f9;
+    stroke: #667eea;
+    stroke-width: 2px;
+    rx: 8px;
+}
+
+.node text {
+    font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    pointer-events: none;
+    text-anchor: middle;
+    dominant-baseline: central;
+}
+
+.link {
+    fill: none;
+    stroke: #e5e7eb;
+    stroke-width: 2px;
+}
+
+.node.root rect {
+    fill: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    stroke: none;
+}
+
+.node.root text {
+    fill: white;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.node.header1 rect {
+    fill: #e0e7ff;
+    stroke: #667eea;
+}
+
+.node.header2 rect {
+    fill: #f0e6ff;
+    stroke: #9333ea;
+}
+
+.node.header3 rect {
+    fill: #fef3c7;
+    stroke: #f59e0b;
+}
+
+.node.list rect {
+    fill: #f3f4f6;
+    stroke: #9ca3af;
+    stroke-width: 1px;
+}
+
+.node.list text {
+    font-size: 12px;
+}
+
+.node.paragraph rect {
+    fill: #fafafa;
+    stroke: #d1d5db;
+    stroke-dasharray: 4;
+}
+
+/* Fullscreen styles */
+.mindmap-container.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    margin: 0;
+    border-radius: 0;
+}
+
+/* Tooltip styles */
+.tooltip {
+    position: absolute;
+    text-align: left;
+    padding: 8px;
+    font: 12px sans-serif;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: 0px;
+    border-radius: 4px;
+    pointer-events: none;
+}
+
+/* Node count indicator */
+.node-count {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 10;
+}
+</style>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// Store the markdown content and title safely
+const noteData = {
+    content: {{ note.content|tojson }},
+    title: {{ note.title|tojson }}
+};
+
+// Improved Markdown parser
+function parseMarkdownToTree(markdown) {
+    const lines = markdown.split('\n');
+    const root = {
+        name: noteData.title,
+        children: [],
+        level: 0,
+        type: 'root'
+    };
+    
+    const headerStack = [root];
+    let currentParent = root;
+    let lastNode = root;
+    let inCodeBlock = false;
+    let codeBlockContent = [];
+    
+    lines.forEach((line, index) => {
+        // Handle code blocks
+        if (line.trim().startsWith('```')) {
+            if (inCodeBlock) {
+                // End code block
+                const codeNode = {
+                    name: 'Code Block',
+                    content: codeBlockContent.join('\n'),
+                    children: [],
+                    type: 'code',
+                    level: currentParent.level + 1
+                };
+                currentParent.children.push(codeNode);
+                codeBlockContent = [];
+                inCodeBlock = false;
+            } else {
+                // Start code block
+                inCodeBlock = true;
+            }
+            return;
+        }
+        
+        if (inCodeBlock) {
+            codeBlockContent.push(line);
+            return;
+        }
+        
+        // Skip empty lines
+        if (!line.trim()) return;
+        
+        // Check for headers
+        const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
+        if (headerMatch) {
+            const level = headerMatch[1].length;
+            const text = headerMatch[2].trim();
+            
+            // Pop stack to find correct parent
+            while (headerStack.length > 1 && headerStack[headerStack.length - 1].level >= level) {
+                headerStack.pop();
+            }
+            
+            const node = {
+                name: text,
+                children: [],
+                level: level,
+                type: `header${level}`
+            };
+            
+            const parent = headerStack[headerStack.length - 1];
+            parent.children.push(node);
+            headerStack.push(node);
+            currentParent = node;
+            lastNode = node;
+            return;
+        }
+        
+        // Check for unordered list items
+        const listMatch = line.match(/^(\s*)[*\-+]\s+(.+)$/);
+        if (listMatch) {
+            const indent = listMatch[1].length;
+            const text = listMatch[2].trim();
+            
+            const node = {
+                name: text,
+                children: [],
+                level: currentParent.level + 1,
+                type: 'list',
+                indent: indent
+            };
+            
+            // Handle nested lists
+            if (lastNode.type === 'list' && indent > lastNode.indent) {
+                lastNode.children.push(node);
+            } else {
+                currentParent.children.push(node);
+            }
+            lastNode = node;
+            return;
+        }
+        
+        // Check for ordered list items
+        const orderedListMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
+        if (orderedListMatch) {
+            const indent = orderedListMatch[1].length;
+            const text = orderedListMatch[2].trim();
+            
+            const node = {
+                name: text,
+                children: [],
+                level: currentParent.level + 1,
+                type: 'list',
+                indent: indent
+            };
+            
+            currentParent.children.push(node);
+            lastNode = node;
+            return;
+        }
+        
+        // Check for blockquotes
+        if (line.trim().startsWith('>')) {
+            const text = line.replace(/^>\s*/, '').trim();
+            if (text) {
+                const node = {
+                    name: text,
+                    children: [],
+                    level: currentParent.level + 1,
+                    type: 'quote'
+                };
+                currentParent.children.push(node);
+                lastNode = node;
+            }
+            return;
+        }
+        
+        // Regular paragraph text
+        const text = line.trim();
+        if (text) {
+            const node = {
+                name: text.length > 80 ? text.substring(0, 80) + '...' : text,
+                fullText: text,
+                children: [],
+                level: currentParent.level + 1,
+                type: 'paragraph'
+            };
+            currentParent.children.push(node);
+            lastNode = node;
+        }
+    });
+    
+    return root;
+}
+
+// D3 Mind Map Implementation
+const treeData = parseMarkdownToTree(noteData.content);
+
+// Setup dimensions
+const containerWidth = document.getElementById('mindmap-container').clientWidth;
+const containerHeight = document.getElementById('mindmap-container').clientHeight;
+
+// Calculate dynamic dimensions based on content
+function calculateTreeDimensions(root) {
+    let maxDepth = 0;
+    let leafCount = 0;
+    
+    root.each(d => {
+        if (d.depth > maxDepth) maxDepth = d.depth;
+        if (!d.children && !d._children) leafCount++;
+    });
+    
+    // Dynamic sizing based on content
+    const nodeHeight = 50; // Height per node including spacing
+    const nodeWidth = 250; // Width per depth level
+    const width = Math.max(containerWidth, (maxDepth + 1) * nodeWidth);
+    const height = Math.max(containerHeight, leafCount * nodeHeight);
+    
+    return { width, height, nodeWidth, nodeHeight };
+}
+
+// Create SVG with initial viewBox
+const svg = d3.select("#mindmap-svg")
+    .attr("viewBox", [0, 0, containerWidth, containerHeight]);
+
+const g = svg.append("g");
+
+// Add zoom behavior with extended range
+const zoom = d3.zoom()
+    .scaleExtent([0.02, 10])
+    .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+    });
+
+svg.call(zoom);
+
+// Create tree layout - will be configured dynamically
+const tree = d3.tree()
+    .separation((a, b) => {
+        // Dynamic separation based on node content
+        const aSize = (a.data.children ? a.data.children.length : 1);
+        const bSize = (b.data.children ? b.data.children.length : 1);
+        return (a.parent === b.parent ? 1 : 2) * Math.max(1, (aSize + bSize) / 10);
+    });
+
+// Create hierarchy
+const root = d3.hierarchy(treeData);
+root.x0 = 0;
+root.y0 = 0;
+
+// Collapse after the second level for large trees
+let totalNodes = 0;
+root.descendants().forEach((d, i) => {
+    d.id = i;
+    totalNodes++;
+});
+
+// Only auto-collapse if tree is large
+if (totalNodes > 50) {
+    root.descendants().forEach((d) => {
+        if (d.depth && d.depth > 2) {
+            d._children = d.children;
+            d.children = null;
+        }
+    });
+}
+
+// Update node count
+document.getElementById('node-count').textContent = `Nodes: ${totalNodes} (Visible: ${root.descendants().filter(d => d.children || !d.parent).length})`;
+
+// Create tooltip
+const tooltip = d3.select("body").append("div")
+    .attr("class", "tooltip")
+    .style("opacity", 0);
+
+update(root);
+
+function update(source) {
+    const duration = 750;
+    
+    // Compute tree layout
+    const treeData = tree(root);
+    const nodes = treeData.descendants();
+    const links = treeData.links();
+    
+    // Calculate dynamic dimensions
+    const dimensions = calculateTreeDimensions(root);
+    
+    // Update tree size based on content
+    tree.size([dimensions.height, dimensions.width * 0.8]);
+    
+    // Recompute layout with new size
+    tree(root);
+    
+    // Normalize for fixed-depth with dynamic spacing
+    nodes.forEach(d => {
+        d.y = d.depth * dimensions.nodeWidth;
+    });
+    
+    // Update SVG viewBox to accommodate all content
+    const xExtent = d3.extent(nodes, d => d.x);
+    const yExtent = d3.extent(nodes, d => d.y);
+    const padding = 100;
+    
+    svg.attr("viewBox", [
+        yExtent[0] - padding,
+        xExtent[0] - padding,
+        yExtent[1] - yExtent[0] + padding * 2,
+        xExtent[1] - xExtent[0] + padding * 2
+    ]);
+    
+    // Update nodes
+    const node = g.selectAll("g.node")
+        .data(nodes, d => d.id);
+    
+    const nodeEnter = node.enter().append("g")
+        .attr("class", d => `node ${d.data.type || ''}`)
+        .attr("transform", d => `translate(${source.y0},${source.x0})`)
+        .on("click", click)
+        .on("mouseover", (event, d) => {
+            if (d.data.fullText) {
+                tooltip.transition()
+                    .duration(200)
+                    .style("opacity", .9);
+                tooltip.html(d.data.fullText)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+            }
+        })
+        .on("mouseout", (d) => {
+            tooltip.transition()
+                .duration(500)
+                .style("opacity", 0);
+        });
+    
+    // Add rectangles for nodes
+    nodeEnter.append("rect")
+        .attr("width", 1e-6)
+        .attr("height", 1e-6)
+        .attr("x", -1)
+        .attr("y", -1);
+    
+    // Add circles for collapse/expand
+    nodeEnter.append("circle")
+        .attr("r", 1e-6)
+        .style("fill", d => d._children ? "#667eea" : "#fff")
+        .style("display", d => d.children || d._children ? null : "none");
+    
+    // Add text
+    nodeEnter.append("text")
+        .attr("dy", ".35em")
+        .attr("text-anchor", "middle")
+        .text(d => d.data.name)
+        .style("fill-opacity", 1e-6);
+    
+    // Transition nodes to their new position
+    const nodeUpdate = nodeEnter.merge(node);
+    
+    nodeUpdate.transition()
+        .duration(duration)
+        .attr("transform", d => `translate(${d.y},${d.x})`);
+    
+    // Update rectangles
+    nodeUpdate.select("rect")
+        .attr("width", d => {
+            // Better text measurement
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            context.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            const metrics = context.measureText(d.data.name);
+            const textLength = metrics.width + 40; // Add padding
+            return Math.max(textLength, 120);
+        })
+        .attr("height", 40)
+        .attr("x", d => {
+            const textLength = d.data.name.length * 8 + 30;
+            return -Math.max(textLength, 120) / 2;
+        })
+        .attr("y", -18);
+    
+    // Update circles
+    nodeUpdate.select("circle")
+        .attr("r", 6)
+        .attr("cx", d => {
+            const textLength = d.data.name.length * 8 + 30;
+            return Math.max(textLength, 120) / 2 + 10;
+        })
+        .style("fill", d => d._children ? "#667eea" : "#fff");
+    
+    nodeUpdate.select("text")
+        .style("fill-opacity", 1);
+    
+    // Remove exiting nodes
+    const nodeExit = node.exit().transition()
+        .duration(duration)
+        .attr("transform", d => `translate(${source.y},${source.x})`)
+        .remove();
+    
+    nodeExit.select("rect")
+        .attr("width", 1e-6)
+        .attr("height", 1e-6);
+    
+    nodeExit.select("circle")
+        .attr("r", 1e-6);
+    
+    nodeExit.select("text")
+        .style("fill-opacity", 1e-6);
+    
+    // Update links
+    const link = g.selectAll("path.link")
+        .data(links, d => d.target.id);
+    
+    const linkEnter = link.enter().insert("path", "g")
+        .attr("class", "link")
+        .attr("d", d => {
+            const o = {x: source.x0, y: source.y0};
+            return diagonal({source: o, target: o});
+        });
+    
+    const linkUpdate = linkEnter.merge(link);
+    
+    linkUpdate.transition()
+        .duration(duration)
+        .attr("d", diagonal);
+    
+    const linkExit = link.exit().transition()
+        .duration(duration)
+        .attr("d", d => {
+            const o = {x: source.x, y: source.y};
+            return diagonal({source: o, target: o});
+        })
+        .remove();
+    
+    // Store old positions
+    nodes.forEach(d => {
+        d.x0 = d.x;
+        d.y0 = d.y;
+    });
+    
+    // Update node count
+    const visibleNodes = root.descendants().filter(d => {
+        let parent = d.parent;
+        while (parent) {
+            if (!parent.children) return false;
+            parent = parent.parent;
+        }
+        return true;
+    }).length;
+    document.getElementById('node-count').textContent = `Nodes: ${totalNodes} (Visible: ${visibleNodes})`;
+}
+
+// Diagonal link generator
+function diagonal(d) {
+    return `M ${d.source.y} ${d.source.x}
+            C ${(d.source.y + d.target.y) / 2} ${d.source.x},
+              ${(d.source.y + d.target.y) / 2} ${d.target.x},
+              ${d.target.y} ${d.target.x}`;
+}
+
+// Toggle children on click
+function click(event, d) {
+    if (d.children) {
+        d._children = d.children;
+        d.children = null;
+    } else {
+        d.children = d._children;
+        d._children = null;
+    }
+    update(d);
+}
+
+// Utility functions
+function resetZoom() {
+    autoFit();
+}
+
+function toggleFullscreen() {
+    const container = document.getElementById('mindmap-container');
+    container.classList.toggle('fullscreen');
+    
+    // Recalculate dimensions
+    const newWidth = container.clientWidth;
+    const newHeight = container.clientHeight;
+    svg.attr("viewBox", [-newWidth / 2, -newHeight / 2, newWidth, newHeight]);
+}
+
+// Auto-fit the content initially
+function autoFit() {
+    const bounds = g.node().getBBox();
+    const fullWidth = bounds.width;
+    const fullHeight = bounds.height;
+    const width = containerWidth;
+    const height = containerHeight;
+    
+    const midX = bounds.x + fullWidth / 2;
+    const midY = bounds.y + fullHeight / 2;
+    
+    const scale = 0.9 / Math.max(fullWidth / width, fullHeight / height);
+    const translate = [width / 2 - scale * midX, height / 2 - scale * midY];
+    
+    svg.transition()
+        .duration(750)
+        .call(zoom.transform, d3.zoomIdentity
+            .translate(translate[0], translate[1])
+            .scale(scale));
+}
+
+// Center the tree initially
+setTimeout(autoFit, 100);
+
+// Expand all nodes
+function expandAll() {
+    root.descendants().forEach(d => {
+        if (d._children) {
+            d.children = d._children;
+            d._children = null;
+        }
+    });
+    update(root);
+    setTimeout(autoFit, 800);
+}
+
+// Collapse all nodes except root
+function collapseAll() {
+    root.descendants().forEach(d => {
+        if (d.depth > 0 && d.children) {
+            d._children = d.children;
+            d.children = null;
+        }
+    });
+    update(root);
+    setTimeout(autoFit, 800);
+}
+</script>
+
+{% endblock %}

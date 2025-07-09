@@ -1,0 +1,390 @@
+/* ===================================================================
+   TIMETRACK HOVER STANDARDS
+   Consistent hover states based on primary gradient colors
+   Primary: #667eea to #764ba2
+   =================================================================== */
+
+:root {
+    /* Primary gradient colors */
+    --primary-gradient-start: #667eea;
+    --primary-gradient-end: #764ba2;
+    --primary-color: #667eea;
+    
+    /* Hover color variations */
+    --hover-primary: #5569d6;  /* Darker primary for hover */
+    --hover-primary-dark: #4a5bc8;  /* Even darker primary */
+    --hover-secondary: #6a4195;  /* Darker gradient end */
+    
+    /* Background hover colors */
+    --hover-bg-light: rgba(102, 126, 234, 0.05);  /* 5% primary */
+    --hover-bg-medium: rgba(102, 126, 234, 0.1);  /* 10% primary */
+    --hover-bg-strong: rgba(102, 126, 234, 0.15); /* 15% primary */
+    
+    /* Shadow definitions */
+    --hover-shadow-light: 0 2px 4px rgba(102, 126, 234, 0.15);
+    --hover-shadow-medium: 0 4px 12px rgba(102, 126, 234, 0.2);
+    --hover-shadow-strong: 0 6px 20px rgba(102, 126, 234, 0.25);
+    --hover-shadow-heavy: 0 8px 30px rgba(102, 126, 234, 0.3);
+    
+    /* Transform values */
+    --hover-lift-subtle: translateY(-1px);
+    --hover-lift-small: translateY(-2px);
+    --hover-lift-medium: translateY(-3px);
+    --hover-lift-large: translateY(-5px);
+    
+    /* Transition timing */
+    --hover-transition-fast: all 0.2s ease;
+    --hover-transition-normal: all 0.3s ease;
+    --hover-transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===================================================================
+   GLOBAL HOVER STYLES
+   =================================================================== */
+
+/* All links */
+a {
+    transition: var(--hover-transition-fast);
+}
+
+a:hover {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+/* ===================================================================
+   BUTTON HOVER STYLES
+   =================================================================== */
+
+/* Base button hover */
+.btn {
+    transition: var(--hover-transition-normal);
+}
+
+.btn:hover {
+    transform: var(--hover-lift-subtle);
+    box-shadow: var(--hover-shadow-light);
+}
+
+/* Primary button with gradient */
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, var(--hover-primary) 0%, var(--hover-secondary) 100%);
+    transform: var(--hover-lift-small);
+    box-shadow: var(--hover-shadow-medium);
+    border-color: var(--hover-primary);
+}
+
+/* Secondary button */
+.btn-secondary:hover {
+    background-color: var(--hover-bg-medium);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    transform: var(--hover-lift-subtle);
+    box-shadow: var(--hover-shadow-light);
+}
+
+/* Success button - maintain green but with consistent effects */
+.btn-success:hover {
+    transform: var(--hover-lift-small);
+    box-shadow: var(--hover-shadow-medium);
+    filter: brightness(0.9);
+}
+
+/* Danger button - maintain red but with consistent effects */
+.btn-danger:hover {
+    transform: var(--hover-lift-small);
+    box-shadow: var(--hover-shadow-medium);
+    filter: brightness(0.9);
+}
+
+/* Outline buttons */
+.btn-outline:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    transform: var(--hover-lift-subtle);
+    box-shadow: var(--hover-shadow-light);
+}
+
+/* Small buttons */
+.btn-sm:hover {
+    transform: var(--hover-lift-subtle);
+    box-shadow: var(--hover-shadow-light);
+}
+
+/* ===================================================================
+   NAVIGATION HOVER STYLES
+   =================================================================== */
+
+/* Sidebar */
+.sidebar {
+    transition: var(--hover-transition-normal);
+}
+
+.sidebar:hover {
+    box-shadow: var(--hover-shadow-heavy);
+}
+
+/* Sidebar navigation items */
+.sidebar-nav li a {
+    transition: var(--hover-transition-fast);
+}
+
+.sidebar-nav li a:hover {
+    background-color: var(--hover-bg-medium);
+    border-left-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+/* Active state should be stronger */
+.sidebar-nav li.active a {
+    background-color: var(--hover-bg-strong);
+    border-left-color: var(--primary-gradient-end);
+    color: var(--primary-gradient-end);
+}
+
+/* Top navigation */
+.navbar-nav .nav-link:hover {
+    color: var(--primary-color);
+    background-color: var(--hover-bg-light);
+    border-radius: 4px;
+}
+
+/* Dropdown items */
+.dropdown-item:hover {
+    background-color: var(--hover-bg-medium);
+    color: var(--primary-color);
+}
+
+/* ===================================================================
+   CARD & PANEL HOVER STYLES
+   =================================================================== */
+
+/* Base card hover */
+.card,
+.panel,
+.dashboard-card,
+.admin-card,
+.stat-card {
+    transition: var(--hover-transition-normal);
+}
+
+.card:hover,
+.panel:hover,
+.dashboard-card:hover {
+    transform: var(--hover-lift-small);
+    box-shadow: var(--hover-shadow-medium);
+}
+
+/* Clickable cards get stronger effect */
+.admin-card:hover,
+.clickable-card:hover {
+    transform: var(--hover-lift-medium);
+    box-shadow: var(--hover-shadow-strong);
+    cursor: pointer;
+}
+
+/* Stat cards */
+.stat-card:hover {
+    transform: var(--hover-lift-small);
+    box-shadow: var(--hover-shadow-medium);
+    border-color: var(--hover-bg-strong);
+}
+
+/* Management cards */
+.management-card {
+    transition: var(--hover-transition-normal);
+}
+
+.management-card:hover {
+    transform: var(--hover-lift-small);
+    box-shadow: var(--hover-shadow-medium);
+    border-color: var(--hover-bg-medium);
+}
+
+/* ===================================================================
+   TABLE HOVER STYLES
+   =================================================================== */
+
+/* Table rows */
+.table tbody tr,
+.data-table tbody tr,
+.time-history tbody tr {
+    transition: var(--hover-transition-fast);
+}
+
+.table tbody tr:hover,
+.data-table tbody tr:hover,
+.time-history tbody tr:hover {
+    background-color: var(--hover-bg-light);
+}
+
+/* Clickable rows get pointer */
+.clickable-row:hover {
+    cursor: pointer;
+    background-color: var(--hover-bg-medium);
+}
+
+/* ===================================================================
+   FORM ELEMENT HOVER STYLES
+   =================================================================== */
+
+/* Input fields */
+.form-control,
+.form-select {
+    transition: var(--hover-transition-fast);
+}
+
+.form-control:hover:not(:focus),
+.form-select:hover:not(:focus) {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 1px var(--hover-bg-light);
+}
+
+/* Checkboxes and radios */
+.form-check-input:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px var(--hover-bg-medium);
+}
+
+/* ===================================================================
+   ICON HOVER STYLES
+   =================================================================== */
+
+/* Icon buttons */
+.icon-btn {
+    transition: var(--hover-transition-fast);
+}
+
+.icon-btn:hover {
+    color: var(--primary-color);
+    background-color: var(--hover-bg-medium);
+    border-radius: 50%;
+}
+
+/* Action icons */
+.action-icon:hover {
+    color: var(--primary-color);
+    transform: scale(1.1);
+}
+
+/* ===================================================================
+   SPECIAL COMPONENT HOVER STYLES
+   =================================================================== */
+
+/* Task cards */
+.task-card {
+    transition: var(--hover-transition-normal);
+}
+
+.task-card:hover {
+    transform: var(--hover-lift-subtle);
+    box-shadow: var(--hover-shadow-medium);
+    border-left-color: var(--primary-color);
+}
+
+/* Note cards */
+.note-card:hover {
+    transform: var(--hover-lift-small);
+    box-shadow: var(--hover-shadow-medium);
+    border-color: var(--hover-bg-strong);
+}
+
+/* Export sections */
+.export-section:hover {
+    transform: var(--hover-lift-small);
+    box-shadow: var(--hover-shadow-strong);
+}
+
+/* Widget hover */
+.widget:hover {
+    transform: var(--hover-lift-small);
+    box-shadow: var(--hover-shadow-medium);
+    border-color: var(--hover-bg-medium);
+}
+
+/* Mode buttons */
+.mode-btn:hover:not(.active) {
+    background-color: var(--hover-bg-medium);
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+/* Tab buttons */
+.tab-btn:hover:not(.active) {
+    background-color: var(--hover-bg-light);
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+/* ===================================================================
+   UTILITY HOVER CLASSES
+   =================================================================== */
+
+/* Add these classes to elements for consistent hover effects */
+.hover-lift:hover {
+    transform: var(--hover-lift-small);
+}
+
+.hover-lift-large:hover {
+    transform: var(--hover-lift-large);
+}
+
+.hover-shadow:hover {
+    box-shadow: var(--hover-shadow-medium);
+}
+
+.hover-shadow-strong:hover {
+    box-shadow: var(--hover-shadow-strong);
+}
+
+.hover-bg:hover {
+    background-color: var(--hover-bg-medium);
+}
+
+.hover-primary:hover {
+    color: var(--primary-color);
+}
+
+.hover-scale:hover {
+    transform: scale(1.05);
+}
+
+.hover-brightness:hover {
+    filter: brightness(1.1);
+}
+
+/* ===================================================================
+   ANIMATION UTILITIES
+   =================================================================== */
+
+/* Smooth all transitions */
+.smooth-transition {
+    transition: var(--hover-transition-smooth);
+}
+
+/* Quick transitions for responsive feel */
+.quick-transition {
+    transition: var(--hover-transition-fast);
+}
+
+/* Disable transitions on request */
+.no-transition {
+    transition: none !important;
+}
+
+/* ===================================================================
+   DARK MODE ADJUSTMENTS (if applicable)
+   =================================================================== */
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --hover-bg-light: rgba(102, 126, 234, 0.1);
+        --hover-bg-medium: rgba(102, 126, 234, 0.2);
+        --hover-bg-strong: rgba(102, 126, 234, 0.3);
+    }
+}

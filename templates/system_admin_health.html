@@ -1,359 +1,500 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container">
-    <div class="header-section">
-        <h1>🏥 System Health Check</h1>
-        <p class="subtitle">System diagnostics and event monitoring</p>
-        <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
-    </div>
-
-    <!-- System Health Status -->
-    <div class="health-status-section">
-        <h2>🔍 System Status</h2>
-        <div class="health-cards">
-            <div class="health-card {% if health_summary.health_status == 'healthy' %}healthy{% elif health_summary.health_status == 'issues' %}warning{% else %}critical{% endif %}">
-                <div class="health-icon">
-                    {% if health_summary.health_status == 'healthy' %}
-                        ✅
-                    {% elif health_summary.health_status == 'issues' %}
-                        ⚠️
-                    {% else %}
-                        ❌
-                    {% endif %}
-                </div>
-                <div class="health-info">
-                    <h3>Overall Health</h3>
-                    <p class="health-status">{{ health_summary.health_status|title }}</p>
-                    <small>
-                        {% if health_summary.health_status == 'healthy' %}
-                            All systems running normally
-                        {% elif health_summary.health_status == 'issues' %}
-                            Minor issues detected
-                        {% else %}
-                            Critical issues require attention
-                        {% endif %}
-                    </small>
-                </div>
+<div class="health-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-heart-rate-monitor"></i></span>
+                    System Health
+                </h1>
+                <p class="page-subtitle">System diagnostics and event monitoring</p>
             </div>
-
-            <div class="health-card {% if db_healthy %}healthy{% else %}critical{% endif %}">
-                <div class="health-icon">
-                    {% if db_healthy %}✅{% else %}❌{% endif %}
-                </div>
-                <div class="health-info">
-                    <h3>Database</h3>
-                    <p class="health-status">{% if db_healthy %}Connected{% else %}Error{% endif %}</p>
-                    <small>
-                        {% if db_healthy %}
-                            PostgreSQL connection active
-                        {% else %}
-                            {{ db_error }}
-                        {% endif %}
-                    </small>
-                </div>
-            </div>
-
-            <div class="health-card info">
-                <div class="health-icon">⏱️</div>
-                <div class="health-info">
-                    <h3>Uptime</h3>
-                    <p class="health-status">{{ uptime_duration.days }}d {{ uptime_duration.seconds//3600 }}h {{ (uptime_duration.seconds//60)%60 }}m</p>
-                    <small>Since first recorded event</small>
-                </div>
+            <div class="header-actions">
+                <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">
+                    <i class="ti ti-arrow-left"></i>
+                    Back to Dashboard
+                </a>
             </div>
         </div>
     </div>
 
-    <!-- Quick Stats -->
+    <!-- Health Status Cards -->
+    <div class="health-cards">
+        <div class="health-card {% if health_status == 'healthy' %}healthy{% elif health_status == 'warning' %}warning{% else %}critical{% endif %}">
+            <div class="health-icon">
+                {% if health_status == 'healthy' %}
+                    <i class="ti ti-circle-check"></i>
+                {% elif health_status == 'warning' %}
+                    <i class="ti ti-alert-triangle"></i>
+                {% else %}
+                    <i class="ti ti-circle-x"></i>
+                {% endif %}
+            </div>
+            <div class="health-content">
+                <div class="health-label">Overall Health</div>
+                <div class="health-value">{{ health_status|title }}</div>
+                <div class="health-detail">
+                    {% if health_status == 'healthy' %}
+                        All systems running normally
+                    {% elif health_status == 'warning' %}
+                        Minor issues detected
+                    {% else %}
+                        Critical issues require attention
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="health-card {% if db_healthy %}healthy{% else %}critical{% endif %}">
+            <div class="health-icon">
+                {% if db_healthy %}
+                    <i class="ti ti-database"></i>
+                {% else %}
+                    <i class="ti ti-database-off"></i>
+                {% endif %}
+            </div>
+            <div class="health-content">
+                <div class="health-label">Database</div>
+                <div class="health-value">{% if db_healthy %}Connected{% else %}Error{% endif %}</div>
+                <div class="health-detail">
+                    {% if db_healthy %}
+                        Database connection active
+                    {% else %}
+                        {{ db_error }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="health-card info">
+            <div class="health-icon">
+                <i class="ti ti-clock"></i>
+            </div>
+            <div class="health-content">
+                <div class="health-label">Uptime</div>
+                <div class="health-value">{{ uptime_duration.days }}d {{ uptime_duration.seconds//3600 }}h</div>
+                <div class="health-detail">Since first recorded event</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Statistics -->
     <div class="stats-section">
-        <h2>📊 Event Statistics</h2>
-        <div class="stats-grid">
-            <div class="stat-card {% if health_summary.errors_24h > 0 %}error{% endif %}">
-                <h3>{{ health_summary.errors_24h }}</h3>
-                <p>Errors (24h)</p>
-            </div>
-            <div class="stat-card {% if health_summary.warnings_24h > 0 %}warning{% endif %}">
-                <h3>{{ health_summary.warnings_24h }}</h3>
-                <p>Warnings (24h)</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ today_events }}</h3>
-                <p>Events Today</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ health_summary.total_events_week }}</h3>
-                <p>Events This Week</p>
-            </div>
+        <div class="stat-card {% if error_count_24h > 0 %}error{% endif %}">
+            <div class="stat-value">{{ error_count_24h }}</div>
+            <div class="stat-label">Errors (24h)</div>
+        </div>
+        <div class="stat-card {% if warning_count_24h > 0 %}warning{% endif %}">
+            <div class="stat-value">{{ warning_count_24h }}</div>
+            <div class="stat-label">Warnings (24h)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ today_events }}</div>
+            <div class="stat-label">Events Today</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_events_week }}</div>
+            <div class="stat-label">Events This Week</div>
         </div>
     </div>
 
     <!-- Recent Errors -->
     {% if errors %}
-    <div class="events-section error-section">
-        <h2>🚨 Recent Errors</h2>
-        <div class="events-list">
-            {% for error in errors %}
-            <div class="event-item error">
-                <div class="event-header">
-                    <span class="event-type">{{ error.event_type }}</span>
-                    <span class="event-time">{{ error.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+    <div class="card error-card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span class="icon"><i class="ti ti-alert-circle"></i></span>
+                Recent Errors
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="event-list">
+                {% for error in errors %}
+                <div class="event-item error">
+                    <div class="event-header">
+                        <span class="event-type">{{ error.event_type }}</span>
+                        <span class="event-time">{{ error.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                    </div>
+                    <div class="event-description">{{ error.description }}</div>
+                    <div class="event-meta">
+                        {% if error.user %}
+                            <span><i class="ti ti-user"></i> {{ error.user.username }}</span>
+                        {% endif %}
+                        {% if error.company %}
+                            <span><i class="ti ti-building"></i> {{ error.company.name }}</span>
+                        {% endif %}
+                        {% if error.ip_address %}
+                            <span><i class="ti ti-world"></i> {{ error.ip_address }}</span>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="event-description">{{ error.description }}</div>
-                {% if error.user %}
-                    <div class="event-meta">User: {{ error.user.username }}</div>
-                {% endif %}
-                {% if error.company %}
-                    <div class="event-meta">Company: {{ error.company.name }}</div>
-                {% endif %}
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
     </div>
     {% endif %}
 
     <!-- Recent Warnings -->
     {% if warnings %}
-    <div class="events-section warning-section">
-        <h2>⚠️ Recent Warnings</h2>
-        <div class="events-list">
-            {% for warning in warnings %}
-            <div class="event-item warning">
-                <div class="event-header">
-                    <span class="event-type">{{ warning.event_type }}</span>
-                    <span class="event-time">{{ warning.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+    <div class="card warning-card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span class="icon"><i class="ti ti-alert-triangle"></i></span>
+                Recent Warnings
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="event-list">
+                {% for warning in warnings %}
+                <div class="event-item warning">
+                    <div class="event-header">
+                        <span class="event-type">{{ warning.event_type }}</span>
+                        <span class="event-time">{{ warning.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                    </div>
+                    <div class="event-description">{{ warning.description }}</div>
+                    <div class="event-meta">
+                        {% if warning.user %}
+                            <span><i class="ti ti-user"></i> {{ warning.user.username }}</span>
+                        {% endif %}
+                        {% if warning.company %}
+                            <span><i class="ti ti-building"></i> {{ warning.company.name }}</span>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="event-description">{{ warning.description }}</div>
-                {% if warning.user %}
-                    <div class="event-meta">User: {{ warning.user.username }}</div>
-                {% endif %}
-                {% if warning.company %}
-                    <div class="event-meta">Company: {{ warning.company.name }}</div>
-                {% endif %}
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
     </div>
     {% endif %}
 
     <!-- System Event Log -->
-    <div class="events-section">
-        <h2>📋 System Event Log (Last 7 Days)</h2>
-        <div class="events-controls">
-            <button class="filter-btn active" data-filter="all">All Events</button>
-            <button class="filter-btn" data-filter="auth">Authentication</button>
-            <button class="filter-btn" data-filter="user_management">User Management</button>
-            <button class="filter-btn" data-filter="system">System</button>
-            <button class="filter-btn" data-filter="error">Errors</button>
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span class="icon"><i class="ti ti-clipboard-list"></i></span>
+                System Event Log
+                <span class="card-subtitle">Last 7 days</span>
+            </h2>
         </div>
-        <div class="events-list" id="eventsList">
-            {% for event in recent_events %}
-            <div class="event-item {{ event.severity }} {{ event.event_category }}" data-category="{{ event.event_category }}" data-severity="{{ event.severity }}">
-                <div class="event-header">
-                    <span class="event-type">{{ event.event_type }}</span>
-                    <span class="event-category-badge">{{ event.event_category }}</span>
-                    <span class="event-time">{{ event.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</span>
-                </div>
-                <div class="event-description">{{ event.description }}</div>
-                {% if event.user %}
-                    <div class="event-meta">User: {{ event.user.username }}</div>
-                {% endif %}
-                {% if event.company %}
-                    <div class="event-meta">Company: {{ event.company.name }}</div>
-                {% endif %}
-                {% if event.ip_address %}
-                    <div class="event-meta">IP: {{ event.ip_address }}</div>
-                {% endif %}
+        <div class="card-body">
+            <div class="event-controls">
+                <button class="filter-btn active" data-filter="all">All Events</button>
+                <button class="filter-btn" data-filter="auth">Authentication</button>
+                <button class="filter-btn" data-filter="user_management">User Management</button>
+                <button class="filter-btn" data-filter="system">System</button>
+                <button class="filter-btn" data-filter="error">Errors</button>
             </div>
-            {% endfor %}
-        </div>
-    </div>
-
-    <!-- Last Error Details -->
-    {% if health_summary.last_error %}
-    <div class="events-section error-section">
-        <h2>🔍 Last Critical Error</h2>
-        <div class="last-error-details">
-            <div class="error-card">
-                <div class="error-header">
-                    <h3>{{ health_summary.last_error.event_type }}</h3>
-                    <span class="error-time">{{ health_summary.last_error.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</span>
-                </div>
-                <div class="error-description">{{ health_summary.last_error.description }}</div>
-                {% if health_summary.last_error.event_metadata %}
-                    <div class="error-metadata">
-                        <strong>Additional Details:</strong>
-                        <pre>{{ health_summary.last_error.event_metadata }}</pre>
+            <div class="event-list" id="eventsList">
+                {% for event in recent_events %}
+                <div class="event-item {{ event.severity }}" data-category="{{ event.event_category }}" data-severity="{{ event.severity }}">
+                    <div class="event-header">
+                        <div class="event-info">
+                            <span class="event-type">{{ event.event_type }}</span>
+                            <span class="event-category">{{ event.event_category }}</span>
+                            {% if event.severity != 'info' %}
+                                <span class="severity-badge severity-{{ event.severity }}">{{ event.severity|upper }}</span>
+                            {% endif %}
+                        </div>
+                        <span class="event-time">{{ event.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</span>
                     </div>
-                {% endif %}
+                    <div class="event-description">{{ event.description }}</div>
+                    {% if event.user or event.company or event.ip_address %}
+                    <div class="event-meta">
+                        {% if event.user %}
+                            <span><i class="ti ti-user"></i> {{ event.user.username }}</span>
+                        {% endif %}
+                        {% if event.company %}
+                            <span><i class="ti ti-building"></i> {{ event.company.name }}</span>
+                        {% endif %}
+                        {% if event.ip_address %}
+                            <span><i class="ti ti-world"></i> {{ event.ip_address }}</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
             </div>
         </div>
     </div>
-    {% endif %}
 </div>
 
 <style>
-.header-section {
+/* Container */
+.health-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
     margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
-.subtitle {
-    color: #6c757d;
-    margin-bottom: 1rem;
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
 }
 
-.health-status-section {
-    margin-bottom: 2rem;
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+/* Health Cards */
 .health-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1rem;
+    gap: 1.5rem;
     margin-bottom: 2rem;
 }
 
 .health-card {
     background: white;
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 1.5rem;
     display: flex;
     align-items: center;
-    gap: 1rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    border-left: 4px solid #dee2e6;
+    gap: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid #e5e7eb;
+    transition: all 0.3s ease;
+}
+
+.health-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .health-card.healthy {
-    border-left-color: #28a745;
-    background: #f8fff9;
+    border-left-color: #10b981;
+    background: #f0fdf4;
 }
 
 .health-card.warning {
-    border-left-color: #ffc107;
-    background: #fffdf7;
+    border-left-color: #f59e0b;
+    background: #fffbeb;
 }
 
 .health-card.critical {
-    border-left-color: #dc3545;
-    background: #fff8f8;
+    border-left-color: #ef4444;
+    background: #fef2f2;
 }
 
 .health-card.info {
-    border-left-color: #17a2b8;
-    background: #f8fcfd;
+    border-left-color: #3b82f6;
+    background: #eff6ff;
 }
 
 .health-icon {
-    font-size: 2.5rem;
-    line-height: 1;
+    font-size: 3rem;
+    flex-shrink: 0;
 }
 
-.health-info h3 {
-    margin: 0 0 0.25rem 0;
-    color: #495057;
+.health-card.healthy .health-icon {
+    color: #10b981;
 }
 
-.health-status {
-    font-size: 1.1rem;
-    font-weight: 600;
-    margin: 0 0 0.25rem 0;
+.health-card.warning .health-icon {
+    color: #f59e0b;
 }
 
-.health-card.healthy .health-status {
-    color: #28a745;
+.health-card.critical .health-icon {
+    color: #ef4444;
 }
 
-.health-card.warning .health-status {
-    color: #ffc107;
+.health-card.info .health-icon {
+    color: #3b82f6;
 }
 
-.health-card.critical .health-status {
-    color: #dc3545;
+.health-content {
+    flex: 1;
 }
 
-.health-card.info .health-status {
-    color: #17a2b8;
-}
-
-.health-info small {
-    color: #6c757d;
+.health-label {
     font-size: 0.875rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
 }
 
+.health-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.health-card.healthy .health-value {
+    color: #059669;
+}
+
+.health-card.warning .health-value {
+    color: #d97706;
+}
+
+.health-card.critical .health-value {
+    color: #dc2626;
+}
+
+.health-card.info .health-value {
+    color: #2563eb;
+}
+
+.health-detail {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* Stats Section */
 .stats-section {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-}
-
-.stats-section h2 {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    color: #495057;
-}
-
-.stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
 }
 
 .stat-card {
     background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
     padding: 1.5rem;
+    border-radius: 12px;
     text-align: center;
-    border-left: 4px solid #dee2e6;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+    border-left: 4px solid #e5e7eb;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .stat-card.error {
-    border-left-color: #dc3545;
-    background: #fff8f8;
+    border-left-color: #ef4444;
+    background: #fef2f2;
 }
 
 .stat-card.warning {
-    border-left-color: #ffc107;
-    background: #fffdf7;
+    border-left-color: #f59e0b;
+    background: #fffbeb;
 }
 
-.stat-card h3 {
-    font-size: 2rem;
-    margin: 0 0 0.5rem 0;
-    color: #007bff;
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #667eea;
 }
 
-.stat-card.error h3 {
-    color: #dc3545;
+.stat-card.error .stat-value {
+    color: #dc2626;
 }
 
-.stat-card.warning h3 {
-    color: #ffc107;
+.stat-card.warning .stat-value {
+    color: #d97706;
 }
 
-.stat-card p {
-    margin: 0;
-    color: #6c757d;
-    font-weight: 500;
+.stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
 }
 
-.events-section {
+/* Cards */
+.card {
     background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-}
-
-.events-section h2 {
-    margin-top: 0;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
     margin-bottom: 1.5rem;
-    color: #495057;
+    overflow: hidden;
+    transition: all 0.3s ease;
 }
 
-.events-controls {
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.card.error-card {
+    border-left: 4px solid #ef4444;
+}
+
+.card.warning-card {
+    border-left: 4px solid #f59e0b;
+}
+
+.card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-title .icon {
+    font-size: 1.5rem;
+}
+
+.card-subtitle {
+    font-size: 0.875rem;
+    color: #6b7280;
+    font-weight: 400;
+    margin-left: auto;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Event Controls */
+.event-controls {
     display: flex;
     gap: 0.5rem;
     margin-bottom: 1.5rem;
@@ -362,53 +503,62 @@
 
 .filter-btn {
     padding: 0.5rem 1rem;
-    border: 1px solid #dee2e6;
+    border: 1px solid #e5e7eb;
     background: white;
-    color: #495057;
-    border-radius: 4px;
+    color: #6b7280;
+    border-radius: 8px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     font-weight: 500;
+    font-size: 0.875rem;
 }
 
 .filter-btn:hover {
-    background: #f8f9fa;
-    border-color: #adb5bd;
-    color: #212529;
+    background: #f3f4f6;
+    border-color: #667eea;
+    color: #667eea;
 }
 
 .filter-btn.active {
-    background: #007bff;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    border-color: #007bff;
+    border-color: transparent;
 }
 
-.events-list {
+/* Event List */
+.event-list {
     max-height: 600px;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
 .event-item {
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
+    background: #f8f9fa;
+    border-radius: 8px;
     padding: 1rem;
-    margin-bottom: 0.5rem;
-    background: white;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+}
+
+.event-item:hover {
+    background: #f3f4f6;
 }
 
 .event-item.error {
-    border-left: 4px solid #dc3545;
-    background: #fff8f8;
+    border-left: 4px solid #ef4444;
+    background: #fef2f2;
 }
 
 .event-item.warning {
-    border-left: 4px solid #ffc107;
-    background: #fffdf7;
+    border-left: 4px solid #f59e0b;
+    background: #fffbeb;
 }
 
 .event-item.critical {
-    border-left: 4px solid #dc3545;
-    background: #fff5f5;
+    border-left: 4px solid #dc2626;
+    background: #fee2e2;
 }
 
 .event-header {
@@ -420,101 +570,119 @@
     gap: 0.5rem;
 }
 
-.event-type {
-    font-weight: 600;
-    color: #495057;
+.event-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-.event-category-badge {
-    background: #e9ecef;
-    color: #495057;
+.event-type {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.event-category {
+    background: #e5e7eb;
+    color: #6b7280;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.75rem;
     text-transform: uppercase;
 }
 
+.severity-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.severity-warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.severity-error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.severity-critical {
+    background: #dc2626;
+    color: white;
+}
+
 .event-time {
-    color: #6c757d;
+    color: #6b7280;
     font-size: 0.875rem;
 }
 
 .event-description {
+    color: #4b5563;
     margin-bottom: 0.5rem;
-    color: #495057;
 }
 
 .event-meta {
-    font-size: 0.875rem;
-    color: #6c757d;
-    margin-bottom: 0.25rem;
-}
-
-.error-section {
-    border-left: 4px solid #dc3545;
-}
-
-.warning-section {
-    border-left: 4px solid #ffc107;
-}
-
-.last-error-details {
-    background: #fff8f8;
-    border: 1px solid #f5c6cb;
-    border-radius: 6px;
-    padding: 1rem;
-}
-
-.error-card {
-    background: white;
-    border-radius: 6px;
-    padding: 1rem;
-}
-
-.error-header {
     display: flex;
-    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.event-meta span {
+    display: flex;
     align-items: center;
-    margin-bottom: 0.5rem;
+    gap: 0.25rem;
 }
 
-.error-header h3 {
-    margin: 0;
-    color: #dc3545;
-}
-
-.error-time {
-    color: #6c757d;
+.event-meta i {
     font-size: 0.875rem;
 }
 
-.error-description {
-    margin-bottom: 0.5rem;
-    color: #495057;
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
 }
 
-.error-metadata {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    padding: 0.5rem;
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid rgba(255, 255, 255, 0.3);
 }
 
-.error-metadata pre {
-    margin: 0.5rem 0 0 0;
-    font-size: 0.875rem;
-    white-space: pre-wrap;
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Button styles now centralized in main style.css */
-
+/* Responsive Design */
 @media (max-width: 768px) {
-    .health-cards {
-        grid-template-columns: 1fr;
+    .health-container {
+        padding: 1rem;
     }
     
-    .stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .health-cards {
+        grid-template-columns: 1fr;
     }
     
     .event-header {
@@ -522,10 +690,35 @@
         align-items: flex-start;
     }
     
-    .events-controls {
+    .event-controls {
         flex-direction: column;
     }
+    
+    .filter-btn {
+        width: 100%;
+    }
 }
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: slideIn 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+.card:nth-child(1) { animation-delay: 0.1s; }
+.card:nth-child(2) { animation-delay: 0.2s; }
+.card:nth-child(3) { animation-delay: 0.3s; }
 </style>
 
 <script>
@@ -547,7 +740,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (filter === 'all') {
                     item.style.display = 'block';
                 } else if (filter === 'error') {
-                    item.style.display = item.classList.contains('error') || item.classList.contains('critical') ? 'block' : 'none';
+                    item.style.display = (item.classList.contains('error') || item.classList.contains('critical')) ? 'block' : 'none';
                 } else {
                     item.style.display = item.dataset.category === filter ? 'block' : 'none';
                 }

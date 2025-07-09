@@ -1,19 +1,35 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="content-header">
-    <div class="header-row">
-        <h1>System Announcements</h1>
-        <a href="{{ url_for('announcements.create') }}" class="btn btn-md btn-primary">
-            <i class="icon">➕</i> New Announcement
-        </a>
+<div class="announcements-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-speakerphone"></i></span>
+                    System Announcements
+                </h1>
+                <p class="page-subtitle">Manage system-wide announcements and notifications</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">
+                    <i class="ti ti-arrow-left"></i>
+                    Back to Dashboard
+                </a>
+                <a href="{{ url_for('announcements.create') }}" class="btn btn-primary">
+                    <i class="ti ti-plus"></i>
+                    New Announcement
+                </a>
+            </div>
+        </div>
     </div>
-</div>
 
-<div class="content-body">
+    <!-- Announcements Table -->
     {% if announcements.items %}
-        <div class="table-container">
-            <table class="data-table">
+    <div class="card">
+        <div class="card-body no-padding">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>Title</th>
@@ -28,62 +44,72 @@
                 </thead>
                 <tbody>
                     {% for announcement in announcements.items %}
-                    <tr class="{% if not announcement.is_active %}inactive{% endif %}">
+                    <tr class="{% if not announcement.is_active %}inactive-row{% endif %}">
                         <td>
-                            <strong>{{ announcement.title }}</strong>
-                            {% if announcement.is_urgent %}
-                                <span class="badge badge-danger">URGENT</span>
-                            {% endif %}
+                            <div class="announcement-title">
+                                <strong>{{ announcement.title }}</strong>
+                                {% if announcement.is_urgent %}
+                                    <span class="badge badge-urgent">URGENT</span>
+                                {% endif %}
+                            </div>
                         </td>
                         <td>
-                            <span class="badge badge-{{ announcement.announcement_type }}">
+                            <span class="type-badge type-{{ announcement.announcement_type }}">
                                 {{ announcement.announcement_type.title() }}
                             </span>
                         </td>
                         <td>
                             {% if announcement.is_active %}
                                 {% if announcement.is_visible_now() %}
-                                    <span class="badge badge-success">Active</span>
+                                    <span class="status-badge status-active">Active</span>
                                 {% else %}
-                                    <span class="badge badge-warning">Scheduled</span>
+                                    <span class="status-badge status-scheduled">Scheduled</span>
                                 {% endif %}
                             {% else %}
-                                <span class="badge badge-secondary">Inactive</span>
+                                <span class="status-badge status-inactive">Inactive</span>
                             {% endif %}
                         </td>
                         <td>
                             {% if announcement.start_date %}
-                                {{ announcement.start_date.strftime('%Y-%m-%d %H:%M') }}
+                                <span class="date-text">{{ announcement.start_date.strftime('%Y-%m-%d %H:%M') }}</span>
                             {% else %}
-                                <em>Immediate</em>
+                                <em class="text-muted">Immediate</em>
                             {% endif %}
                         </td>
                         <td>
                             {% if announcement.end_date %}
-                                {{ announcement.end_date.strftime('%Y-%m-%d %H:%M') }}
+                                <span class="date-text">{{ announcement.end_date.strftime('%Y-%m-%d %H:%M') }}</span>
                             {% else %}
-                                <em>No expiry</em>
+                                <em class="text-muted">No expiry</em>
                             {% endif %}
                         </td>
                         <td>
                             {% if announcement.target_all_users %}
-                                All Users
+                                <span class="target-badge target-all">
+                                    <i class="ti ti-users"></i>
+                                    All Users
+                                </span>
                             {% else %}
-                                <span class="text-muted">Targeted</span>
+                                <span class="target-badge target-specific">
+                                    <i class="ti ti-target"></i>
+                                    Targeted
+                                </span>
                             {% endif %}
                         </td>
-                        <td>{{ announcement.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            <span class="date-text">{{ announcement.created_at.strftime('%Y-%m-%d') }}</span>
+                        </td>
                         <td>
                             <div class="action-buttons">
                                 <a href="{{ url_for('announcements.edit', id=announcement.id) }}" 
-                                   class="btn btn-sm btn-outline-primary" title="Edit">
-                                    ✏️
+                                   class="btn-icon" title="Edit">
+                                    <i class="ti ti-pencil"></i>
                                 </a>
                                 <form method="POST" action="{{ url_for('announcements.delete', id=announcement.id) }}" 
                                       style="display: inline-block;" 
                                       onsubmit="return confirm('Are you sure you want to delete this announcement?')">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                        🗑️
+                                    <button type="submit" class="btn-icon danger" title="Delete">
+                                        <i class="ti ti-trash"></i>
                                     </button>
                                 </form>
                             </div>
@@ -93,15 +119,20 @@
                 </tbody>
             </table>
         </div>
+    </div>
 
-        <!-- Pagination -->
-        {% if announcements.pages > 1 %}
-        <div class="pagination-container">
-            <div class="pagination">
-                {% if announcements.has_prev %}
-                    <a href="{{ url_for('announcements.index', page=announcements.prev_num) }}" class="page-link">« Previous</a>
-                {% endif %}
-                
+    <!-- Pagination -->
+    {% if announcements.pages > 1 %}
+    <div class="pagination-container">
+        <div class="pagination">
+            {% if announcements.has_prev %}
+                <a href="{{ url_for('announcements.index', page=announcements.prev_num) }}" class="page-link">
+                    <i class="ti ti-chevron-left"></i>
+                    Previous
+                </a>
+            {% endif %}
+            
+            <div class="page-numbers">
                 {% for page_num in announcements.iter_pages() %}
                     {% if page_num %}
                         {% if page_num != announcements.page %}
@@ -110,56 +141,452 @@
                             <span class="page-link current">{{ page_num }}</span>
                         {% endif %}
                     {% else %}
-                        <span class="page-link">…</span>
+                        <span class="page-dots">...</span>
                     {% endif %}
                 {% endfor %}
-                
-                {% if announcements.has_next %}
-                    <a href="{{ url_for('announcements.index', page=announcements.next_num) }}" class="page-link">Next »</a>
-                {% endif %}
             </div>
+            
+            {% if announcements.has_next %}
+                <a href="{{ url_for('announcements.index', page=announcements.next_num) }}" class="page-link">
+                    Next
+                    <i class="ti ti-chevron-right"></i>
+                </a>
+            {% endif %}
         </div>
-        {% endif %}
+        
+        <div class="pagination-info">
+            Showing {{ announcements.per_page * (announcements.page - 1) + 1 }} - 
+            {{ announcements.per_page * (announcements.page - 1) + announcements.items|length }} of {{ announcements.total }} announcements
+        </div>
+    </div>
+    {% endif %}
 
     {% else %}
-        <div class="empty-state">
-            <h3>No announcements found</h3>
-            <p>Create your first announcement to communicate with users.</p>
-            <a href="{{ url_for('announcements.create') }}" class="btn btn-primary">
-                Create Announcement
-            </a>
-        </div>
+    <!-- Empty State -->
+    <div class="empty-state">
+        <div class="empty-icon"><i class="ti ti-speakerphone"></i></div>
+        <h3 class="empty-title">No announcements found</h3>
+        <p class="empty-message">Create your first announcement to communicate with users.</p>
+        <a href="{{ url_for('announcements.create') }}" class="btn btn-primary">
+            <i class="ti ti-plus"></i>
+            Create Announcement
+        </a>
+    </div>
     {% endif %}
 </div>
 
 <style>
-.inactive {
+/* Container */
+.announcements-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+/* Cards */
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.card-body.no-padding {
+    padding: 0;
+}
+
+/* Table */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+.table th,
+.table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.8rem;
+}
+
+.table tr:hover {
+    background: #f8f9fa;
+}
+
+.inactive-row {
     opacity: 0.6;
 }
 
-.badge {
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.75em;
-    font-weight: bold;
-    text-transform: uppercase;
+/* Announcement Title */
+.announcement-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-.badge-info { background: #17a2b8; color: white; }
-.badge-warning { background: #ffc107; color: #212529; }
-.badge-success { background: #28a745; color: white; }
-.badge-danger { background: #dc3545; color: white; }
-.badge-secondary { background: #6c757d; color: white; }
+/* Badges */
+.badge,
+.status-badge,
+.type-badge,
+.target-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
 
+.badge-urgent {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Type Badges */
+.type-info {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.type-warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.type-success {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.type-danger {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Status Badges */
+.status-active {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-scheduled {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-inactive {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+/* Target Badges */
+.target-badge {
+    font-size: 0.875rem;
+}
+
+.target-all {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.target-specific {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+/* Date Text */
+.date-text {
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.text-muted {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* Action Buttons */
 .action-buttons {
     display: flex;
-    gap: 5px;
+    gap: 0.5rem;
 }
 
+.btn-icon {
+    color: #6b7280;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.btn-icon:hover {
+    background: #667eea;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-icon.danger:hover {
+    background: #dc2626;
+}
+
+/* Pagination */
+.pagination-container {
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.page-numbers {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.page-link {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e5e7eb;
+    color: #667eea;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.page-link:hover {
+    background: #f3f4f6;
+    border-color: #667eea;
+}
+
+.page-link.current {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+}
+
+.page-dots {
+    padding: 0.5rem;
+    color: #6b7280;
+}
+
+.pagination-info {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+/* Empty State */
 .empty-state {
     text-align: center;
-    padding: 3rem;
-    color: #6c757d;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
 }
+
+.empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1.5rem;
+    opacity: 0.3;
+}
+
+.empty-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.empty-message {
+    font-size: 1.1rem;
+    color: #6b7280;
+    margin-bottom: 2rem;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .announcements-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .header-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+    
+    .table {
+        font-size: 0.8rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.5rem;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .pagination-container {
+        flex-direction: column;
+    }
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: slideIn 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+.card:nth-child(1) { animation-delay: 0.1s; }
+.card:nth-child(2) { animation-delay: 0.2s; }
+.card:nth-child(3) { animation-delay: 0.3s; }
 </style>
 {% endblock %}

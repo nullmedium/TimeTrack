@@ -1,0 +1,642 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="notes-folders-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-folder"></i></span>
+                    Note Folders
+                </h1>
+                <p class="page-subtitle">Organize your notes with folders</p>
+            </div>
+            <div class="header-actions">
+                <button type="button" class="btn btn-success" onclick="showCreateFolderModal()">
+                    <span class="icon"><i class="ti ti-plus"></i></span>
+                    Create Folder
+                </button>
+                <a href="{{ url_for('notes.notes_list') }}" class="btn btn-secondary">
+                    <span class="icon"><i class="ti ti-arrow-left"></i></span>
+                    Back to Notes
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="folders-layout">
+        <!-- Folder Tree -->
+        <div class="folder-tree-panel">
+            <h3>Folder Structure</h3>
+            <div class="folder-tree" id="folder-tree">
+                {{ render_folder_tree(folder_tree)|safe }}
+            </div>
+        </div>
+
+        <!-- Folder Details -->
+        <div class="folder-details-panel">
+            <div id="folder-info">
+                <p class="text-muted">Select a folder to view details</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Folder Modal -->
+<div class="modal" id="folderModal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">Create New Folder</h3>
+            <button type="button" class="close-btn" onclick="closeFolderModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="folderForm">
+                <div class="form-group">
+                    <label for="folderName">Folder Name</label>
+                    <input type="text" id="folderName" name="name" class="form-control" required 
+                           placeholder="e.g., Projects, Meeting Notes">
+                </div>
+                <div class="form-group">
+                    <label for="parentFolder">Parent Folder</label>
+                    <select id="parentFolder" name="parent" class="form-control">
+                        <option value="">Root (Top Level)</option>
+                        {% for folder in all_folders %}
+                        <option value="{{ folder }}">{{ folder }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="folderDescription">Description (Optional)</label>
+                    <textarea id="folderDescription" name="description" class="form-control" 
+                              rows="3" placeholder="What kind of notes will go in this folder?"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeFolderModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveFolder()">Save Folder</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.notes-folders-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Page Header - Time Tracking style */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Button styles */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+    border: none;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border-color: #e5e7eb;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #667eea;
+}
+
+.btn .icon {
+    font-size: 1.1em;
+}
+
+.folders-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 2rem;
+    min-height: 600px;
+}
+
+.folder-tree-panel,
+.folder-details-panel {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.folder-tree-panel h3,
+.folder-details-panel h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    color: #333;
+}
+
+/* Folder Tree Styles */
+.folder-tree {
+    font-size: 0.95rem;
+}
+
+.folder-item {
+    position: relative;
+    margin: 0.25rem 0;
+}
+
+.folder-item.has-children > .folder-content::before {
+    content: "▶";
+    position: absolute;
+    left: -15px;
+    transition: transform 0.2s;
+    cursor: pointer;
+}
+
+.folder-item.has-children.expanded > .folder-content::before {
+    transform: rotate(90deg);
+}
+
+.folder-content {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    margin-left: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.folder-content:hover {
+    background: #f8f9fa;
+}
+
+.folder-content.selected {
+    background: #e3f2fd;
+    font-weight: 500;
+}
+
+.folder-icon {
+    margin-right: 0.5rem;
+}
+
+.folder-name {
+    flex: 1;
+}
+
+.folder-count {
+    font-size: 0.85rem;
+    color: #666;
+    margin-left: 0.5rem;
+}
+
+.folder-children {
+    margin-left: 1.5rem;
+    display: none;
+}
+
+.folder-item.expanded > .folder-children {
+    display: block;
+}
+
+/* Folder Details */
+.folder-details {
+    padding: 1rem;
+}
+
+.folder-details h4 {
+    margin-top: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.folder-path {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 1rem;
+    font-family: monospace;
+    background: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 4px;
+}
+
+.folder-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.stat-box {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+
+.folder-actions {
+    margin-top: 2rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.notes-preview {
+    margin-top: 2rem;
+}
+
+.notes-preview h5 {
+    margin-bottom: 1rem;
+    color: #333;
+}
+
+.note-preview-item {
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    transition: background 0.2s;
+}
+
+.note-preview-item:hover {
+    background: #e9ecef;
+}
+
+.note-preview-title {
+    font-weight: 500;
+    color: #333;
+    text-decoration: none;
+    display: block;
+}
+
+.note-preview-date {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    width: 90%;
+    max-width: 500px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    color: #333;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .folders-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .folder-tree-panel {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+}
+</style>
+
+<script>
+let selectedFolder = null;
+
+function selectFolder(folderPath) {
+    // Remove previous selection
+    document.querySelectorAll('.folder-content').forEach(el => {
+        el.classList.remove('selected');
+    });
+    
+    // Add selection to clicked folder
+    event.currentTarget.classList.add('selected');
+    selectedFolder = folderPath;
+    
+    // Load folder details
+    loadFolderDetails(folderPath);
+}
+
+function toggleFolder(event, folderPath) {
+    event.stopPropagation();
+    const folderItem = event.currentTarget.closest('.folder-item');
+    folderItem.classList.toggle('expanded');
+}
+
+function loadFolderDetails(folderPath) {
+    fetch(`/api/notes/folder-details?path=${encodeURIComponent(folderPath)}`)
+        .then(response => response.json())
+        .then(data => {
+            const detailsHtml = `
+                <div class="folder-details">
+                    <h4><span class="folder-icon"><i class="ti ti-folder"></i></span> ${data.name}</h4>
+                    <div class="folder-path">${data.path}</div>
+                    
+                    <div class="folder-stats">
+                        <div class="stat-box">
+                            <div class="stat-value">${data.note_count}</div>
+                            <div class="stat-label">Notes</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${data.subfolder_count}</div>
+                            <div class="stat-label">Subfolders</div>
+                        </div>
+                    </div>
+                    
+                    <div class="folder-actions">
+                        <a href="/notes?folder=${encodeURIComponent(data.path)}" class="btn btn-sm btn-primary">
+                            View Notes
+                        </a>
+                        <button type="button" class="btn btn-sm btn-info" onclick="editFolder('${data.path}')">
+                            Rename
+                        </button>
+                        ${data.note_count === 0 && data.subfolder_count === 0 ? 
+                            `<button type="button" class="btn btn-sm btn-danger" onclick="deleteFolder('${data.path}')">
+                                Delete
+                            </button>` : ''}
+                    </div>
+                    
+                    ${data.recent_notes.length > 0 ? `
+                        <div class="notes-preview">
+                            <h5>Recent Notes</h5>
+                            ${data.recent_notes.map(note => `
+                                <div class="note-preview-item">
+                                    <a href="/notes/${note.slug}" class="note-preview-title">${note.title}</a>
+                                    <div class="note-preview-date">${note.updated_at}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            document.getElementById('folder-info').innerHTML = detailsHtml;
+        })
+        .catch(error => {
+            console.error('Error loading folder details:', error);
+        });
+}
+
+function showCreateFolderModal() {
+    document.getElementById('modalTitle').textContent = 'Create New Folder';
+    document.getElementById('folderForm').reset();
+    document.getElementById('folderModal').style.display = 'flex';
+}
+
+function closeFolderModal() {
+    document.getElementById('folderModal').style.display = 'none';
+}
+
+function saveFolder() {
+    const formData = new FormData(document.getElementById('folderForm'));
+    const data = {
+        name: formData.get('name'),
+        parent: formData.get('parent'),
+        description: formData.get('description')
+    };
+    
+    // Check if we're editing or creating
+    const modalTitle = document.getElementById('modalTitle').textContent;
+    const isEditing = modalTitle.includes('Edit');
+    
+    if (isEditing && selectedFolder) {
+        // Rename folder
+        fetch('/api/notes/folders', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                old_path: selectedFolder,
+                new_name: data.name
+            })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert(result.message);
+                window.location.reload();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error renaming folder');
+        });
+    } else {
+        // Create new folder
+        fetch('/api/notes/folders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert(result.message);
+                window.location.reload();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error creating folder');
+        });
+    }
+}
+
+function editFolder(folderPath) {
+    const parts = folderPath.split('/');
+    const folderName = parts[parts.length - 1];
+    const parentPath = parts.slice(0, -1).join('/');
+    
+    document.getElementById('modalTitle').textContent = 'Edit Folder';
+    document.getElementById('folderName').value = folderName;
+    document.getElementById('parentFolder').value = parentPath;
+    document.getElementById('folderModal').style.display = 'flex';
+}
+
+function deleteFolder(folderPath) {
+    if (confirm(`Are you sure you want to delete the folder "${folderPath}"? This cannot be undone.`)) {
+        fetch(`/api/notes/folders?path=${encodeURIComponent(folderPath)}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert(result.message);
+                window.location.reload();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting folder');
+        });
+    }
+}
+
+// Close modal when clicking outside
+document.getElementById('folderModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeFolderModal();
+    }
+});
+</script>
+
+{% endblock %}
+
+{% macro render_folder_tree(tree, level=0) %}
+    {% for folder, children in tree.items() %}
+        <div class="folder-item {% if children %}has-children{% endif %}" data-folder="{{ folder }}">
+            <div class="folder-content" onclick="selectFolder('{{ folder }}')">
+                {% if children %}
+                    <span onclick="toggleFolder(event, '{{ folder }}')" style="position: absolute; left: -15px; cursor: pointer;">▶</span>
+                {% endif %}
+                <span class="folder-icon"><i class="ti ti-folder"></i></span>
+                <span class="folder-name">{{ folder.split('/')[-1] }}</span>
+                <span class="folder-count">({{ folder_counts.get(folder, 0) }})</span>
+            </div>
+            {% if children %}
+                <div class="folder-children">
+                    {{ render_folder_tree(children, level + 1)|safe }}
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+{% endmacro %}

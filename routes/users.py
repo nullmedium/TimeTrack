@@ -38,9 +38,8 @@ def get_available_roles():
 @admin_required
 @company_required
 def admin_users():
-    user_repo = UserRepository()
-    users = user_repo.get_by_company(g.user.company_id)
-    return render_template('admin_users.html', title='User Management', users=users)
+    # Redirect to the new unified organization management page
+    return redirect(url_for('organization.admin_organization'))
 
 
 @users_bp.route('/create', methods=['GET', 'POST'])

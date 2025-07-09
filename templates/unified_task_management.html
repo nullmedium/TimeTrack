@@ -1,51 +1,67 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="management-container task-management-container">
+<div class="page-container">
     <!-- Header Section -->
-    <div class="management-header task-header">
-        <h1>📋 Task Management</h1>
-        <div class="management-controls task-controls">
-            <!-- Smart Search -->
-            <div class="smart-search-container">
-                <div class="smart-search-box">
-                    <input type="text" id="smart-search-input" class="smart-search-input" placeholder="Search tasks... (e.g., my-tasks priority:high, project:TimeTrack, overdue)">
-                    <button type="button" class="smart-search-clear" id="smart-search-clear" title="Clear search">×</button>
-                </div>
-                <div class="smart-search-suggestions" id="smart-search-suggestions" style="display: none;">
-                    <!-- Suggestions will be populated here -->
-                </div>
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-clipboard-list"></i></span>
+                    Task Management
+                </h1>
+                <p class="page-subtitle">Manage and track all tasks across projects</p>
             </div>
-            
-            <!-- Actions -->
-            <div class="management-actions task-actions">
-                <button id="add-task-btn" class="btn btn-primary">+ Add Task</button>
-                <button id="refresh-tasks" class="btn btn-secondary">🔄 Refresh</button>
-                <button id="toggle-archived" class="btn btn-outline" title="Show/Hide Archived Tasks">📦 Show Archived</button>
+            <div class="header-actions">
+                <button id="refresh-tasks" class="btn btn-secondary">
+                    <i class="ti ti-refresh"></i>
+                    Refresh
+                </button>
+                <button id="toggle-archived" class="btn btn-outline" title="Show/Hide Archived Tasks">
+                    <i class="ti ti-archive"></i>
+                    Show Archived
+                </button>
+                <button id="add-task-btn" class="btn btn-primary">
+                    <i class="ti ti-plus"></i>
+                    Add Task
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="search-section">
+        <div class="smart-search-container">
+            <div class="smart-search-box">
+                <input type="text" id="smart-search-input" class="smart-search-input" placeholder="Search tasks... (e.g., my-tasks priority:high, project:TimeTrack, overdue)">
+                <button type="button" class="smart-search-clear" id="smart-search-clear" title="Clear search"><i class="ti ti-x"></i></button>
+            </div>
+            <div class="smart-search-suggestions" id="smart-search-suggestions" style="display: none;">
+                <!-- Suggestions will be populated here -->
             </div>
         </div>
     </div>
 
     <!-- Task Statistics -->
-    <div class="management-stats task-stats">
+    <div class="stats-section">
         <div class="stat-card">
-            <div class="stat-number" id="total-tasks">0</div>
+            <div class="stat-value" id="total-tasks">0</div>
             <div class="stat-label">Total Tasks</div>
         </div>
         <div class="stat-card">
-            <div class="stat-number" id="completed-tasks">0</div>
+            <div class="stat-value" id="completed-tasks">0</div>
             <div class="stat-label">Completed</div>
         </div>
         <div class="stat-card">
-            <div class="stat-number" id="in-progress-tasks">0</div>
+            <div class="stat-value" id="in-progress-tasks">0</div>
             <div class="stat-label">In Progress</div>
         </div>
         <div class="stat-card">
-            <div class="stat-number" id="overdue-tasks">0</div>
+            <div class="stat-value" id="overdue-tasks">0</div>
             <div class="stat-label">Overdue</div>
         </div>
         <div class="stat-card" id="archived-stat-card" style="display: none;">
-            <div class="stat-number" id="archived-tasks">0</div>
+            <div class="stat-value" id="archived-tasks">0</div>
             <div class="stat-label">Archived</div>
         </div>
     </div>
@@ -54,7 +70,7 @@
     <div class="task-board" id="task-board">
         <div class="task-column" data-status="TODO">
             <div class="column-header">
-                <h3>📝 To Do</h3>
+                <h3><i class="ti ti-circle"></i> To Do</h3>
                 <span class="task-count">0</span>
             </div>
             <div class="column-content" id="column-TODO">
@@ -64,7 +80,7 @@
         
         <div class="task-column" data-status="IN_PROGRESS">
             <div class="column-header">
-                <h3>⚡ In Progress</h3>
+                <h3><i class="ti ti-player-play"></i> In Progress</h3>
                 <span class="task-count">0</span>
             </div>
             <div class="column-content" id="column-IN_PROGRESS">
@@ -74,7 +90,7 @@
         
         <div class="task-column" data-status="IN_REVIEW">
             <div class="column-header">
-                <h3>🔍 In Review</h3>
+                <h3><i class="ti ti-eye"></i> In Review</h3>
                 <span class="task-count">0</span>
             </div>
             <div class="column-content" id="column-IN_REVIEW">
@@ -84,7 +100,7 @@
         
         <div class="task-column" data-status="DONE">
             <div class="column-header">
-                <h3>✅ Done</h3>
+                <h3><i class="ti ti-circle-check"></i> Done</h3>
                 <span class="task-count">0</span>
             </div>
             <div class="column-content" id="column-DONE">
@@ -94,7 +110,7 @@
         
         <div class="task-column" data-status="CANCELLED">
             <div class="column-header">
-                <h3>❌ Cancelled</h3>
+                <h3><i class="ti ti-circle-x"></i> Cancelled</h3>
                 <span class="task-count">0</span>
             </div>
             <div class="column-content" id="column-CANCELLED">
@@ -104,7 +120,7 @@
         
         <div class="task-column archived-column" data-status="ARCHIVED" style="display: none;">
             <div class="column-header">
-                <h3>📦 Archived</h3>
+                <h3><i class="ti ti-archive"></i> Archived</h3>
                 <span class="task-count">0</span>
             </div>
             <div class="column-content" id="column-ARCHIVED">
@@ -129,12 +145,26 @@
 
 <!-- Styles -->
 <style>
+/* Header adjustments for Task Management */
+.header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Search Section */
+.search-section {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
 /* Smart Search Styles */
 .smart-search-container {
-    margin-bottom: 1rem;
     position: relative;
     width: 100%;
-    flex: 1;
 }
 
 .smart-search-box {
@@ -237,71 +267,9 @@
     font-size: 0.8rem;
 }
 
-/* Task Management Layout */
-.task-controls {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    flex-wrap: wrap;
-    width: 100%;
-}
+/* Task Management specific styles removed - using common page styles */
 
-.task-controls .smart-search-container {
-    flex: 1;
-    min-width: 300px;
-    max-width: 600px;
-    margin-bottom: 0; /* Remove margin to align with buttons */
-}
-
-.task-controls .management-actions {
-    flex-shrink: 0;
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-/* Ensure all buttons and search input have same height */
-.smart-search-input,
-.task-controls .btn {
-    height: 38px; /* Standard height for consistency */
-}
-
-.task-controls .btn {
-    padding: 0.5rem 1rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap; /* Prevent button text from wrapping */
-}
-
-/* Responsive adjustments */
-@media (max-width: 992px) {
-    .task-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .task-controls .smart-search-container {
-        max-width: 100%;
-        margin-bottom: 0.5rem;
-    }
-    
-    .task-controls .management-actions {
-        justify-content: center;
-    }
-}
-
-@media (max-width: 576px) {
-    .task-controls .management-actions {
-        flex-wrap: wrap;
-        gap: 0.25rem;
-    }
-    
-    .task-controls .btn {
-        font-size: 0.875rem;
-        padding: 0.4rem 0.8rem;
-    }
-}
+/* Responsive adjustments handled by common page styles */
 
 /* Subtask progress styles */
 .task-subtasks {
@@ -336,18 +304,6 @@
     white-space: nowrap;
 }
 
-@media (max-width: 768px) {
-    .task-controls {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.75rem;
-    }
-    
-    .task-controls .smart-search-container {
-        min-width: auto;
-        max-width: none;
-    }
-}
 
 
 
@@ -1644,13 +1600,13 @@ class UnifiedTaskManager {
         if (task.status === 'COMPLETED') {
             actionButtons = `
                 <div class="task-actions">
-                    <button class="archive-btn" onclick="taskManager.archiveTask(${task.id}); event.stopPropagation();" title="Archive Task">📦</button>
+                    <button class="archive-btn" onclick="taskManager.archiveTask(${task.id}); event.stopPropagation();" title="Archive Task"><i class="ti ti-archive"></i></button>
                 </div>
             `;
         } else if (task.status === 'ARCHIVED') {
             actionButtons = `
                 <div class="task-actions">
-                    <button class="restore-btn" onclick="taskManager.restoreTask(${task.id}); event.stopPropagation();" title="Restore Task">↩️</button>
+                    <button class="restore-btn" onclick="taskManager.restoreTask(${task.id}); event.stopPropagation();" title="Restore Task"><i class="ti ti-arrow-back-up"></i></button>
                 </div>
             `;
         }
@@ -1727,12 +1683,12 @@ class UnifiedTaskManager {
         const archivedStatCard = document.getElementById('archived-stat-card');
         
         if (this.showArchived) {
-            toggleBtn.textContent = '📦 Hide Archived';
+            toggleBtn.innerHTML = '<i class="ti ti-archive"></i> Hide Archived';
             toggleBtn.classList.add('active');
             archivedColumn.style.display = 'block';
             archivedStatCard.style.display = 'block';
         } else {
-            toggleBtn.textContent = '📦 Show Archived';
+            toggleBtn.innerHTML = '<i class="ti ti-archive"></i> Show Archived';
             toggleBtn.classList.remove('active');
             archivedColumn.style.display = 'none';
             archivedStatCard.style.display = 'none';
@@ -2141,7 +2097,7 @@ class UnifiedTaskManager {
         element.dataset.commentId = comment.id;
         
         const visibilityBadge = comment.visibility === 'Team' ? 
-            '<span class="comment-visibility-badge team">👥 Team</span>' : '';
+            '<span class="comment-visibility-badge team"><i class="ti ti-users"></i> Team</span>' : '';
         
         const editedText = comment.is_edited ? 
             ` <span class="comment-edited">(edited)</span>` : '';

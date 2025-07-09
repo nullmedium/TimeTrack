@@ -367,7 +367,8 @@ body.auth-page::after {
 }
 
 .company-code-group::before {
-    content: '🏢';
+    content: '\eebe'; /* Tabler icon building */
+    font-family: 'tabler-icons';
     position: absolute;
     left: 1rem;
     top: 2.5rem; /* Position below the label */

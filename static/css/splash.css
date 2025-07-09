@@ -9,7 +9,7 @@
 
 /* Hero Section */
 .splash-hero {
-    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     padding: 6rem 2rem;
     text-align: center;
@@ -19,6 +19,21 @@
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Add geometric pattern overlay */
+.splash-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255,255,255,0.05) 0%, transparent 50%),
+        radial-gradient(circle at 40% 20%, rgba(255,255,255,0.08) 0%, transparent 50%);
+    pointer-events: none;
 }
 
 .hero-content {
@@ -64,15 +79,35 @@
 }
 
 .btn-primary {
-    background: #4CAF50;
+    background: #667eea;
     color: white;
-    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
 }
 
 .btn-primary:hover {
-    background: #45a049;
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-primary:hover::before {
+    width: 300px;
+    height: 300px;
 }
 
 .btn-secondary {
@@ -83,7 +118,9 @@
 
 .btn-secondary:hover {
     background: white;
-    color: #2a5298;
+    color: #667eea;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 /* Floating Clock Animation */
@@ -135,7 +172,7 @@
     width: 2px;
     height: 110px;
     margin-left: -1px;
-    background: #4CAF50;
+    background: #764ba2;
     animation: rotate 60s linear infinite;
 }
 
@@ -149,8 +186,22 @@
     text-align: center;
     font-size: 2.5rem;
     margin-bottom: 3rem;
-    color: #333;
+    color: #1f2937;
     font-weight: 600;
+    position: relative;
+    padding-bottom: 1rem;
+}
+
+.section-title::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 4px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 2px;
 }
 
 .feature-cards {
@@ -168,32 +219,40 @@
     text-align: center;
     box-shadow: 0 5px 20px rgba(0,0,0,0.08);
     transition: all 0.3s ease;
+    border: 1px solid #e5e7eb;
 }
 
 .feature-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    background: linear-gradient(white, white) padding-box,
+                linear-gradient(135deg, #667eea 0%, #764ba2 100%) border-box;
 }
 
 .feature-icon {
     font-size: 3rem;
     margin-bottom: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .feature-card h3 {
     font-size: 1.5rem;
     margin-bottom: 1rem;
-    color: #333;
+    color: #1f2937;
 }
 
 .feature-card p {
-    color: #666;
+    color: #6b7280;
     line-height: 1.6;
 }
 
 /* Statistics Section */
 .statistics {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
     padding: 5rem 2rem;
     display: flex;
     justify-content: space-around;
@@ -249,7 +308,7 @@
 /* Testimonials */
 .testimonials {
     padding: 5rem 2rem;
-    background: white;
+    background: #f9fafb;
 }
 
 .testimonial-grid {
@@ -261,10 +320,20 @@
 }
 
 .testimonial-card {
-    background: #f8f9fa;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
     padding: 2rem;
     border-radius: 12px;
     text-align: center;
+    border: 1px solid rgba(102, 126, 234, 0.1);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+    transition: all 0.3s ease;
+}
+
+.testimonial-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(102, 126, 234, 0.15);
+    border-color: rgba(102, 126, 234, 0.2);
 }
 
 .stars {
@@ -275,7 +344,7 @@
 .testimonial-card p {
     font-size: 1.1rem;
     line-height: 1.6;
-    color: #555;
+    color: #4b5563;
     margin-bottom: 1.5rem;
     font-style: italic;
 }
@@ -287,18 +356,18 @@
 }
 
 .testimonial-author strong {
-    color: #333;
+    color: #1f2937;
 }
 
 .testimonial-author span {
-    color: #666;
+    color: #6b7280;
     font-size: 0.9rem;
 }
 
 /* Pricing Section */
 .pricing {
     padding: 5rem 2rem;
-    background: #f8f9fa;
+    background: #f3f4f6;
 }
 
 .pricing-cards {
@@ -317,11 +386,21 @@
     position: relative;
     box-shadow: 0 5px 20px rgba(0,0,0,0.08);
     transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.pricing-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(102, 126, 234, 0.15);
 }
 
 .pricing-card.featured {
     transform: scale(1.05);
     box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    border: 2px solid;
+    border-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%) 1;
+    background: linear-gradient(white, white) padding-box,
+                linear-gradient(135deg, #667eea 0%, #764ba2 100%) border-box;
 }
 
 .badge {
@@ -329,7 +408,7 @@
     top: -15px;
     left: 50%;
     transform: translateX(-50%);
-    background: #4CAF50;
+    background: #667eea;
     color: white;
     padding: 0.5rem 1.5rem;
     border-radius: 20px;
@@ -340,20 +419,20 @@
 .pricing-card h3 {
     font-size: 1.8rem;
     margin-bottom: 1rem;
-    color: #333;
+    color: #1f2937;
 }
 
 .price {
     font-size: 3rem;
     font-weight: 700;
-    color: #2a5298;
+    color: #667eea;
     margin-bottom: 2rem;
 }
 
 .price span {
     font-size: 1rem;
     font-weight: 400;
-    color: #666;
+    color: #6b7280;
 }
 
 .pricing-features {
@@ -364,8 +443,8 @@
 
 .pricing-features li {
     padding: 0.75rem 0;
-    color: #555;
-    border-bottom: 1px solid #eee;
+    color: #4b5563;
+    border-bottom: 1px solid #e5e7eb;
 }
 
 .pricing-features li:last-child {
@@ -375,7 +454,7 @@
 .btn-pricing {
     display: inline-block;
     padding: 1rem 2rem;
-    background: #4CAF50;
+    background: #667eea;
     color: white;
     text-decoration: none;
     border-radius: 6px;
@@ -385,21 +464,23 @@
 }
 
 .btn-pricing:hover {
-    background: #45a049;
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
     transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
 }
 
 .pricing-card.featured .btn-pricing {
-    background: #2a5298;
+    background: #764ba2;
 }
 
 .pricing-card.featured .btn-pricing:hover {
-    background: #1e3c72;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
 /* Final CTA */
 .final-cta {
-    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     padding: 5rem 2rem;
     text-align: center;
@@ -421,6 +502,99 @@
     padding: 1.25rem 3rem;
 }
 
+/* Sliding Features Banner */
+.features-banner {
+    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+    padding: 1.5rem 0;
+    overflow: hidden;
+    position: relative;
+    white-space: nowrap;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1), 0 -2px 10px rgba(0, 0, 0, 0.1);
+    margin: 3rem 0;
+}
+
+.features-banner.reverse {
+    background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
+}
+
+.features-slider {
+    width: 100%;
+    overflow: hidden;
+}
+
+.features-track {
+    display: flex;
+    animation: slide 40s linear infinite;
+}
+
+.features-banner.reverse .features-track {
+    animation: slideReverse 45s linear infinite;
+}
+
+.feature-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 3rem;
+    color: white;
+    font-size: 1rem;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.feature-item i {
+    font-size: 1.25rem;
+    color: #a78bfa;
+    text-shadow: 0 0 10px rgba(167, 139, 250, 0.5);
+    transition: all 0.3s ease;
+}
+
+.feature-item:hover i {
+    color: #c4b5fd;
+    text-shadow: 0 0 15px rgba(196, 181, 253, 0.7);
+    transform: scale(1.1);
+}
+
+.feature-item span {
+    opacity: 0.9;
+}
+
+@keyframes slide {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+@keyframes slideReverse {
+    0% {
+        transform: translateX(-50%);
+    }
+    100% {
+        transform: translateX(0);
+    }
+}
+
+/* Pause on hover */
+.features-banner:hover .features-track {
+    animation-play-state: paused;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .feature-item {
+        padding: 0 2rem;
+        font-size: 0.9rem;
+    }
+    
+    .feature-item i {
+        font-size: 1.1rem;
+    }
+}
+
 /* Animations */
 @keyframes fadeInUp {
     from {
@@ -431,6 +605,34 @@
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Add gradient animation */
+@keyframes gradientShift {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+.splash-hero {
+    background-size: 200% 200%;
+    animation: gradientShift 15s ease infinite;
+}
+
+.statistics {
+    background-size: 200% 200%;
+    animation: gradientShift 20s ease infinite;
+}
+
+.final-cta {
+    background-size: 200% 200%;
+    animation: gradientShift 18s ease infinite;
 }
 
 @keyframes float {

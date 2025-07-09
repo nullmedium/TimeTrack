@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const toggleBtn = document.createElement('button');
         toggleBtn.type = 'button';
         toggleBtn.className = 'password-toggle';
-        toggleBtn.innerHTML = '👁️';
+        toggleBtn.innerHTML = '<i class="ti ti-eye"></i>';
         toggleBtn.style.cssText = `
             position: absolute;
             right: 1rem;
@@ -120,10 +120,10 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleBtn.addEventListener('click', function() {
             if (input.type === 'password') {
                 input.type = 'text';
-                this.innerHTML = '🙈';
+                this.innerHTML = '<i class="ti ti-eye-off"></i>';
             } else {
                 input.type = 'password';
-                this.innerHTML = '👁️';
+                this.innerHTML = '<i class="ti ti-eye"></i>';
             }
         });
         

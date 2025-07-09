@@ -1,0 +1,1089 @@
+{% extends "layout.html" %}
+
+<!-- Folder tree rendering macro -->
+{% macro render_folder_tree(tree, parent_path='') %}
+    {% for folder_path, children in tree.items() %}
+        {% set folder_name = folder_path.split('/')[-1] %}
+        {% set is_active = folder_filter == folder_path %}
+        <div class="folder-item {% if is_active %}active{% endif %}" style="padding-left: {{ (folder_path.count('/') + 1) * 20 }}px;">
+            <span class="folder-icon"><i class="ti ti-folder"></i></span>
+            <a href="{{ url_for('notes.notes_list', folder=folder_path) }}" class="folder-link">
+                {{ folder_name }}
+            </a>
+            <span class="folder-count">({{ folder_counts.get(folder_path, 0) }})</span>
+        </div>
+        {% if children %}
+            {{ render_folder_tree(children, folder_path) }}
+        {% endif %}
+    {% endfor %}
+{% endmacro %}
+
+{% block content %}
+<div class="notes-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-notes"></i></span>
+                    Notes & Documentation
+                </h1>
+                <p class="page-subtitle">Organize your thoughts and documentation</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('notes.create_note') }}" class="btn btn-primary">
+                    <span class="icon"><i class="ti ti-plus"></i></span>
+                    Create New Note
+                </a>
+                <button type="button" class="btn btn-secondary" id="toggle-sidebar">
+                    <span class="icon"><i class="ti ti-folder"></i></span>
+                    Toggle Folders
+                </button>
+                <a href="{{ url_for('notes.notes_folders') }}" class="btn btn-secondary">
+                    <span class="icon"><i class="ti ti-settings"></i></span>
+                    Manage Folders
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="notes-layout">
+        <!-- Sidebar -->
+        <div class="notes-sidebar" id="notes-sidebar">
+            <!-- Search -->
+            <div class="sidebar-section">
+                <form method="GET" action="{{ url_for('notes.notes_list') }}">
+                    <div class="search-box">
+                        <input type="text" 
+                               name="search" 
+                               class="form-control" 
+                               placeholder="Search notes..."
+                               value="{{ search_query }}">
+                        <button type="submit" class="search-btn"><i class="ti ti-search"></i></button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Folders -->
+            <div class="sidebar-section">
+                <h4>Folders</h4>
+                <div class="folder-tree">
+                    <div class="folder-item {% if not folder_filter %}active{% endif %}">
+                        <span class="folder-icon"><i class="ti ti-home"></i></span>
+                        <a href="{{ url_for('notes.notes_list') }}" class="folder-link">All Notes</a>
+                        <span class="folder-count">({{ notes|length }})</span>
+                    </div>
+                    {{ render_folder_tree(folder_tree)|safe }}
+                </div>
+            </div>
+
+            <!-- Tags -->
+            <div class="sidebar-section">
+                <h4>Tags</h4>
+                {% if all_tags %}
+                <div class="tags-list">
+                    {% for tag in all_tags %}
+                    <a href="{{ url_for('notes.notes_list', tag=tag) }}" 
+                       class="tag-link {% if tag_filter == tag %}active{% endif %}">
+                        <span class="tag-icon"><i class="ti ti-tag"></i></span>
+                        {{ tag }}
+                        <span class="tag-count">({{ tag_counts.get(tag, 0) }})</span>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">No tags yet</p>
+                {% endif %}
+            </div>
+
+            <!-- Visibility Filter -->
+            <div class="sidebar-section">
+                <h4>Visibility</h4>
+                <div class="visibility-filters">
+                    <a href="{{ url_for('notes.notes_list') }}" 
+                       class="visibility-link {% if not visibility_filter %}active{% endif %}">
+                        <span><i class="ti ti-eye"></i></span> All Notes
+                    </a>
+                    <a href="{{ url_for('notes.notes_list', visibility='private') }}" 
+                       class="visibility-link {% if visibility_filter == 'private' %}active{% endif %}">
+                        <span><i class="ti ti-lock"></i></span> Private
+                    </a>
+                    <a href="{{ url_for('notes.notes_list', visibility='team') }}" 
+                       class="visibility-link {% if visibility_filter == 'team' %}active{% endif %}">
+                        <span><i class="ti ti-users"></i></span> Team
+                    </a>
+                    <a href="{{ url_for('notes.notes_list', visibility='company') }}" 
+                       class="visibility-link {% if visibility_filter == 'company' %}active{% endif %}">
+                        <span><i class="ti ti-building"></i></span> Company
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="notes-content">
+            <!-- Active Filters -->
+            {% if folder_filter or tag_filter or visibility_filter or search_query %}
+            <div class="active-filters">
+                <span>Active filters:</span>
+                {% if folder_filter %}
+                <span class="filter-tag">
+                    <i class="ti ti-folder"></i> {{ folder_filter }}
+                    <a href="{{ url_for('notes.notes_list', tag=tag_filter, visibility=visibility_filter, search=search_query) }}" class="remove-filter"><i class="ti ti-x"></i></a>
+                </span>
+                {% endif %}
+                {% if tag_filter %}
+                <span class="filter-tag">
+                    <i class="ti ti-tag"></i> {{ tag_filter }}
+                    <a href="{{ url_for('notes.notes_list', folder=folder_filter, visibility=visibility_filter, search=search_query) }}" class="remove-filter"><i class="ti ti-x"></i></a>
+                </span>
+                {% endif %}
+                {% if visibility_filter %}
+                <span class="filter-tag">
+                    <i class="ti ti-eye"></i> {{ visibility_filter|title }}
+                    <a href="{{ url_for('notes.notes_list', folder=folder_filter, tag=tag_filter, search=search_query) }}" class="remove-filter"><i class="ti ti-x"></i></a>
+                </span>
+                {% endif %}
+                {% if search_query %}
+                <span class="filter-tag">
+                    <i class="ti ti-search"></i> "{{ search_query }}"
+                    <a href="{{ url_for('notes.notes_list', folder=folder_filter, tag=tag_filter, visibility=visibility_filter) }}" class="remove-filter"><i class="ti ti-x"></i></a>
+                </span>
+                {% endif %}
+                <a href="{{ url_for('notes.notes_list') }}" class="clear-all">Clear all</a>
+            </div>
+            {% endif %}
+
+            {% if notes %}
+            <!-- View Toggle -->
+            <div class="view-controls">
+                <div class="view-toggle">
+                    <button class="toggle-btn active" data-view="grid" onclick="switchView('grid')">
+                        <span><i class="ti ti-layout-grid"></i></span> Grid
+                    </button>
+                    <button class="toggle-btn" data-view="list" onclick="switchView('list')">
+                        <span><i class="ti ti-list"></i></span> List
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grid View -->
+            <div class="notes-view grid-view active" id="grid-view">
+                <div class="notes-grid" id="notes-grid">
+                {% for note in notes %}
+                <div class="note-card {% if note.is_pinned %}pinned{% endif %}" 
+                     data-note-id="{{ note.id }}"
+                     draggable="true">
+                    <div class="note-card-header">
+                        {% if note.is_pinned %}
+                        <span class="pin-indicator" title="Pinned"><i class="ti ti-pin"></i></span>
+                        {% endif %}
+                        <span class="visibility-badge visibility-{{ note.visibility.value.lower() }}">
+                            {% if note.visibility.value == 'Private' %}<i class="ti ti-lock"></i>{% elif note.visibility.value == 'Team' %}<i class="ti ti-users"></i>{% else %}<i class="ti ti-building"></i>{% endif %}
+                            {{ note.visibility.value }}
+                        </span>
+                    </div>
+                    
+                    <h3 class="note-title">
+                        <a href="{{ url_for('notes.view_note', slug=note.slug) }}">{{ note.title }}</a>
+                    </h3>
+                    
+                    <p class="note-preview">{{ note.get_preview(150) }}</p>
+                    
+                    {% if note.tags %}
+                    <div class="note-tags">
+                        {% for tag in note.get_tags_list() %}
+                        <span class="tag-chip">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="note-footer">
+                        <span class="note-meta">
+                            <span><i class="ti ti-folder"></i></span> {{ note.folder or 'No folder' }}
+                        </span>
+                        <span class="note-meta">
+                            <span><i class="ti ti-user"></i></span> {{ note.created_by.username }}
+                        </span>
+                        <span class="note-meta">
+                            <span><i class="ti ti-clock"></i></span> {{ note.updated_at.strftime('%b %d, %Y') }}
+                        </span>
+                    </div>
+                    
+                    <div class="note-actions">
+                        <a href="{{ url_for('notes.view_note', slug=note.slug) }}" class="btn-sm btn-secondary">View</a>
+                        {% if note.can_user_edit(g.user) %}
+                        <a href="{{ url_for('notes.edit_note', slug=note.slug) }}" class="btn-sm btn-primary">Edit</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                </div>
+            </div>
+
+            <!-- List View -->
+            <div class="notes-view list-view" id="list-view">
+                <table class="notes-table">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Folder</th>
+                            <th>Tags</th>
+                            <th>Visibility</th>
+                            <th>Author</th>
+                            <th>Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for note in notes %}
+                        <tr class="note-row {% if note.is_pinned %}pinned{% endif %}"
+                            data-note-id="{{ note.id }}"
+                            draggable="true">
+                            <td>
+                                {% if note.is_pinned %}<span class="pin-indicator" title="Pinned"><i class="ti ti-pin"></i></span>{% endif %}
+                                <a href="{{ url_for('notes.view_note', slug=note.slug) }}">{{ note.title }}</a>
+                            </td>
+                            <td>{{ note.folder or '-' }}</td>
+                            <td>
+                                {% if note.tags %}
+                                    {% for tag in note.get_tags_list() %}
+                                    <span class="tag-chip">{{ tag }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="visibility-badge visibility-{{ note.visibility.value.lower() }}">
+                                    {% if note.visibility.value == 'Private' %}<i class="ti ti-lock"></i>{% elif note.visibility.value == 'Team' %}<i class="ti ti-users"></i>{% else %}<i class="ti ti-building"></i>{% endif %}
+                                    {{ note.visibility.value }}
+                                </span>
+                            </td>
+                            <td>{{ note.created_by.username }}</td>
+                            <td>{{ note.updated_at.strftime('%b %d, %Y') }}</td>
+                            <td>
+                                <a href="{{ url_for('notes.view_note', slug=note.slug) }}" class="btn-sm btn-secondary">View</a>
+                                {% if note.can_user_edit(g.user) %}
+                                <a href="{{ url_for('notes.edit_note', slug=note.slug) }}" class="btn-sm btn-primary">Edit</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon"><i class="ti ti-notes"></i></div>
+                <h3>No notes found</h3>
+                <p>
+                    {% if folder_filter or tag_filter or visibility_filter or search_query %}
+                        No notes match your current filters. Try adjusting your search criteria.
+                    {% else %}
+                        Start documenting your knowledge by creating your first note.
+                    {% endif %}
+                </p>
+                <a href="{{ url_for('notes.create_note') }}" class="btn btn-primary">Create Your First Note</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+/* Container */
+.notes-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Page Header - Time Tracking style */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Modern button styles to match Time Tracking */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border-color: #e5e7eb;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #667eea;
+}
+
+.btn .icon {
+    font-size: 1.1em;
+}
+
+/* Small buttons */
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.btn-sm.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-sm.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-sm.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 1px solid #e5e7eb;
+}
+
+.btn-sm.btn-secondary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-color: #667eea;
+}
+
+/* Notes layout */
+.notes-layout {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+/* Sidebar */
+.notes-sidebar {
+    width: 280px;
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    height: fit-content;
+    position: sticky;
+    top: 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+}
+
+.notes-sidebar.collapsed {
+    display: none;
+}
+
+.sidebar-section {
+    margin-bottom: 25px;
+}
+
+.sidebar-section h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #1f2937;
+}
+
+.search-box {
+    position: relative;
+    display: flex;
+    max-width: 100%;
+}
+
+.search-box input {
+    padding: 0.75rem;
+    padding-right: 35px;
+    width: 100%;
+    font-size: 0.9rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.search-box input:focus {
+    border-color: #667eea;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.search-btn {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+}
+
+/* Folder Tree */
+.folder-tree {
+    font-size: 0.85rem;
+}
+
+.folder-item {
+    padding: 5px 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.folder-item.active .folder-link {
+    font-weight: 600;
+    color: #667eea;
+}
+
+.folder-item.drag-over {
+    background: #e3f2fd;
+    border-radius: 3px;
+}
+
+.folder-link {
+    color: #495057;
+    text-decoration: none;
+    flex: 1;
+}
+
+.folder-link:hover {
+    color: #667eea;
+}
+
+.folder-count {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+/* Tags */
+.tags-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.tag-link {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #495057;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.tag-link:hover {
+    background: #e9ecef;
+    transform: translateX(2px);
+}
+
+.tag-link.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.tag-count {
+    margin-left: auto;
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+/* Visibility Filters */
+.visibility-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.visibility-link {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #495057;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.visibility-link:hover {
+    background: #e9ecef;
+    transform: translateX(2px);
+}
+
+.visibility-link.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+/* Main Content */
+.notes-content {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Active Filters */
+.active-filters {
+    background: white;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+}
+
+.filter-tag {
+    background: #f8f9fa;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+}
+
+.remove-filter {
+    margin-left: 5px;
+    color: #dc3545;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.clear-all {
+    margin-left: auto;
+    color: #667eea;
+    text-decoration: none;
+}
+
+/* View Controls */
+.view-controls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 20px;
+}
+
+.view-toggle {
+    display: flex;
+    gap: 5px;
+}
+
+.toggle-btn {
+    padding: 5px 15px;
+    background: white;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toggle-btn:first-child {
+    border-radius: 3px 0 0 3px;
+}
+
+.toggle-btn:last-child {
+    border-radius: 0 3px 3px 0;
+}
+
+.toggle-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: #667eea;
+}
+
+/* View Containers */
+.notes-view {
+    display: none;
+}
+
+.notes-view.active {
+    display: block;
+}
+
+/* Notes Grid */
+.notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+.note-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+    transition: all 0.2s;
+    cursor: move;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.note-card:hover {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    transform: translateY(-4px);
+}
+
+.note-card.pinned {
+    border-color: #ffc107;
+}
+
+.note-card.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+.note-card.drag-over {
+    border: 2px dashed #667eea;
+}
+
+.note-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.pin-indicator {
+    font-size: 0.875rem;
+}
+
+.visibility-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.visibility-private {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.visibility-team {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.visibility-company {
+    background: #d4edda;
+    color: #155724;
+}
+
+.note-title {
+    font-size: 1rem;
+    margin: 0 0 8px 0;
+    line-height: 1.3;
+}
+
+.note-title a {
+    color: #333;
+    text-decoration: none;
+}
+
+.note-title a:hover {
+    color: #667eea;
+}
+
+.note-preview {
+    color: #6c757d;
+    font-size: 0.8rem;
+    line-height: 1.3;
+    margin-bottom: 8px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.note-tags {
+    margin-bottom: 8px;
+}
+
+.tag-chip {
+    display: inline-block;
+    background: #e9ecef;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    margin-right: 4px;
+}
+
+.note-footer {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 0.7rem;
+    color: #6c757d;
+}
+
+.note-meta {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.note-actions {
+    display: flex;
+    gap: 5px;
+    padding-top: 8px;
+    border-top: 1px solid #e9ecef;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+}
+
+.empty-icon {
+    font-size: 3rem;
+    margin-bottom: 20px;
+}
+
+.empty-icon i {
+    font-size: 3rem;
+    color: #667eea;
+}
+
+/* Icon styling */
+.folder-icon i, .tag-icon i, .visibility-link i, 
+.filter-tag i, .note-meta i, .search-btn i,
+.page-icon i {
+    font-size: 1em;
+}
+
+.btn .icon i {
+    font-size: 1.1em;
+}
+
+/* List View / Table */
+.notes-table {
+    width: 100%;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    border-collapse: collapse;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.notes-table th {
+    background: #f8f9fa;
+    padding: 10px;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+    font-size: 0.85rem;
+}
+
+.notes-table td {
+    padding: 10px;
+    border-bottom: 1px solid #e9ecef;
+    font-size: 0.85rem;
+}
+
+.notes-table tr:hover {
+    background: #f8f9fa;
+}
+
+.notes-table tr.pinned {
+    background: #fff8dc;
+}
+
+.notes-table tr.pinned:hover {
+    background: #fff3cd;
+}
+
+/* Draggable table rows */
+.note-row {
+    cursor: move;
+}
+
+.note-row.dragging {
+    opacity: 0.5;
+}
+
+.note-row a {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .notes-layout {
+        flex-direction: column;
+    }
+    
+    .notes-sidebar {
+        width: 100%;
+        position: static;
+    }
+    
+    .notes-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+// Sidebar toggle
+document.getElementById('toggle-sidebar').addEventListener('click', function() {
+    document.getElementById('notes-sidebar').classList.toggle('collapsed');
+});
+
+// View switching
+function switchView(view) {
+    // Update button states
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.view === view) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Update view visibility
+    document.querySelectorAll('.notes-view').forEach(v => {
+        v.classList.remove('active');
+    });
+    
+    document.getElementById(view + '-view').classList.add('active');
+}
+
+// Drag and Drop functionality
+let draggedNote = null;
+let draggedNoteId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDragAndDrop();
+});
+
+function initializeDragAndDrop() {
+    // Note cards (grid view)
+    const noteCards = document.querySelectorAll('.note-card');
+    noteCards.forEach(card => {
+        card.addEventListener('dragstart', handleNoteDragStart);
+        card.addEventListener('dragend', handleNoteDragEnd);
+        card.addEventListener('dragover', handleNoteDragOver);
+        card.addEventListener('drop', handleNoteDrop);
+        card.addEventListener('dragleave', handleNoteDragLeave);
+    });
+    
+    // Note rows (list view)
+    const noteRows = document.querySelectorAll('.note-row');
+    noteRows.forEach(row => {
+        row.addEventListener('dragstart', handleNoteDragStart);
+        row.addEventListener('dragend', handleNoteDragEnd);
+    });
+    
+    // Folder items
+    const folderItems = document.querySelectorAll('.folder-item');
+    folderItems.forEach(folder => {
+        folder.addEventListener('dragover', handleFolderDragOver);
+        folder.addEventListener('drop', handleFolderDrop);
+        folder.addEventListener('dragleave', handleFolderDragLeave);
+    });
+}
+
+// Note drag handlers
+function handleNoteDragStart(e) {
+    draggedNote = this;
+    draggedNoteId = this.dataset.noteId;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', draggedNoteId);
+}
+
+function handleNoteDragEnd(e) {
+    this.classList.remove('dragging');
+    
+    // Remove all drag-over classes
+    document.querySelectorAll('.note-card, .note-row, .folder-item').forEach(el => {
+        el.classList.remove('drag-over');
+    });
+}
+
+function handleNoteDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    
+    e.dataTransfer.dropEffect = 'move';
+    
+    if (this !== draggedNote) {
+        this.classList.add('drag-over');
+    }
+    
+    return false;
+}
+
+function handleNoteDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+function handleNoteDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+    
+    if (draggedNote !== this) {
+        // Reorder notes
+        const notesGrid = document.getElementById('notes-grid');
+        const allCards = Array.from(notesGrid.querySelectorAll('.note-card'));
+        const draggedIndex = allCards.indexOf(draggedNote);
+        const targetIndex = allCards.indexOf(this);
+        
+        if (draggedIndex < targetIndex) {
+            this.parentNode.insertBefore(draggedNote, this.nextSibling);
+        } else {
+            this.parentNode.insertBefore(draggedNote, this);
+        }
+    }
+    
+    return false;
+}
+
+// Folder drag handlers
+function handleFolderDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    
+    e.dataTransfer.dropEffect = 'move';
+    this.classList.add('drag-over');
+    
+    return false;
+}
+
+function handleFolderDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+function handleFolderDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+    
+    this.classList.remove('drag-over');
+    
+    // Get folder path
+    const folderLink = this.querySelector('.folder-link');
+    let folderPath = '';
+    
+    if (folderLink) {
+        // Extract folder path from the URL
+        const href = folderLink.getAttribute('href');
+        const url = new URL(href, window.location.origin);
+        folderPath = url.searchParams.get('folder') || '';
+    }
+    
+    // Move note to folder
+    if (draggedNoteId && confirm(`Move this note to folder "${folderPath || 'All Notes'}"?`)) {
+        // Here you would make an API call to update the note's folder
+        fetch(`/api/notes/${draggedNoteId}/move`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ folder: folderPath })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Failed to move note: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to move note');
+        });
+    }
+    
+    return false;
+}
+</script>
+
+{% endblock %}

@@ -79,6 +79,8 @@ def run_all_migrations(db_path=None):
     migrate_system_events(db_path)
     migrate_dashboard_system(db_path)
     migrate_comment_system(db_path)
+    migrate_notes_system(db_path)
+    update_note_link_cascade(db_path)
     
     # Run PostgreSQL-specific migrations if applicable
     if FLASK_AVAILABLE:
@@ -1275,6 +1277,126 @@ def migrate_postgresql_schema():
                 """))
                 db.session.commit()
             
+            # Check if note table exists
+            result = db.session.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_name = 'note'
+            """))
+            
+            if result.fetchone():
+                # Table exists, check for folder column
+                result = db.session.execute(text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'note' AND column_name = 'folder'
+                """))
+                
+                if not result.fetchone():
+                    print("Adding folder column to note table...")
+                    db.session.execute(text("ALTER TABLE note ADD COLUMN folder VARCHAR(100)"))
+                    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_note_folder ON note(folder)"))
+                    db.session.commit()
+                    print("Folder column added successfully!")
+            else:
+                print("Creating note and note_link tables...")
+                
+                # Create NoteVisibility enum type
+                db.session.execute(text("""
+                    DO $$ BEGIN
+                        CREATE TYPE notevisibility AS ENUM ('Private', 'Team', 'Company');
+                    EXCEPTION
+                        WHEN duplicate_object THEN null;
+                    END $$;
+                """))
+                
+                db.session.execute(text("""
+                    CREATE TABLE note (
+                        id SERIAL PRIMARY KEY,
+                        title VARCHAR(200) NOT NULL,
+                        content TEXT NOT NULL,
+                        slug VARCHAR(100) NOT NULL,
+                        visibility notevisibility NOT NULL DEFAULT 'Private',
+                        folder VARCHAR(100),
+                        company_id INTEGER NOT NULL,
+                        created_by_id INTEGER NOT NULL,
+                        project_id INTEGER,
+                        task_id INTEGER,
+                        tags TEXT[],
+                        is_archived BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (company_id) REFERENCES company (id),
+                        FOREIGN KEY (created_by_id) REFERENCES "user" (id),
+                        FOREIGN KEY (project_id) REFERENCES project (id),
+                        FOREIGN KEY (task_id) REFERENCES task (id)
+                    )
+                """))
+                
+                # Create note_link table
+                db.session.execute(text("""
+                    CREATE TABLE note_link (
+                        source_note_id INTEGER NOT NULL,
+                        target_note_id INTEGER NOT NULL,
+                        link_type VARCHAR(50) DEFAULT 'related',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (source_note_id, target_note_id),
+                        FOREIGN KEY (source_note_id) REFERENCES note (id) ON DELETE CASCADE,
+                        FOREIGN KEY (target_note_id) REFERENCES note (id) ON DELETE CASCADE
+                    )
+                """))
+                
+                # Check if note_folder table exists
+                result = db.session.execute(text("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_name = 'note_folder'
+                """))
+                
+                if not result.fetchone():
+                    print("Creating note_folder table...")
+                    db.session.execute(text("""
+                        CREATE TABLE note_folder (
+                            id SERIAL PRIMARY KEY,
+                            name VARCHAR(100) NOT NULL,
+                            path VARCHAR(500) NOT NULL,
+                            parent_path VARCHAR(500),
+                            description TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            created_by_id INTEGER NOT NULL,
+                            company_id INTEGER NOT NULL,
+                            FOREIGN KEY (created_by_id) REFERENCES "user" (id),
+                            FOREIGN KEY (company_id) REFERENCES company (id),
+                            CONSTRAINT uq_folder_path_company UNIQUE (path, company_id)
+                        )
+                    """))
+                
+                # Create indexes
+                db.session.execute(text("CREATE INDEX idx_note_company ON note(company_id)"))
+                db.session.execute(text("CREATE INDEX idx_note_created_by ON note(created_by_id)"))
+                db.session.execute(text("CREATE INDEX idx_note_project ON note(project_id)"))
+                db.session.execute(text("CREATE INDEX idx_note_task ON note(task_id)"))
+                db.session.execute(text("CREATE INDEX idx_note_slug ON note(company_id, slug)"))
+                db.session.execute(text("CREATE INDEX idx_note_visibility ON note(visibility)"))
+                db.session.execute(text("CREATE INDEX idx_note_archived ON note(is_archived)"))
+                db.session.execute(text("CREATE INDEX idx_note_created_at ON note(created_at DESC)"))
+                db.session.execute(text("CREATE INDEX idx_note_folder ON note(folder)"))
+                db.session.execute(text("CREATE INDEX idx_note_link_source ON note_link(source_note_id)"))
+                db.session.execute(text("CREATE INDEX idx_note_link_target ON note_link(target_note_id)"))
+                
+                # Create indexes for note_folder if table was created
+                result = db.session.execute(text("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_name = 'note_folder'
+                """))
+                if result.fetchone():
+                    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_note_folder_company ON note_folder(company_id)"))
+                    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_note_folder_parent_path ON note_folder(parent_path)"))
+                    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_note_folder_created_by ON note_folder(created_by_id)"))
+                
+                db.session.commit()
+            
             print("PostgreSQL schema migration completed successfully!")
             
     except Exception as e:
@@ -1483,6 +1605,222 @@ def migrate_comment_system(db_file=None):
         raise
     finally:
         conn.close()
+
+
+def migrate_notes_system(db_file=None):
+    """Migrate to add Notes system with markdown support."""
+    db_path = get_db_path(db_file)
+
+    print(f"Migrating Notes system in {db_path}...")
+
+    if not os.path.exists(db_path):
+        print(f"Database file {db_path} does not exist. Run basic migration first.")
+        return False
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        # Check if note table already exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='note'")
+        if cursor.fetchone():
+            print("Note table already exists. Checking for updates...")
+            
+            # Check if folder column exists
+            cursor.execute("PRAGMA table_info(note)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'folder' not in columns:
+                print("Adding folder column to note table...")
+                cursor.execute("ALTER TABLE note ADD COLUMN folder VARCHAR(100)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_note_folder ON note(folder)")
+                conn.commit()
+                print("Folder column added successfully!")
+            
+            # Check if note_folder table exists
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='note_folder'")
+            if not cursor.fetchone():
+                print("Creating note_folder table...")
+                cursor.execute("""
+                CREATE TABLE note_folder (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name VARCHAR(100) NOT NULL,
+                    path VARCHAR(500) NOT NULL,
+                    parent_path VARCHAR(500),
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by_id INTEGER NOT NULL,
+                    company_id INTEGER NOT NULL,
+                    FOREIGN KEY (created_by_id) REFERENCES user(id),
+                    FOREIGN KEY (company_id) REFERENCES company(id),
+                    UNIQUE(path, company_id)
+                )
+                """)
+                
+                # Create indexes for note_folder
+                cursor.execute("CREATE INDEX idx_note_folder_company ON note_folder(company_id)")
+                cursor.execute("CREATE INDEX idx_note_folder_parent_path ON note_folder(parent_path)")
+                cursor.execute("CREATE INDEX idx_note_folder_created_by ON note_folder(created_by_id)")
+                conn.commit()
+                print("Note folder table created successfully!")
+            
+            return True
+
+        print("Creating Notes system tables...")
+
+        # Create note table
+        cursor.execute("""
+        CREATE TABLE note (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title VARCHAR(200) NOT NULL,
+            content TEXT NOT NULL,
+            slug VARCHAR(100) NOT NULL,
+            visibility VARCHAR(20) NOT NULL DEFAULT 'Private',
+            folder VARCHAR(100),
+            company_id INTEGER NOT NULL,
+            created_by_id INTEGER NOT NULL,
+            project_id INTEGER,
+            task_id INTEGER,
+            tags TEXT,
+            archived BOOLEAN DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES company (id),
+            FOREIGN KEY (created_by_id) REFERENCES user (id),
+            FOREIGN KEY (project_id) REFERENCES project (id),
+            FOREIGN KEY (task_id) REFERENCES task (id)
+        )
+        """)
+
+        # Create note_link table for linking notes
+        cursor.execute("""
+        CREATE TABLE note_link (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_note_id INTEGER NOT NULL,
+            target_note_id INTEGER NOT NULL,
+            link_type VARCHAR(50) DEFAULT 'related',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_by_id INTEGER NOT NULL,
+            FOREIGN KEY (source_note_id) REFERENCES note (id) ON DELETE CASCADE,
+            FOREIGN KEY (target_note_id) REFERENCES note (id) ON DELETE CASCADE,
+            FOREIGN KEY (created_by_id) REFERENCES user (id),
+            UNIQUE(source_note_id, target_note_id)
+        )
+        """)
+
+        # Create indexes for better performance
+        cursor.execute("CREATE INDEX idx_note_company ON note(company_id)")
+        cursor.execute("CREATE INDEX idx_note_created_by ON note(created_by_id)")
+        cursor.execute("CREATE INDEX idx_note_project ON note(project_id)")
+        cursor.execute("CREATE INDEX idx_note_task ON note(task_id)")
+        cursor.execute("CREATE INDEX idx_note_slug ON note(company_id, slug)")
+        cursor.execute("CREATE INDEX idx_note_visibility ON note(visibility)")
+        cursor.execute("CREATE INDEX idx_note_archived ON note(archived)")
+        cursor.execute("CREATE INDEX idx_note_created_at ON note(created_at DESC)")
+        
+        # Create indexes for note links
+        cursor.execute("CREATE INDEX idx_note_link_source ON note_link(source_note_id)")
+        cursor.execute("CREATE INDEX idx_note_link_target ON note_link(target_note_id)")
+        
+        # Create note_folder table
+        cursor.execute("""
+        CREATE TABLE note_folder (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) NOT NULL,
+            path VARCHAR(500) NOT NULL,
+            parent_path VARCHAR(500),
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_by_id INTEGER NOT NULL,
+            company_id INTEGER NOT NULL,
+            FOREIGN KEY (created_by_id) REFERENCES user(id),
+            FOREIGN KEY (company_id) REFERENCES company(id),
+            UNIQUE(path, company_id)
+        )
+        """)
+        
+        # Create indexes for note_folder
+        cursor.execute("CREATE INDEX idx_note_folder_company ON note_folder(company_id)")
+        cursor.execute("CREATE INDEX idx_note_folder_parent_path ON note_folder(parent_path)")
+        cursor.execute("CREATE INDEX idx_note_folder_created_by ON note_folder(created_by_id)")
+
+        conn.commit()
+        print("Notes system migration completed successfully!")
+        return True
+
+    except Exception as e:
+        print(f"Error during Notes system migration: {e}")
+        conn.rollback()
+        return False
+
+    finally:
+        conn.close()
+
+
+def update_note_link_cascade(db_path):
+    """Update note_link table to ensure CASCADE delete is enabled."""
+    print("Checking note_link cascade delete constraints...")
+    
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Check if note_link table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='note_link'")
+        if not cursor.fetchone():
+            print("note_link table does not exist, skipping cascade update")
+            return
+        
+        # Check current foreign key constraints
+        cursor.execute("PRAGMA foreign_key_list(note_link)")
+        fk_info = cursor.fetchall()
+        
+        # Check if CASCADE is already set
+        has_cascade = any('CASCADE' in str(fk) for fk in fk_info)
+        
+        if not has_cascade:
+            print("Updating note_link table with CASCADE delete...")
+            
+            # SQLite doesn't support ALTER TABLE for foreign keys, so recreate the table
+            cursor.execute("""
+            CREATE TABLE note_link_temp (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_note_id INTEGER NOT NULL,
+                target_note_id INTEGER NOT NULL,
+                link_type VARCHAR(50) DEFAULT 'related',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by_id INTEGER NOT NULL,
+                FOREIGN KEY (source_note_id) REFERENCES note(id) ON DELETE CASCADE,
+                FOREIGN KEY (target_note_id) REFERENCES note(id) ON DELETE CASCADE,
+                FOREIGN KEY (created_by_id) REFERENCES user(id),
+                UNIQUE(source_note_id, target_note_id)
+            )
+            """)
+            
+            # Copy data
+            cursor.execute("INSERT INTO note_link_temp SELECT * FROM note_link")
+            
+            # Drop old table and rename new one
+            cursor.execute("DROP TABLE note_link")
+            cursor.execute("ALTER TABLE note_link_temp RENAME TO note_link")
+            
+            # Recreate indexes
+            cursor.execute("CREATE INDEX idx_note_link_source ON note_link(source_note_id)")
+            cursor.execute("CREATE INDEX idx_note_link_target ON note_link(target_note_id)")
+            
+            print("note_link table updated with CASCADE delete")
+        else:
+            print("note_link table already has CASCADE delete")
+        
+        conn.commit()
+        
+    except Exception as e:
+        print(f"Error updating note_link cascade: {e}")
+        if conn:
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
 
 
 def main():

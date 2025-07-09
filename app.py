@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file, abort
-from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings, CompanyInvitation
+from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings, CompanyInvitation, Note, NoteFolder, NoteShare
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
     format_table_data, format_graph_data, format_team_data, format_burndown_data
@@ -20,9 +20,10 @@ from password_utils import PasswordValidator
 from werkzeug.security import check_password_hash
 
 # Import blueprints
-# from routes.notes import notes_bp
-# from routes.notes_download import notes_download_bp
-# from routes.notes_api import notes_api_bp
+from routes.notes import notes_bp
+from routes.notes_download import notes_download_bp
+from routes.notes_api import notes_api_bp
+from routes.notes_public import notes_public_bp
 from routes.tasks import tasks_bp, get_filtered_tasks_for_burndown
 from routes.tasks_api import tasks_api_bp
 from routes.sprints import sprints_bp
@@ -39,6 +40,7 @@ from routes.system_admin import system_admin_bp
 from routes.announcements import announcements_bp
 from routes.export import export_bp
 from routes.export_api import export_api_bp
+from routes.organization import organization_bp
 
 # Import auth decorators from routes.auth
 from routes.auth import login_required, admin_required, system_admin_required, role_required, company_required
@@ -84,9 +86,10 @@ mail = Mail(app)
 db.init_app(app)
 
 # Register blueprints
-# app.register_blueprint(notes_bp)
-# app.register_blueprint(notes_download_bp)
-# app.register_blueprint(notes_api_bp)
+app.register_blueprint(notes_bp)
+app.register_blueprint(notes_download_bp)
+app.register_blueprint(notes_api_bp)
+app.register_blueprint(notes_public_bp)
 app.register_blueprint(tasks_bp)
 app.register_blueprint(tasks_api_bp)
 app.register_blueprint(sprints_bp)
@@ -103,6 +106,7 @@ app.register_blueprint(system_admin_bp)
 app.register_blueprint(announcements_bp)
 app.register_blueprint(export_bp)
 app.register_blueprint(export_api_bp)
+app.register_blueprint(organization_bp)
 
 # Import and register invitations blueprint
 from routes.invitations import invitations_bp
@@ -829,8 +833,10 @@ def verify_email(token):
 @role_required(Role.TEAM_MEMBER)
 @company_required
 def dashboard():
-    """User dashboard with configurable widgets."""
-    return render_template('dashboard.html', title='Dashboard')
+    """User dashboard with configurable widgets - DISABLED due to widget issues."""
+    # Redirect to home page instead of dashboard
+    flash('Dashboard is temporarily disabled. Redirecting to home page.', 'info')
+    return redirect(url_for('index'))
 
 
 @app.route('/profile', methods=['GET', 'POST'])
@@ -2665,6 +2671,36 @@ def search_sprints():
     except Exception as e:
         logger.error(f"Error in search_sprints: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/render-markdown', methods=['POST'])
+@login_required
+def render_markdown():
+    """Render markdown content to HTML for preview"""
+    try:
+        data = request.get_json()
+        content = data.get('content', '')
+        
+        if not content:
+            return jsonify({'html': '<p class="preview-placeholder">Start typing to see the preview...</p>'})
+        
+        # Parse frontmatter and extract body
+        from frontmatter_utils import parse_frontmatter
+        metadata, body = parse_frontmatter(content)
+        
+        # Render markdown to HTML
+        try:
+            import markdown
+            # Use extensions for better markdown support
+            html = markdown.markdown(body, extensions=['extra', 'codehilite', 'toc', 'tables', 'fenced_code'])
+        except ImportError:
+            # Fallback if markdown not installed
+            html = f'<pre>{body}</pre>'
+        
+        return jsonify({'html': html})
+        
+    except Exception as e:
+        logger.error(f"Error rendering markdown: {str(e)}")
+        return jsonify({'html': '<p class="error">Error rendering markdown</p>'})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
