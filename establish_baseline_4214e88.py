@@ -85,105 +85,133 @@ def main():
             return 1
         run_command("rm -rf migrations", "Removing existing migrations directory")
     
-    # Step 2: Create a temporary directory for baseline models
-    with tempfile.TemporaryDirectory() as tmpdir:
-        print(f"\nCreating temporary directory: {tmpdir}")
+    # Step 2: Backup current models and extract baseline
+    print(f"\nPreparing baseline models from commit {BASELINE_COMMIT}...")
+    
+    # Check if baseline commit has models.py or models/ directory
+    result = subprocess.run(
+        f"git show {BASELINE_COMMIT}:models.py",
+        shell=True,
+        capture_output=True
+    )
+    has_single_models_file = result.returncode == 0
+    
+    if has_single_models_file:
+        print("✓ Found models.py in baseline commit (monolithic structure)")
         
-        # Step 3: Extract models from baseline commit
-        print(f"\nExtracting models from commit {BASELINE_COMMIT}...")
+        # Backup current models directory
+        if os.path.exists('models'):
+            print("Backing up current models/ directory...")
+            run_command("mv models models_backup_temp", "Backing up current models")
         
-        # Get the models directory from the baseline commit
-        models_files = [
-            "models/__init__.py",
-            "models/base.py",
-            "models/enums.py",
-            "models/company.py",
-            "models/user.py",
-            "models/team.py",
-            "models/project.py",
-            "models/task.py",
-            "models/time_entry.py",
-            "models/sprint.py",
-            "models/system.py",
-            "models/announcement.py",
-            "models/dashboard.py",
-            "models/work_config.py",
-            "models/invitation.py",
-            "models/note.py",
-            "models/note_share.py"
-        ]
+        # Extract baseline models.py
+        run_command(
+            f"git show {BASELINE_COMMIT}:models.py > models.py",
+            "Extracting baseline models.py"
+        )
         
-        # Also check if models_old.py exists in baseline (fallback)
+        # We need to ensure the models.py imports db correctly
+        # The old file might have different imports
+        print("Adjusting imports in baseline models.py...")
+        with open('models.py', 'r') as f:
+            content = f.read()
+        
+        # Ensure it has proper imports for Flask-Migrate
+        if 'from flask_sqlalchemy import SQLAlchemy' not in content:
+            # Add the import at the top if missing
+            lines = content.split('\n')
+            for i, line in enumerate(lines):
+                if line.strip() and not line.startswith('#'):
+                    lines.insert(i, 'from flask_sqlalchemy import SQLAlchemy\ndb = SQLAlchemy()\n')
+                    break
+            content = '\n'.join(lines)
+            
+            with open('models.py', 'w') as f:
+                f.write(content)
+    else:
+        print("⚠️  No models.py found in baseline commit")
+        print("Checking for models/ directory...")
+        
+        # Try to check if models/ exists
         result = subprocess.run(
-            f"git show {BASELINE_COMMIT}:models_old.py",
+            f"git show {BASELINE_COMMIT}:models/__init__.py",
             shell=True,
             capture_output=True
         )
-        use_models_old = result.returncode == 0
         
-        if use_models_old:
-            print("Using models_old.py from baseline commit")
-            # Save current models
-            run_command("cp -r models models_current", "Backing up current models")
-            
-            # Get models_old.py from baseline
-            run_command(
-                f"git show {BASELINE_COMMIT}:models_old.py > models_baseline.py",
-                "Extracting baseline models"
-            )
-            
-            # Temporarily replace models with baseline
-            # This is a bit hacky but ensures we generate the right migration
-            print("\nPreparing baseline schema...")
-            with open('models_baseline.py', 'r') as f:
-                baseline_content = f.read()
-            
-            # We need to be careful here - save current state and restore later
+        if result.returncode == 0:
+            print("Found models/ directory in baseline commit")
+            # This shouldn't happen for commit 4214e88, but handle it anyway
+            # ... existing code for models/ directory ...
         else:
-            print("Using models/ directory from baseline commit")
-            # Extract each model file from baseline
-            os.makedirs(os.path.join(tmpdir, "models"), exist_ok=True)
-            
-            for model_file in models_files:
-                result = subprocess.run(
-                    f"git show {BASELINE_COMMIT}:{model_file}",
-                    shell=True,
-                    capture_output=True,
-                    text=True
-                )
-                if result.returncode == 0:
-                    file_path = os.path.join(tmpdir, model_file)
-                    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                    with open(file_path, 'w') as f:
-                        f.write(result.stdout)
-                    print(f"  ✓ Extracted {model_file}")
-                else:
-                    print(f"  ⚠️  Could not extract {model_file}")
+            print("❌ Neither models.py nor models/ found in baseline commit!")
+            print("This commit might not have SQLAlchemy models yet.")
+            return 1
         
-        # Step 4: Initialize Flask-Migrate
-        run_command("flask db init", "Initializing Flask-Migrate")
+    # Step 3: Initialize Flask-Migrate
+    run_command("flask db init", "Initializing Flask-Migrate")
+    
+    # Step 4: Create the baseline migration
+    print("\n📝 Creating baseline migration...")
+    print("This migration represents the schema at commit 4214e88")
+    
+    migration_message = f"Baseline schema from commit {BASELINE_COMMIT[:8]} ({BASELINE_DATE})"
+    
+    # Need to temporarily update app.py imports if using old models.py
+    if has_single_models_file:
+        print("Temporarily adjusting app.py imports...")
+        with open('app.py', 'r') as f:
+            app_content = f.read()
         
-        # Step 5: Create the baseline migration
-        print("\n📝 Creating baseline migration...")
-        print("This migration represents the schema at commit 4214e88")
-        
-        migration_message = f"Baseline schema from commit {BASELINE_COMMIT[:8]} ({BASELINE_DATE})"
-        run_command(
-            f'flask db migrate -m "{migration_message}"',
-            "Generating baseline migration"
+        # Replace models imports temporarily
+        app_content_backup = app_content
+        app_content = app_content.replace(
+            'from models import db,',
+            'from models import db,'
+        ).replace(
+            'from models import',
+            'from models import'
         )
         
-        # Step 6: Add a note to the migration file
-        migration_files = os.listdir("migrations/versions")
-        if migration_files:
-            latest_migration = sorted(migration_files)[-1]
-            migration_path = os.path.join("migrations/versions", latest_migration)
-            
-            with open(migration_path, 'r') as f:
-                content = f.read()
-            
-            # Add comment at the top of the file
-            baseline_note = f'''"""
+        with open('app.py', 'w') as f:
+            f.write(app_content)
+    
+    # Generate the migration
+    result = run_command(
+        f'flask db migrate -m "{migration_message}"',
+        "Generating baseline migration"
+    )
+    
+    # Step 5: Restore current models structure
+    if has_single_models_file:
+        print("\nRestoring current models structure...")
+        
+        # Remove temporary models.py
+        if os.path.exists('models.py'):
+            os.remove('models.py')
+            print("✓ Removed temporary models.py")
+        
+        # Restore models directory
+        if os.path.exists('models_backup_temp'):
+            run_command("mv models_backup_temp models", "Restoring models directory")
+        
+        # Restore app.py if we modified it
+        if 'app_content_backup' in locals():
+            with open('app.py', 'w') as f:
+                f.write(app_content_backup)
+            print("✓ Restored app.py")
+    
+    # Step 6: Add a note to the migration file
+    migration_files = os.listdir("migrations/versions")
+    if migration_files:
+        latest_migration = sorted(migration_files)[-1]
+        migration_path = os.path.join("migrations/versions", latest_migration)
+        
+        with open(migration_path, 'r') as f:
+            content = f.read()
+        
+        # Add comment at the top of the file
+        baseline_note = f'''"""
 BASELINE MIGRATION - DO NOT MODIFY
 
 This migration represents the database schema at commit {BASELINE_COMMIT}.
@@ -201,11 +229,11 @@ If you're creating a new database:
 """
 
 '''
-            
-            with open(migration_path, 'w') as f:
-                f.write(baseline_note + content)
-            
-            print(f"✓ Added baseline note to migration: {latest_migration}")
+        
+        with open(migration_path, 'w') as f:
+            f.write(baseline_note + content)
+        
+        print(f"✓ Added baseline note to migration: {latest_migration}")
     
     # Step 7: Create documentation
     doc_content = f"""# Flask-Migrate Baseline Information

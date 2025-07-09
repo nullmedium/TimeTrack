@@ -17,7 +17,8 @@ If you have an existing database with the old migration system:
 pip install -r requirements.txt
 
 # 2. Establish baseline from commit 4214e88
-python establish_baseline_4214e88.py
+python simple_baseline_4214e88.py
+# Note: Use simple_baseline_4214e88.py as it handles the models.py transition correctly
 
 # 3. Mark your database as being at the baseline
 flask db stamp head
