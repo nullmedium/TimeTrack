@@ -1,340 +1,816 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container">
-    <h1><i class="ti ti-tool"></i> System Administrator Dashboard</h1>
-    <p class="subtitle">Global system overview and management tools</p>
+<div class="system-dashboard-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-world"></i></span>
+                    System Dashboard
+                </h1>
+                <p class="page-subtitle">Global system overview and management tools</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('system_admin.system_admin_settings') }}" class="btn btn-secondary">
+                    <i class="ti ti-settings"></i>
+                    System Settings
+                </a>
+                <a href="{{ url_for('announcements.index') }}" class="btn btn-primary">
+                    <i class="ti ti-speakerphone"></i>
+                    Announcements
+                </a>
+            </div>
+        </div>
+    </div>
 
     <!-- System Overview Statistics -->
     <div class="stats-section">
-        <h2><i class="ti ti-chart-bar"></i> System Overview</h2>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>{{ total_companies }}</h3>
-                <p>Total Companies</p>
-                <a href="{{ url_for('system_admin.system_admin_companies') }}" class="stat-link">Manage <i class="ti ti-arrow-right"></i></a>
-            </div>
-            <div class="stat-card">
-                <h3>{{ total_users }}</h3>
-                <p>Total Users</p>
-                <a href="{{ url_for('users.system_admin_users') }}" class="stat-link">Manage <i class="ti ti-arrow-right"></i></a>
-            </div>
-            <div class="stat-card">
-                <h3>{{ total_teams }}</h3>
-                <p>Total Teams</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ total_projects }}</h3>
-                <p>Total Projects</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ total_time_entries }}</h3>
-                <p>Time Entries</p>
-                <a href="{{ url_for('system_admin.system_admin_time_entries') }}" class="stat-link">View <i class="ti ti-arrow-right"></i></a>
-            </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_companies }}</div>
+            <div class="stat-label">Total Companies</div>
+            <a href="{{ url_for('system_admin.system_admin_companies') }}" class="stat-link">Manage <i class="ti ti-arrow-right"></i></a>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_users }}</div>
+            <div class="stat-label">Total Users</div>
+            <a href="{{ url_for('users.system_admin_users') }}" class="stat-link">View all <i class="ti ti-arrow-right"></i></a>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_teams }}</div>
+            <div class="stat-label">Total Teams</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_projects }}</div>
+            <div class="stat-label">Total Projects</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_time_entries|default(0) }}</div>
+            <div class="stat-label">Time Entries</div>
+            <a href="{{ url_for('system_admin.system_admin_time_entries') }}" class="stat-link">View <i class="ti ti-arrow-right"></i></a>
         </div>
     </div>
 
-    <!-- Administrator Statistics -->
-    <div class="stats-section">
-        <h2><i class="ti ti-user"></i> Administrator Overview</h2>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>{{ system_admins }}</h3>
-                <p>System Administrators</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ regular_admins }}</h3>
-                <p>Company Administrators</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ blocked_users }}</h3>
-                <p>Blocked Users</p>
-                {% if blocked_users > 0 %}
-                    <a href="{{ url_for('users.system_admin_users', filter='blocked') }}" class="stat-link">Review <i class="ti ti-arrow-right"></i></a>
+    <!-- Alert Section for System Health Issues -->
+    {% if orphaned_users > 0 or orphaned_time_entries > 0 %}
+    <div class="alert-banner">
+        <div class="alert-icon">
+            <i class="ti ti-alert-triangle"></i>
+        </div>
+        <div class="alert-content">
+            <h3>System Health Issues Detected</h3>
+            <div class="alert-details">
+                {% if orphaned_users > 0 %}
+                <div class="alert-item">
+                    <strong>{{ orphaned_users }} Orphaned Users</strong> - Users without company assignment
+                </div>
+                {% endif %}
+                {% if orphaned_time_entries > 0 %}
+                <div class="alert-item">
+                    <strong>{{ orphaned_time_entries }} Orphaned Time Entries</strong> - Time entries without user assignment
+                </div>
                 {% endif %}
             </div>
         </div>
-    </div>
-
-    <!-- Recent Activity -->
-    <div class="stats-section">
-        <h2><i class="ti ti-trending-up"></i> Recent Activity (Last 7 Days)</h2>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>{{ recent_users }}</h3>
-                <p>New Users</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ recent_companies }}</h3>
-                <p>New Companies</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ recent_time_entries }}</h3>
-                <p>Time Entries</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- System Health -->
-    {% if orphaned_users > 0 or orphaned_time_entries > 0 %}
-    <div class="stats-section alert-section">
-        <h2><i class="ti ti-alert-triangle"></i> System Health Issues</h2>
-        <div class="stats-grid">
-            {% if orphaned_users > 0 %}
-            <div class="stat-card alert-card">
-                <h3>{{ orphaned_users }}</h3>
-                <p>Orphaned Users</p>
-                <small>Users without company assignment</small>
-            </div>
-            {% endif %}
-            {% if orphaned_time_entries > 0 %}
-            <div class="stat-card alert-card">
-                <h3>{{ orphaned_time_entries }}</h3>
-                <p>Orphaned Time Entries</p>
-                <small>Time entries without user assignment</small>
-            </div>
-            {% endif %}
+        <div class="alert-actions">
+            <a href="{{ url_for('system_admin.system_admin_health') }}" class="btn btn-warning">
+                <i class="ti ti-heart-rate-monitor"></i>
+                System Health
+            </a>
         </div>
     </div>
     {% endif %}
 
-    <div class="dashboard-grid">
-        <!-- Top Companies -->
-        <div class="dashboard-card">
-            <h3><i class="ti ti-building"></i> Top Companies by Users</h3>
-            {% if top_companies %}
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Company</th>
-                            <th>Users</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for company in top_companies %}
-                        <tr>
-                            <td>{{ company.name }}</td>
-                            <td>{{ company.user_count }}</td>
-                            <td>
-                                <a href="{{ url_for('system_admin.system_admin_company_detail', company_id=company.id) }}" class="btn btn-sm">View</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p>No companies found.</p>
-            {% endif %}
+    <!-- Main Content Grid -->
+    <div class="content-grid">
+        <!-- Left Column -->
+        <div class="content-column">
+            <!-- Administrator Overview Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon"><i class="ti ti-shield"></i></span>
+                        Administrator Overview
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-value">{{ system_admins }}</div>
+                            <div class="info-label">System Administrators</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-value">{{ regular_admins }}</div>
+                            <div class="info-label">Company Administrators</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-value">{{ blocked_users }}</div>
+                            <div class="info-label">Blocked Users</div>
+                            {% if blocked_users > 0 %}
+                            <a href="{{ url_for('users.system_admin_users', filter='blocked') }}" class="info-link">Review</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon"><i class="ti ti-trending-up"></i></span>
+                        Recent Activity
+                        <span class="card-subtitle">Last 7 days</span>
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <div class="activity-list">
+                        <div class="activity-item">
+                            <div class="activity-icon new-users">
+                                <i class="ti ti-user-plus"></i>
+                            </div>
+                            <div class="activity-content">
+                                <div class="activity-value">{{ recent_users }}</div>
+                                <div class="activity-label">New Users</div>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon new-companies">
+                                <i class="ti ti-building-plus"></i>
+                            </div>
+                            <div class="activity-content">
+                                <div class="activity-value">{{ recent_companies }}</div>
+                                <div class="activity-label">New Companies</div>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon time-entries">
+                                <i class="ti ti-clock"></i>
+                            </div>
+                            <div class="activity-content">
+                                <div class="activity-value">{{ recent_time_entries }}</div>
+                                <div class="activity-label">Time Entries</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon"><i class="ti ti-bolt"></i></span>
+                        Quick Actions
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <div class="action-grid">
+                        <a href="{{ url_for('users.system_admin_users') }}" class="action-item">
+                            <div class="action-icon"><i class="ti ti-users"></i></div>
+                            <div class="action-content">
+                                <h3>All Users</h3>
+                                <p>System-wide user management</p>
+                            </div>
+                        </a>
+                        
+                        <a href="{{ url_for('system_admin.system_admin_companies') }}" class="action-item">
+                            <div class="action-icon"><i class="ti ti-building"></i></div>
+                            <div class="action-content">
+                                <h3>Companies</h3>
+                                <p>Manage all companies</p>
+                            </div>
+                        </a>
+                        
+                        <a href="{{ url_for('system_admin.branding') }}" class="action-item">
+                            <div class="action-icon"><i class="ti ti-palette"></i></div>
+                            <div class="action-content">
+                                <h3>Branding</h3>
+                                <p>System appearance</p>
+                            </div>
+                        </a>
+
+                        <a href="{{ url_for('system_admin.system_admin_health') }}" class="action-item">
+                            <div class="action-icon"><i class="ti ti-heart-rate-monitor"></i></div>
+                            <div class="action-content">
+                                <h3>System Health</h3>
+                                <p>Monitor & diagnostics</p>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Recent Companies -->
-        <div class="dashboard-card">
-            <h3><i class="ti ti-sparkles"></i> Recent Companies</h3>
-            {% if recent_companies_list %}
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Company</th>
-                            <th>Created</th>
-                            <th>Type</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for company in recent_companies_list %}
-                        <tr>
-                            <td>{{ company.name }}</td>
-                            <td>{{ company.created_at.strftime('%Y-%m-%d') }}</td>
-                            <td>
-                                {% if company.is_personal %}
-                                    <span class="badge badge-freelancer">Freelancer</span>
-                                {% else %}
-                                    <span class="badge badge-company">Company</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <a href="{{ url_for('system_admin.system_admin_company_detail', company_id=company.id) }}" class="btn btn-sm">View</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p>No recent companies found.</p>
-            {% endif %}
-        </div>
-    </div>
+        <!-- Right Column -->
+        <div class="content-column">
+            <!-- Top Companies Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon"><i class="ti ti-building"></i></span>
+                        Top Companies by Users
+                    </h2>
+                </div>
+                <div class="card-body">
+                    {% if top_companies %}
+                        <div class="company-list">
+                            {% for company in top_companies %}
+                            <div class="company-item">
+                                <div class="company-info">
+                                    <h4>{{ company.name }}</h4>
+                                    <div class="company-stats">
+                                        <span class="user-count"><i class="ti ti-users"></i> {{ company.user_count }} users</span>
+                                    </div>
+                                </div>
+                                <a href="{{ url_for('system_admin.system_admin_company_detail', company_id=company.id) }}" class="btn btn-sm btn-ghost">
+                                    View <i class="ti ti-arrow-right"></i>
+                                </a>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty-message">No companies found.</p>
+                    {% endif %}
+                </div>
+            </div>
 
-    <!-- Management Actions -->
-    <div class="admin-panel">
-        <h2><i class="ti ti-settings"></i> System Management</h2>
-        <div class="admin-actions">
-            <a href="{{ url_for('users.system_admin_users') }}" class="btn btn-primary">
-                <i class="ti ti-users"></i> Manage All Users
-            </a>
-            <a href="{{ url_for('system_admin.system_admin_companies') }}" class="btn btn-primary">
-                <i class="ti ti-building"></i> Manage Companies
-            </a>
-            <a href="{{ url_for('system_admin.system_admin_time_entries') }}" class="btn btn-primary">
-                <i class="ti ti-clock"></i> View Time Entries
-            </a>
-            <a href="{{ url_for('system_admin.system_admin_settings') }}" class="btn btn-primary">
-                <i class="ti ti-settings"></i> System Settings
-            </a>
-            <a href="{{ url_for('system_admin.branding') }}" class="btn btn-primary">
-                <i class="ti ti-palette"></i> Branding Settings
-            </a>
-            <a href="{{ url_for('system_admin.system_admin_health') }}" class="btn btn-primary">
-                <i class="ti ti-heart-rate-monitor"></i> System Health
-            </a>
+            <!-- Recent Companies Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon"><i class="ti ti-sparkles"></i></span>
+                        Recent Companies
+                    </h2>
+                </div>
+                <div class="card-body">
+                    {% if recent_companies_list %}
+                        <div class="company-list">
+                            {% for company in recent_companies_list %}
+                            <div class="company-item">
+                                <div class="company-info">
+                                    <h4>{{ company.name }}</h4>
+                                    <div class="company-meta">
+                                        <span class="company-date"><i class="ti ti-calendar"></i> {{ company.created_at.strftime('%Y-%m-%d') }}</span>
+                                        {% if company.is_personal %}
+                                            <span class="badge badge-freelancer">Freelancer</span>
+                                        {% else %}
+                                            <span class="badge badge-company">Company</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <a href="{{ url_for('system_admin.system_admin_company_detail', company_id=company.id) }}" class="btn btn-sm btn-ghost">
+                                    View <i class="ti ti-arrow-right"></i>
+                                </a>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty-message">No recent companies found.</p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <style>
+/* Container */
+.system-dashboard-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+/* Stats Section */
 .stats-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
     margin-bottom: 2rem;
 }
 
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
 .stat-card {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
+    background: white;
     padding: 1.5rem;
+    border-radius: 12px;
     text-align: center;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
     position: relative;
 }
 
-.stat-card h3 {
-    font-size: 2rem;
-    margin: 0 0 0.5rem 0;
-    color: #007bff;
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
-.stat-card p {
-    margin: 0;
-    color: #6c757d;
-    font-weight: 500;
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #667eea;
 }
 
-.stat-card small {
-    display: block;
-    color: #6c757d;
-    font-size: 0.8rem;
-    margin-top: 0.25rem;
+.stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
 }
 
 .stat-link {
     position: absolute;
-    bottom: 0.5rem;
-    right: 0.75rem;
-    font-size: 0.8rem;
-    color: #007bff;
+    bottom: 0.75rem;
+    right: 1rem;
+    font-size: 0.875rem;
+    color: #667eea;
     text-decoration: none;
+    opacity: 0.7;
+    transition: opacity 0.2s;
 }
 
 .stat-link:hover {
+    opacity: 1;
     text-decoration: underline;
 }
 
-.alert-section {
-    border: 2px solid #dc3545;
-    border-radius: 8px;
-    padding: 1rem;
-    background: #f8d7da;
+/* Alert Banner */
+.alert-banner {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    border: 2px solid #ef4444;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
 }
 
-.alert-card {
-    background: #f5c6cb;
-    border-color: #dc3545;
+.alert-icon {
+    font-size: 2.5rem;
+    color: #dc2626;
+    flex-shrink: 0;
 }
 
-.alert-card h3 {
-    color: #dc3545;
+.alert-content {
+    flex: 1;
 }
 
-.dashboard-grid {
+.alert-content h3 {
+    margin: 0 0 0.5rem 0;
+    color: #991b1b;
+    font-size: 1.25rem;
+}
+
+.alert-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.alert-item {
+    color: #7f1d1d;
+    font-size: 0.95rem;
+}
+
+/* Content Grid */
+.content-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    grid-template-columns: 1fr 1fr;
     gap: 2rem;
-    margin: 2rem 0;
 }
 
-.dashboard-card {
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
+@media (max-width: 1024px) {
+    .content-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Cards */
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-title .icon {
+    font-size: 1.5rem;
+}
+
+.card-subtitle {
+    font-size: 0.875rem;
+    color: #6b7280;
+    font-weight: 400;
+    margin-left: auto;
+}
+
+.card-body {
     padding: 1.5rem;
 }
 
-.dashboard-card h3 {
-    margin-top: 0;
-    margin-bottom: 1rem;
-    color: #495057;
+/* Info Grid */
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.5rem;
 }
 
-.table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
+.info-item {
+    text-align: center;
 }
 
-.table th,
-.table td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #dee2e6;
+.info-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 0.25rem;
 }
 
-.table th {
-    font-weight: 600;
-    background: #f8f9fa;
-}
-
-.badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
+.info-label {
+    font-size: 0.875rem;
+    color: #6b7280;
     font-weight: 500;
 }
 
+.info-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: #667eea;
+    text-decoration: none;
+}
+
+.info-link:hover {
+    text-decoration: underline;
+}
+
+/* Activity List */
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.activity-item {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.activity-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.activity-icon.new-users {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.activity-icon.new-companies {
+    background: #e0e7ff;
+    color: #4f46e5;
+}
+
+.activity-icon.time-entries {
+    background: #f3e8ff;
+    color: #9333ea;
+}
+
+.activity-content {
+    flex: 1;
+}
+
+.activity-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.activity-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* Action Grid */
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.action-item {
+    display: flex;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+}
+
+.action-item:hover {
+    background: white;
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.action-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+}
+
+.action-icon i {
+    font-size: 2rem;
+    color: #667eea;
+}
+
+.action-content h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+}
+
+.action-content p {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+/* Company List */
+.company-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.company-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.company-item:hover {
+    background: #f3f4f6;
+}
+
+.company-info h4 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+}
+
+.company-stats,
+.company-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.user-count i,
+.company-date i {
+    font-size: 1rem;
+    margin-right: 0.25rem;
+}
+
+/* Badges */
+.badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
 .badge-company {
-    background: #d1ecf1;
-    color: #0c5460;
+    background: #dbeafe;
+    color: #1e40af;
 }
 
 .badge-freelancer {
-    background: #d4edda;
-    color: #155724;
+    background: #d1fae5;
+    color: #065f46;
 }
 
-.admin-panel {
-    margin-top: 2rem;
-    padding: 2rem;
-    background: #f8f9fa;
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
     border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
 }
 
-.admin-actions {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
 }
 
-/* Button styles now centralized in main style.css */
-
-.subtitle {
-    color: #6c757d;
-    margin-bottom: 2rem;
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-warning {
+    background: #f59e0b;
+    color: white;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-ghost {
+    background: transparent;
+    color: #667eea;
+    border: 2px solid #e5e7eb;
+    padding: 0.5rem 1rem;
+}
+
+.btn-ghost:hover {
+    background: #f3f4f6;
+    border-color: #667eea;
+}
+
+.btn-sm {
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+}
+
+/* Empty State */
+.empty-message {
+    text-align: center;
+    color: #6b7280;
+    padding: 2rem;
+    font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .system-dashboard-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .page-title {
+        font-size: 1.75rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .header-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+    
+    .action-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .alert-banner {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: slideIn 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+.card:nth-child(1) { animation-delay: 0.1s; }
+.card:nth-child(2) { animation-delay: 0.2s; }
+.card:nth-child(3) { animation-delay: 0.3s; }
 </style>
 {% endblock %}

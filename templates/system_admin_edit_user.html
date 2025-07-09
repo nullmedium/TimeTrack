@@ -1,19 +1,38 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container">
-    <div class="header-section">
-        <h1>✏️ Edit User: {{ user.username }}</h1>
-        <p class="subtitle">System Administrator - Edit user across companies</p>
-        <a href="{{ url_for('users.system_admin_users') }}" class="btn btn-secondary"><i class="ti ti-arrow-left"></i> Back to Users</a>
+<div class="edit-user-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-user-edit"></i></span>
+                    Edit User: {{ user.username }}
+                </h1>
+                <p class="page-subtitle">System Administrator - Edit user across companies</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('users.system_admin_users') }}" class="btn btn-secondary">
+                    <i class="ti ti-arrow-left"></i>
+                    Back to Users
+                </a>
+            </div>
+        </div>
     </div>
 
-    <div class="form-container">
-        <form method="POST">
-            <div class="form-grid">
-                <!-- Basic Information -->
-                <div class="form-section">
-                    <h3>Basic Information</h3>
+    <!-- Main Form -->
+    <form method="POST" class="user-edit-form">
+        <div class="form-grid">
+            <!-- Basic Information -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon"><i class="ti ti-user"></i></span>
+                        Basic Information
+                    </h2>
+                </div>
+                <div class="card-body">
                     
                     <div class="form-group">
                         <label for="username">Username</label>
@@ -29,10 +48,17 @@
                                class="form-control">
                     </div>
                 </div>
+            </div>
 
-                <!-- Company & Team Assignment -->
-                <div class="form-section">
-                    <h3>Company & Team</h3>
+            <!-- Company & Team Assignment -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon"><i class="ti ti-building"></i></span>
+                        Company & Team
+                    </h2>
+                </div>
+                <div class="card-body">
                     
                     <div class="form-group">
                         <label for="company_id">Company</label>
@@ -60,10 +86,17 @@
                         </select>
                     </div>
                 </div>
+            </div>
 
-                <!-- Role & Permissions -->
-                <div class="form-section">
-                    <h3>Role & Permissions</h3>
+            <!-- Role & Permissions -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon"><i class="ti ti-shield-check"></i></span>
+                        Role & Permissions
+                    </h2>
+                </div>
+                <div class="card-body">
                     
                     <div class="form-group">
                         <label for="role">Role</label>
@@ -76,40 +109,54 @@
                             {% endfor %}
                         </select>
                         {% if user.role == Role.SYSTEM_ADMIN %}
-                        <small class="form-text">⚠️ Warning: This user is a System Administrator</small>
+                        <small class="form-text warning-text"><i class="ti ti-alert-triangle"></i> Warning: This user is a System Administrator</small>
                         {% endif %}
                     </div>
                 </div>
+            </div>
 
-                <!-- Account Status -->
-                <div class="form-section">
-                    <h3>Account Status</h3>
+            <!-- Account Status -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <span class="icon"><i class="ti ti-settings"></i></span>
+                        Account Status
+                    </h2>
+                </div>
+                <div class="card-body">
                     
                     <div class="form-group">
-                        <label class="checkbox-label">
+                        <label class="toggle-label">
                             <input type="checkbox" name="is_verified" 
                                    {% if user.is_verified %}checked{% endif %}>
-                            <span class="checkmark"></span>
-                            Email Verified
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-text">Email Verified</span>
                         </label>
                         <small class="form-text">Whether the user's email address has been verified</small>
                     </div>
 
                     <div class="form-group">
-                        <label class="checkbox-label">
+                        <label class="toggle-label">
                             <input type="checkbox" name="is_blocked" 
                                    {% if user.is_blocked %}checked{% endif %}>
-                            <span class="checkmark"></span>
-                            Account Blocked
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-text">Account Blocked</span>
                         </label>
                         <small class="form-text">Blocked users cannot log in to the system</small>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- User Information Display -->
-            <div class="info-section">
-                <h3>User Information</h3>
+        <!-- User Information Display -->
+        <div class="card full-width">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <span class="icon"><i class="ti ti-info-circle"></i></span>
+                    User Information
+                </h2>
+            </div>
+            <div class="card-body">
                 <div class="info-grid">
                     <div class="info-item">
                         <label>Account Type:</label>
@@ -138,26 +185,46 @@
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Form Actions -->
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Save Changes</button>
-                <a href="{{ url_for('users.system_admin_users') }}" class="btn btn-secondary">Cancel</a>
-                
-                {% if user.id != g.user.id and not (user.role == Role.SYSTEM_ADMIN and user.id == g.user.id) %}
-                <div class="danger-zone">
-                    <h4>Danger Zone</h4>
-                    <p>Permanently delete this user account. This action cannot be undone.</p>
+        <!-- Form Actions -->
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="ti ti-device-floppy"></i>
+                Save Changes
+            </button>
+            <a href="{{ url_for('users.system_admin_users') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+
+    <!-- Danger Zone -->
+    {% if user.id != g.user.id and not (user.role == Role.SYSTEM_ADMIN and user.id == g.user.id) %}
+    <div class="danger-zone">
+        <div class="danger-header">
+            <h2 class="danger-title">
+                <i class="ti ti-alert-triangle"></i>
+                Danger Zone
+            </h2>
+        </div>
+        <div class="danger-content">
+            <div class="danger-item">
+                <div class="danger-info">
+                    <h4>Delete User Account</h4>
+                    <p>Permanently delete this user account. This will also delete all their time entries and cannot be undone.</p>
+                </div>
+                <div class="danger-actions">
                     <form method="POST" action="{{ url_for('users.system_admin_delete_user', user_id=user.id) }}" 
-                          style="display: inline;" 
                           onsubmit="return confirm('Are you sure you want to delete user \'{{ user.username }}\'? This will also delete all their time entries and cannot be undone.')">
-                        <button type="submit" class="btn btn-danger">Delete User</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="ti ti-trash"></i>
+                            Delete User
+                        </button>
                     </form>
                 </div>
-                {% endif %}
             </div>
-        </form>
+        </div>
     </div>
+    {% endif %}
 </div>
 
 <script>
@@ -191,175 +258,402 @@ document.getElementById('company_id').addEventListener('change', function() {
 </script>
 
 <style>
-.header-section {
-    margin-bottom: 2rem;
-}
-
-.subtitle {
-    color: #6c757d;
-    margin-bottom: 1rem;
-}
-
-.form-container {
-    max-width: 800px;
-    background: white;
-    border-radius: 8px;
+/* Container */
+.edit-user-container {
+    max-width: 1200px;
+    margin: 0 auto;
     padding: 2rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+/* Form Grid */
 .form-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
 }
 
-.form-section {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
+/* Cards */
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.card.full-width {
+    grid-column: 1 / -1;
+}
+
+.card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-title .icon {
+    font-size: 1.5rem;
+}
+
+.card-body {
     padding: 1.5rem;
 }
 
-.form-section h3 {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    color: #495057;
-    border-bottom: 2px solid #e9ecef;
-    padding-bottom: 0.5rem;
-}
-
+/* Form Elements */
 .form-group {
     margin-bottom: 1.5rem;
 }
 
 .form-group label {
     display: block;
+    font-weight: 600;
     margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: #495057;
+    color: #374151;
 }
 
 .form-control {
     width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
+    padding: 0.625rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
     font-size: 1rem;
-    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    transition: all 0.2s ease;
 }
 
 .form-control:focus {
-    border-color: #007bff;
-    outline: 0;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .form-text {
     display: block;
     margin-top: 0.25rem;
     font-size: 0.875rem;
-    color: #6c757d;
+    color: #6b7280;
 }
 
-.checkbox-label {
-    display: flex;
+.warning-text {
+    color: #dc2626 !important;
+    font-weight: 500;
+}
+
+/* Toggle Switches */
+.toggle-label {
+    display: inline-flex;
     align-items: center;
+    gap: 0.75rem;
     cursor: pointer;
-    font-weight: normal;
+    margin-bottom: 0.5rem;
 }
 
-.checkbox-label input[type="checkbox"] {
-    margin-right: 0.5rem;
-    margin-bottom: 0;
+.toggle-label input[type="checkbox"] {
+    display: none;
 }
 
-.info-section {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
+.toggle-slider {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    background: #e5e7eb;
+    border-radius: 24px;
+    transition: background 0.3s;
+    flex-shrink: 0;
 }
 
-.info-section h3 {
-    margin-top: 0;
-    margin-bottom: 1rem;
-    color: #495057;
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
+.toggle-label input[type="checkbox"]:checked + .toggle-slider {
+    background: #667eea;
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider::before {
+    transform: translateX(26px);
+}
+
+.toggle-text {
+    font-weight: 500;
+    color: #1f2937;
+}
+
+/* Info Grid */
 .info-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
 }
 
 .info-item {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.5rem;
 }
 
 .info-item label {
     font-weight: 600;
-    color: #6c757d;
+    color: #6b7280;
     font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
+/* Badges */
 .badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
+    text-transform: uppercase;
     display: inline-block;
+    width: fit-content;
 }
 
 .badge-company {
-    background: #d1ecf1;
-    color: #0c5460;
+    background: #dbeafe;
+    color: #1e40af;
 }
 
 .badge-freelancer {
-    background: #d4edda;
-    color: #155724;
+    background: #d1fae5;
+    color: #065f46;
 }
 
 .text-success {
-    color: #28a745;
+    color: #10b981;
+    font-weight: 500;
 }
 
 .text-muted {
-    color: #6c757d;
+    color: #6b7280;
 }
 
+/* Form Actions */
 .form-actions {
     display: flex;
     gap: 1rem;
-    align-items: center;
-    flex-wrap: wrap;
+    padding: 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    margin-bottom: 2rem;
 }
 
-/* Button styles now centralized in main style.css */
-
+/* Danger Zone */
 .danger-zone {
-    margin-left: auto;
-    padding: 1rem;
-    border: 2px solid #dc3545;
+    background: #fef2f2;
+    border: 2px solid #fecaca;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.danger-header {
+    background: #fee2e2;
+    padding: 1.5rem;
+    border-bottom: 1px solid #fecaca;
+}
+
+.danger-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #991b1b;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.danger-content {
+    padding: 2rem;
+}
+
+.danger-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+}
+
+.danger-info h4 {
+    margin: 0 0 0.5rem 0;
+    color: #991b1b;
+    font-weight: 600;
+}
+
+.danger-info p {
+    margin: 0;
+    color: #7f1d1d;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
     border-radius: 8px;
-    background: #f8d7da;
-    max-width: 300px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
 }
 
-.danger-zone h4 {
-    color: #721c24;
-    margin-top: 0;
-    margin-bottom: 0.5rem;
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
 }
 
-.danger-zone p {
-    color: #721c24;
-    font-size: 0.875rem;
-    margin-bottom: 1rem;
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-danger {
+    background: #dc2626;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .edit-user-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .danger-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: slideIn 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+.card:nth-child(1) { animation-delay: 0.1s; }
+.card:nth-child(2) { animation-delay: 0.2s; }
+.card:nth-child(3) { animation-delay: 0.3s; }
+.card:nth-child(4) { animation-delay: 0.4s; }
 </style>
 
 <script>

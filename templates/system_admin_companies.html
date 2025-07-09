@@ -1,313 +1,591 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container">
-    <div class="header-section">
-        <h1><i class="ti ti-building"></i> System Admin - All Companies</h1>
-        <p class="subtitle">Manage companies across the entire system</p>
-        <div class="header-actions">
-            <a href="/setup" class="btn btn-md btn-success">+ Add New Company</a>
-            <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-md btn-secondary"><i class="ti ti-arrow-left"></i> Back to Dashboard</a>
+<div class="companies-admin-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-building"></i></span>
+                    All Companies
+                </h1>
+                <p class="page-subtitle">Manage companies across the entire system</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">
+                    <i class="ti ti-arrow-left"></i>
+                    Back to Dashboard
+                </a>
+                <a href="/setup" class="btn btn-primary">
+                    <i class="ti ti-plus"></i>
+                    Add New Company
+                </a>
+            </div>
         </div>
     </div>
 
-    <!-- Companies Table -->
-    {% if companies.items %}
-    <div class="table-section">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Company Name</th>
-                    <th>Type</th>
-                    <th>Users</th>
-                    <th>Admins</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for company in companies.items %}
-                <tr class="{% if not company.is_active %}inactive-company{% endif %}">
-                    <td>
-                        <strong>{{ company.name }}</strong>
-                        {% if company.slug %}
-                            <br><small class="text-muted">{{ company.slug }}</small>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if company.is_personal %}
-                            <span class="badge badge-freelancer">Freelancer</span>
-                        {% else %}
-                            <span class="badge badge-company">Company</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span class="stat-number">{{ company_stats[company.id]['user_count'] }}</span>
-                        <small>users</small>
-                    </td>
-                    <td>
-                        <span class="stat-number">{{ company_stats[company.id]['admin_count'] }}</span>
-                        <small>admins</small>
-                    </td>
-                    <td>
-                        {% if company.is_active %}
-                            <span class="status-badge status-active">Active</span>
-                        {% else %}
-                            <span class="status-badge status-inactive">Inactive</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ company.created_at.strftime('%Y-%m-%d') }}</td>
-                    <td>
-                        <div class="action-buttons">
-                            <a href="{{ url_for('system_admin.system_admin_company_detail', company_id=company.id) }}" 
-                               class="btn btn-sm btn-primary">View Details</a>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <!-- Summary Statistics -->
+    <div class="stats-section">
+        <div class="stat-card">
+            <div class="stat-value">{{ companies.total }}</div>
+            <div class="stat-label">Total Companies</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ companies.items | selectattr('is_personal') | list | length }}</div>
+            <div class="stat-label">Personal Companies</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ companies.items | rejectattr('is_personal') | list | length }}</div>
+            <div class="stat-label">Business Companies</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ companies.items | selectattr('is_active') | list | length }}</div>
+            <div class="stat-label">Active Companies</div>
+        </div>
     </div>
 
-    <!-- Pagination -->
-    {% if companies.pages > 1 %}
-    <div class="pagination-section">
-        <div class="pagination">
-            {% if companies.has_prev %}
-                <a href="{{ url_for('system_admin.system_admin_companies', page=companies.prev_num) }}" class="page-link"><i class="ti ti-arrow-left"></i> Previous</a>
-            {% endif %}
-            
-            {% for page_num in companies.iter_pages() %}
-                {% if page_num %}
-                    {% if page_num != companies.page %}
-                        <a href="{{ url_for('system_admin.system_admin_companies', page=page_num) }}" class="page-link">{{ page_num }}</a>
-                    {% else %}
-                        <span class="page-link current">{{ page_num }}</span>
+    <!-- Main Content -->
+    <div class="content-section">
+        {% if companies.items %}
+            <!-- Companies Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Company</th>
+                            <th>Type</th>
+                            <th>Users</th>
+                            <th>Admins</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for company in companies.items %}
+                        <tr class="{% if not company.is_active %}inactive-row{% endif %}">
+                            <td>
+                                <div class="company-cell">
+                                    <div class="company-name">{{ company.name }}</div>
+                                    {% if company.slug %}
+                                        <div class="company-slug">{{ company.slug }}</div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if company.is_personal %}
+                                    <span class="badge badge-freelancer">Freelancer</span>
+                                {% else %}
+                                    <span class="badge badge-company">Company</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="stat-cell">
+                                    <span class="stat-number">{{ company_stats[company.id]['user_count'] }}</span>
+                                    <span class="stat-label">users</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="stat-cell">
+                                    <span class="stat-number">{{ company_stats[company.id]['admin_count'] }}</span>
+                                    <span class="stat-label">admins</span>
+                                </div>
+                            </td>
+                            <td>
+                                {% if company.is_active %}
+                                    <span class="status-badge status-active">Active</span>
+                                {% else %}
+                                    <span class="status-badge status-inactive">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="date-text">{{ company.created_at.strftime('%Y-%m-%d') }}</span>
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{{ url_for('system_admin.system_admin_company_detail', company_id=company.id) }}" 
+                                       class="btn-icon" title="View Details">
+                                        <i class="ti ti-eye"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if companies.pages > 1 %}
+            <div class="pagination-container">
+                <div class="pagination">
+                    {% if companies.has_prev %}
+                        <a href="{{ url_for('system_admin.system_admin_companies', page=companies.prev_num) }}" 
+                           class="page-link">
+                            <i class="ti ti-chevron-left"></i>
+                            Previous
+                        </a>
                     {% endif %}
-                {% else %}
-                    <span class="page-link">…</span>
-                {% endif %}
-            {% endfor %}
-            
-            {% if companies.has_next %}
-                <a href="{{ url_for('system_admin.system_admin_companies', page=companies.next_num) }}" class="page-link">Next <i class="ti ti-arrow-right"></i></a>
+                    
+                    <div class="page-numbers">
+                        {% for page_num in companies.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != companies.page %}
+                                    <a href="{{ url_for('system_admin.system_admin_companies', page=page_num) }}" 
+                                       class="page-link">{{ page_num }}</a>
+                                {% else %}
+                                    <span class="page-link current">{{ page_num }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="page-dots">...</span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    
+                    {% if companies.has_next %}
+                        <a href="{{ url_for('system_admin.system_admin_companies', page=companies.next_num) }}" 
+                           class="page-link">
+                            Next
+                            <i class="ti ti-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+                
+                <div class="pagination-info">
+                    Showing {{ companies.per_page * (companies.page - 1) + 1 }} - 
+                    {{ companies.per_page * (companies.page - 1) + companies.items|length }} of {{ companies.total }} companies
+                </div>
+            </div>
             {% endif %}
-        </div>
-        
-        <p class="pagination-info">
-            Showing {{ companies.per_page * (companies.page - 1) + 1 }} - 
-            {{ companies.per_page * (companies.page - 1) + companies.items|length }} of {{ companies.total }} companies
-        </p>
-    </div>
-    {% endif %}
 
-    {% else %}
-    <div class="empty-state">
-        <h3>No companies found</h3>
-        <p>No companies exist in the system yet.</p>
-    </div>
-    {% endif %}
-
-    <!-- Company Statistics Summary -->
-    <div class="summary-section">
-        <h3><i class="ti ti-chart-bar"></i> Company Summary</h3>
-        <div class="summary-grid">
-            <div class="summary-card">
-                <h4>Total Companies</h4>
-                <p class="summary-number">{{ companies.total }}</p>
+        {% else %}
+            <!-- Empty State -->
+            <div class="empty-state">
+                <div class="empty-icon"><i class="ti ti-building-community"></i></div>
+                <h3 class="empty-title">No Companies Yet</h3>
+                <p class="empty-message">No companies exist in the system.</p>
+                <a href="/setup" class="btn btn-primary">
+                    <i class="ti ti-plus"></i>
+                    Create First Company
+                </a>
             </div>
-            <div class="summary-card">
-                <h4>Personal Companies</h4>
-                <p class="summary-number">{{ companies.items | selectattr('is_personal') | list | length }}</p>
-            </div>
-            <div class="summary-card">
-                <h4>Business Companies</h4>
-                <p class="summary-number">{{ companies.items | rejectattr('is_personal') | list | length }}</p>
-            </div>
-            <div class="summary-card">
-                <h4>Active Companies</h4>
-                <p class="summary-number">{{ companies.items | selectattr('is_active') | list | length }}</p>
-            </div>
-        </div>
+        {% endif %}
     </div>
 </div>
 
 <style>
-.header-section {
+/* Container */
+.companies-admin-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+/* Stats Section */
+.stats-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
     margin-bottom: 2rem;
 }
 
-.subtitle {
-    color: #6c757d;
-    margin-bottom: 1rem;
-}
-
-.table-section {
+.stat-card {
     background: white;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    margin-bottom: 2rem;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
 }
 
-.table {
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #667eea;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* Content Section */
+.content-section {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+}
+
+/* Table Container */
+.table-container {
+    overflow-x: auto;
+}
+
+.data-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 0;
 }
 
-.table th,
-.table td {
-    padding: 1rem;
+.data-table th,
+.data-table td {
+    padding: 1rem 1.5rem;
     text-align: left;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid #e5e7eb;
 }
 
-.table th {
+.data-table th {
     background: #f8f9fa;
     font-weight: 600;
-    color: #495057;
-}
-
-.inactive-company {
-    background-color: #f8f9fa !important;
-    opacity: 0.7;
-}
-
-.text-muted {
-    color: #6c757d;
+    color: #374151;
     font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
+.data-table tr:hover {
+    background: #f8f9fa;
+}
+
+.inactive-row {
+    opacity: 0.6;
+}
+
+/* Company Cell */
+.company-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.company-name {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.company-slug {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* Stat Cell */
+.stat-cell {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+}
+
+.stat-cell .stat-number {
+    font-weight: 700;
+    color: #667eea;
+    font-size: 1.1rem;
+}
+
+.stat-cell .stat-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* Date Text */
+.date-text {
+    color: #6b7280;
+    font-size: 0.95rem;
+}
+
+/* Badges */
 .badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
+    text-transform: uppercase;
 }
 
 .badge-company {
-    background: #d1ecf1;
-    color: #0c5460;
+    background: #dbeafe;
+    color: #1e40af;
 }
 
 .badge-freelancer {
-    background: #d4edda;
-    color: #155724;
+    background: #d1fae5;
+    color: #065f46;
 }
 
-.stat-number {
-    font-weight: 600;
-    color: #007bff;
-}
-
+/* Status Badges */
 .status-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
+    text-transform: uppercase;
 }
 
 .status-active {
-    background: #d4edda;
-    color: #155724;
+    background: #d1fae5;
+    color: #065f46;
 }
 
 .status-inactive {
-    background: #f8d7da;
-    color: #721c24;
+    background: #fee2e2;
+    color: #991b1b;
 }
 
-.action-buttons {
+/* Table Actions */
+.table-actions {
     display: flex;
     gap: 0.5rem;
 }
 
-/* Button styles now centralized in main style.css */
+.btn-icon {
+    color: #6b7280;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
 
-.pagination-section {
-    margin: 2rem 0;
+.btn-icon:hover {
+    background: #667eea;
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* Pagination */
+.pagination-container {
+    padding: 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 1rem;
+    border-top: 1px solid #e5e7eb;
 }
 
 .pagination {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.page-numbers {
     display: flex;
     gap: 0.25rem;
 }
 
 .page-link {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #dee2e6;
-    color: #007bff;
+    padding: 0.5rem 1rem;
+    border: 1px solid #e5e7eb;
+    color: #667eea;
     text-decoration: none;
-    border-radius: 4px;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
 }
 
 .page-link:hover {
-    background: #e9ecef;
+    background: #f3f4f6;
+    border-color: #667eea;
 }
 
 .page-link.current {
-    background: #007bff;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    border-color: #007bff;
+    border-color: transparent;
+}
+
+.page-dots {
+    padding: 0.5rem;
+    color: #6b7280;
 }
 
 .pagination-info {
-    color: #6c757d;
-    margin: 0;
-    font-size: 0.9rem;
+    color: #6b7280;
+    font-size: 0.875rem;
 }
 
+/* Empty State */
 .empty-state {
     text-align: center;
-    padding: 3rem;
-    color: #6c757d;
+    padding: 4rem 2rem;
 }
 
-.summary-section {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 2rem;
-}
-
-.summary-section h3 {
-    margin-top: 0;
+.empty-icon {
+    font-size: 4rem;
     margin-bottom: 1.5rem;
-    color: #495057;
+    opacity: 0.3;
 }
 
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+.empty-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
 }
 
-.summary-card {
-    background: white;
+.empty-message {
+    font-size: 1.1rem;
+    color: #6b7280;
+    margin-bottom: 2rem;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
     border-radius: 8px;
-    padding: 1.5rem;
-    text-align: center;
-    border: 1px solid #dee2e6;
-}
-
-.summary-card h4 {
-    margin: 0 0 0.5rem 0;
-    color: #6c757d;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-.summary-number {
-    font-size: 2rem;
     font-weight: 600;
-    color: #007bff;
-    margin: 0;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .companies-admin-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .header-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+    
+    .table-container {
+        margin: 0 -1rem;
+    }
+    
+    .data-table {
+        font-size: 0.875rem;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 0.75rem;
+    }
+    
+    .pagination-container {
+        flex-direction: column;
+    }
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.content-section {
+    animation: slideIn 0.3s ease-out;
 }
 </style>
 {% endblock %}

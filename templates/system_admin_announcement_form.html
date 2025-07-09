@@ -1,164 +1,213 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container">
-    <div class="header-section">
-        <h1>{{ "Edit" if announcement else "Create" }} Announcement</h1>
-        <p class="subtitle">{{ "Update" if announcement else "Create new" }} system announcement for users</p>
-        <a href="{{ url_for('announcements.index') }}" class="btn btn-secondary">
-            <i class="ti ti-arrow-left"></i> Back to Announcements
-        </a>
+<div class="announcement-form-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-speakerphone"></i></span>
+                    {{ "Edit" if announcement else "Create" }} Announcement
+                </h1>
+                <p class="page-subtitle">{{ "Update" if announcement else "Create new" }} system announcement for users</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('announcements.index') }}" class="btn btn-secondary">
+                    <i class="ti ti-arrow-left"></i>
+                    Back to Announcements
+                </a>
+            </div>
+        </div>
     </div>
 
-    <div class="form-section">
-        <form method="POST" class="announcement-form">
-            <div class="form-group">
-                <label for="title">Title</label>
-                <input type="text" 
-                       id="title" 
-                       name="title" 
-                       value="{{ announcement.title if announcement else '' }}" 
-                       required 
-                       maxlength="200"
-                       class="form-control">
+    <!-- Main Form -->
+    <form method="POST" class="announcement-form">
+        <!-- Basic Information -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <span class="icon"><i class="ti ti-forms"></i></span>
+                    Basic Information
+                </h2>
             </div>
-
-            <div class="form-group">
-                <label for="content">Content</label>
-                <textarea id="content" 
-                          name="content" 
-                          required 
-                          rows="6"
-                          class="form-control">{{ announcement.content if announcement else '' }}</textarea>
-                <small class="form-text">You can use HTML formatting in the content.</small>
-            </div>
-
-            <div class="form-row">
+            <div class="card-body">
                 <div class="form-group">
-                    <label for="announcement_type">Type</label>
-                    <select id="announcement_type" name="announcement_type" class="form-control">
-                        <option value="info" {{ 'selected' if announcement and announcement.announcement_type == 'info' else '' }}>Info</option>
-                        <option value="warning" {{ 'selected' if announcement and announcement.announcement_type == 'warning' else '' }}>Warning</option>
-                        <option value="success" {{ 'selected' if announcement and announcement.announcement_type == 'success' else '' }}>Success</option>
-                        <option value="danger" {{ 'selected' if announcement and announcement.announcement_type == 'danger' else '' }}>Danger</option>
-                    </select>
+                    <label for="title">Title</label>
+                    <input type="text" 
+                           id="title" 
+                           name="title" 
+                           value="{{ announcement.title if announcement else '' }}" 
+                           required 
+                           maxlength="200"
+                           class="form-control"
+                           placeholder="Enter announcement title">
                 </div>
 
                 <div class="form-group">
-                    <label class="checkbox-container">
-                        <input type="checkbox" 
-                               name="is_urgent" 
-                               {{ 'checked' if announcement and announcement.is_urgent else '' }}>
-                        <span class="checkmark"></span>
-                        Mark as Urgent
-                    </label>
+                    <label for="content">Content</label>
+                    <textarea id="content" 
+                              name="content" 
+                              required 
+                              rows="6"
+                              class="form-control"
+                              placeholder="Enter announcement content">{{ announcement.content if announcement else '' }}</textarea>
+                    <small class="form-text">You can use HTML formatting in the content.</small>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-container">
-                        <input type="checkbox" 
-                               name="is_active" 
-                               {{ 'checked' if not announcement or announcement.is_active else '' }}>
-                        <span class="checkmark"></span>
-                        Active
-                    </label>
-                </div>
-            </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="announcement_type">Type</label>
+                        <select id="announcement_type" name="announcement_type" class="form-control">
+                            <option value="info" {{ 'selected' if announcement and announcement.announcement_type == 'info' else '' }}>
+                                <i class="ti ti-info-circle"></i> Info
+                            </option>
+                            <option value="warning" {{ 'selected' if announcement and announcement.announcement_type == 'warning' else '' }}>
+                                <i class="ti ti-alert-triangle"></i> Warning
+                            </option>
+                            <option value="success" {{ 'selected' if announcement and announcement.announcement_type == 'success' else '' }}>
+                                <i class="ti ti-circle-check"></i> Success
+                            </option>
+                            <option value="danger" {{ 'selected' if announcement and announcement.announcement_type == 'danger' else '' }}>
+                                <i class="ti ti-alert-circle"></i> Danger
+                            </option>
+                        </select>
+                    </div>
 
-        <div class="form-section">
-            <h3>Scheduling</h3>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="start_date">Start Date/Time (Optional)</label>
-                    <input type="datetime-local" 
-                           id="start_date" 
-                           name="start_date" 
-                           value="{{ announcement.start_date.strftime('%Y-%m-%dT%H:%M') if announcement and announcement.start_date else '' }}"
-                           class="form-control">
-                    <small class="form-text">Leave empty to show immediately</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="end_date">End Date/Time (Optional)</label>
-                    <input type="datetime-local" 
-                           id="end_date" 
-                           name="end_date" 
-                           value="{{ announcement.end_date.strftime('%Y-%m-%dT%H:%M') if announcement and announcement.end_date else '' }}"
-                           class="form-control">
-                    <small class="form-text">Leave empty for no expiry</small>
+                    <div class="form-group">
+                        <label>Options</label>
+                        <div class="checkbox-group">
+                            <label class="toggle-label">
+                                <input type="checkbox" 
+                                       name="is_urgent" 
+                                       {{ 'checked' if announcement and announcement.is_urgent else '' }}>
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-text">Mark as Urgent</span>
+                            </label>
+                            
+                            <label class="toggle-label">
+                                <input type="checkbox" 
+                                       name="is_active" 
+                                       {{ 'checked' if not announcement or announcement.is_active else '' }}>
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-text">Active</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="form-section">
-            <h3>Targeting</h3>
-            <div class="form-row">
+        <!-- Scheduling -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <span class="icon"><i class="ti ti-calendar-event"></i></span>
+                    Scheduling
+                </h2>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="start_date">Start Date/Time</label>
+                        <input type="datetime-local" 
+                               id="start_date" 
+                               name="start_date" 
+                               value="{{ announcement.start_date.strftime('%Y-%m-%dT%H:%M') if announcement and announcement.start_date else '' }}"
+                               class="form-control">
+                        <small class="form-text">Leave empty to show immediately</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="end_date">End Date/Time</label>
+                        <input type="datetime-local" 
+                               id="end_date" 
+                               name="end_date" 
+                               value="{{ announcement.end_date.strftime('%Y-%m-%dT%H:%M') if announcement and announcement.end_date else '' }}"
+                               class="form-control">
+                        <small class="form-text">Leave empty for no expiry</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Targeting -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <span class="icon"><i class="ti ti-target"></i></span>
+                    Targeting
+                </h2>
+            </div>
+            <div class="card-body">
                 <div class="form-group">
-                    <label class="checkbox-container">
+                    <label class="toggle-label main-toggle">
                         <input type="checkbox" 
                                name="target_all_users" 
                                id="target_all_users"
                                {{ 'checked' if not announcement or announcement.target_all_users else '' }}
                                onchange="toggleTargeting()">
-                        <span class="checkmark"></span>
-                        Target All Users
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-text">Target All Users</span>
                     </label>
+                    <small class="form-text">When enabled, announcement will be shown to all users regardless of role or company</small>
                 </div>
-            </div>
 
-            <div id="targeting_options" style="display: {{ 'none' if not announcement or announcement.target_all_users else 'block' }};">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Target Roles</label>
-                        <div class="checkbox-list">
-                            {% set selected_roles = [] %}
-                            {% if announcement and announcement.target_roles %}
-                                {% set selected_roles = announcement.target_roles|from_json %}
-                            {% endif %}
-                            {% for role in roles %}
-                            <label class="checkbox-container">
-                                <input type="checkbox" 
-                                       name="target_roles" 
-                                       value="{{ role }}"
-                                       {{ 'checked' if role in selected_roles else '' }}>
-                                <span class="checkmark"></span>
-                                {{ role }}
-                            </label>
-                            {% endfor %}
+                <div id="targeting_options" style="display: {{ 'none' if not announcement or announcement.target_all_users else 'block' }};">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label><i class="ti ti-user-check"></i> Target Roles</label>
+                            <div class="checkbox-list">
+                                {% set selected_roles = [] %}
+                                {% if announcement and announcement.target_roles %}
+                                    {% set selected_roles = announcement.target_roles|from_json %}
+                                {% endif %}
+                                {% for role in roles %}
+                                <label class="checkbox-item">
+                                    <input type="checkbox" 
+                                           name="target_roles" 
+                                           value="{{ role }}"
+                                           {{ 'checked' if role in selected_roles else '' }}>
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-label">{{ role }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="form-group">
-                        <label>Target Companies</label>
-                        <div class="checkbox-list">
-                            {% set selected_companies = [] %}
-                            {% if announcement and announcement.target_companies %}
-                                {% set selected_companies = announcement.target_companies|from_json %}
-                            {% endif %}
-                            {% for company in companies %}
-                            <label class="checkbox-container">
-                                <input type="checkbox" 
-                                       name="target_companies" 
-                                       value="{{ company.id }}"
-                                       {{ 'checked' if company.id in selected_companies else '' }}>
-                                <span class="checkmark"></span>
-                                {{ company.name }}
-                            </label>
-                            {% endfor %}
+                        <div class="form-group">
+                            <label><i class="ti ti-building"></i> Target Companies</label>
+                            <div class="checkbox-list">
+                                {% set selected_companies = [] %}
+                                {% if announcement and announcement.target_companies %}
+                                    {% set selected_companies = announcement.target_companies|from_json %}
+                                {% endif %}
+                                {% for company in companies %}
+                                <label class="checkbox-item">
+                                    <input type="checkbox" 
+                                           name="target_companies" 
+                                           value="{{ company.id }}"
+                                           {{ 'checked' if company.id in selected_companies else '' }}>
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-label">{{ company.name }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">
-                    {{ "Update" if announcement else "Create" }} Announcement
-                </button>
-                <a href="{{ url_for('announcements.index') }}" class="btn btn-secondary">Cancel</a>
-            </div>
-        </form>
-    </div>
+        <!-- Form Actions -->
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="ti ti-device-floppy"></i>
+                {{ "Update" if announcement else "Create" }} Announcement
+            </button>
+            <a href="{{ url_for('announcements.index') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
 </div>
 
 <script>
@@ -180,155 +229,334 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-.header-section {
-    margin-bottom: 2rem;
+/* Container */
+.announcement-form-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
 }
 
-.subtitle {
-    color: #6c757d;
-    margin-bottom: 1rem;
-}
-
-.form-section {
-    background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
     padding: 2rem;
     margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+/* Cards */
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-title .icon {
+    font-size: 1.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Form */
 .announcement-form {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
-}
-
-.form-section h3 {
-    margin-top: 0;
-    margin-bottom: 1rem;
-    color: #495057;
-    font-size: 1.2rem;
-    border-bottom: 1px solid #e9ecef;
-    padding-bottom: 0.5rem;
+    gap: 0;
 }
 
 .form-group {
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .form-group label {
     display: block;
+    font-weight: 600;
     margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: #495057;
+    color: #374151;
 }
 
 .form-control {
     width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
+    padding: 0.625rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
     font-size: 1rem;
-    box-sizing: border-box;
+    transition: all 0.2s ease;
 }
 
 .form-control:focus {
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+textarea.form-control {
+    resize: vertical;
+    min-height: 120px;
 }
 
 .form-text {
     display: block;
     margin-top: 0.25rem;
-    color: #6c757d;
     font-size: 0.875rem;
+    color: #6b7280;
 }
 
 .form-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+/* Toggle Switches */
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
 }
 
-.checkbox-container {
-    display: block;
-    position: relative;
-    padding-left: 35px;
-    margin-bottom: 12px;
+.toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
     cursor: pointer;
-    font-size: 16px;
-    user-select: none;
+    margin-bottom: 0;
+    padding: 0;
 }
 
-.checkbox-container input {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
-}
-
-.checkmark {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 25px;
-    width: 25px;
-    background-color: #eee;
-    border-radius: 4px;
-}
-
-.checkbox-container:hover input ~ .checkmark {
-    background-color: #ccc;
-}
-
-.checkbox-container input:checked ~ .checkmark {
-    background-color: #2196F3;
-}
-
-.checkmark:after {
-    content: "";
-    position: absolute;
+.toggle-label input[type="checkbox"] {
     display: none;
 }
 
-.checkbox-container input:checked ~ .checkmark:after {
-    display: block;
+.toggle-slider {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    background: #e5e7eb;
+    border-radius: 24px;
+    transition: background 0.3s;
+    flex-shrink: 0;
 }
 
-.checkbox-container .checkmark:after {
-    left: 9px;
-    top: 5px;
-    width: 5px;
-    height: 10px;
-    border: solid white;
-    border-width: 0 3px 3px 0;
-    transform: rotate(45deg);
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
+.toggle-label input[type="checkbox"]:checked + .toggle-slider {
+    background: #667eea;
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider::before {
+    transform: translateX(26px);
+}
+
+.toggle-text {
+    font-weight: 500;
+    color: #1f2937;
+}
+
+.main-toggle {
+    margin-bottom: 1rem;
+}
+
+/* Checkbox Lists */
 .checkbox-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 0.5rem;
-    max-height: 200px;
+    gap: 0.75rem;
+    max-height: 250px;
     overflow-y: auto;
-    border: 1px solid #ced4da;
-    border-radius: 0.25rem;
-    padding: 0.75rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1rem;
     background: #f8f9fa;
 }
 
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.25rem 0;
+}
+
+.checkbox-item input[type="checkbox"] {
+    display: none;
+}
+
+.checkbox-custom {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #e5e7eb;
+    border-radius: 4px;
+    background: white;
+    transition: all 0.2s ease;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.checkbox-item:hover .checkbox-custom {
+    border-color: #667eea;
+}
+
+.checkbox-item input[type="checkbox"]:checked + .checkbox-custom {
+    background: #667eea;
+    border-color: #667eea;
+}
+
+.checkbox-item input[type="checkbox"]:checked + .checkbox-custom::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.checkbox-label {
+    color: #374151;
+    font-size: 0.95rem;
+}
+
+/* Form Actions */
 .form-actions {
     display: flex;
     gap: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #e9ecef;
+    padding: 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    margin-top: 2rem;
 }
 
-/* Button styles now centralized in main style.css */
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
 
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
+    .announcement-form-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
     .form-row {
         grid-template-columns: 1fr;
     }
@@ -336,6 +564,36 @@ document.addEventListener('DOMContentLoaded', function() {
     .checkbox-list {
         grid-template-columns: 1fr;
     }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: slideIn 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+.card:nth-child(1) { animation-delay: 0.1s; }
+.card:nth-child(2) { animation-delay: 0.2s; }
+.card:nth-child(3) { animation-delay: 0.3s; }
 </style>
 {% endblock %}

@@ -1,35 +1,51 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container">
-    <div class="header-section">
-        <h1>⚙️ System Administrator Settings</h1>
-        <p class="subtitle">Global system configuration and management</p>
-        <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary"><i class="ti ti-arrow-left"></i> Back to Dashboard</a>
-    </div>
-
-    <!-- System Statistics -->
-    <div class="stats-section">
-        <h3>📊 System Overview</h3>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h4>{{ total_companies }}</h4>
-                <p>Total Companies</p>
+<div class="settings-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-settings"></i></span>
+                    System Administrator Settings
+                </h1>
+                <p class="page-subtitle">Global system configuration and management</p>
             </div>
-            <div class="stat-card">
-                <h4>{{ total_users }}</h4>
-                <p>Total Users</p>
-            </div>
-            <div class="stat-card">
-                <h4>{{ total_system_admins }}</h4>
-                <p>System Administrators</p>
+            <div class="header-actions">
+                <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">
+                    <i class="ti ti-arrow-left"></i>
+                    Back to Dashboard
+                </a>
             </div>
         </div>
     </div>
 
+    <!-- System Statistics -->
+    <div class="stats-section">
+        <div class="stat-card">
+            <div class="stat-value">{{ total_companies }}</div>
+            <div class="stat-label">Total Companies</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_users }}</div>
+            <div class="stat-label">Total Users</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ total_system_admins }}</div>
+            <div class="stat-label">System Administrators</div>
+        </div>
+    </div>
+
     <!-- System Settings Form -->
-    <div class="settings-section">
-        <h3>🔧 System Configuration</h3>
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span class="icon"><i class="ti ti-adjustments"></i></span>
+                System Configuration
+            </h2>
+        </div>
+        <div class="card-body">
         <form method="POST" class="settings-form">
             <div class="setting-group">
                 <div class="setting-header">
@@ -111,11 +127,18 @@
                 <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
+        </div>
     </div>
 
     <!-- System Information -->
-    <div class="info-section">
-        <h3>ℹ️ System Information</h3>
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span class="icon"><i class="ti ti-info-circle"></i></span>
+                System Information
+            </h2>
+        </div>
+        <div class="card-body">
         <div class="info-grid">
             <div class="info-card">
                 <h4>Application Version</h4>
@@ -130,11 +153,17 @@
                 <p>Full system control</p>
             </div>
         </div>
+        </div>
     </div>
 
     <!-- Danger Zone -->
-    <div class="danger-section">
-        <h3>⚠️ Danger Zone</h3>
+    <div class="danger-zone">
+        <div class="danger-header">
+            <h2 class="danger-title">
+                <i class="ti ti-alert-triangle"></i>
+                Danger Zone
+            </h2>
+        </div>
         <div class="danger-content">
             <div class="danger-item">
                 <div class="danger-info">
@@ -164,8 +193,14 @@
     </div>
 
     <!-- Quick Actions -->
-    <div class="actions-section">
-        <h3>🚀 Quick Actions</h3>
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span class="icon"><i class="ti ti-rocket"></i></span>
+                Quick Actions
+            </h2>
+        </div>
+        <div class="card-body">
         <div class="actions-grid">
             <a href="{{ url_for('users.system_admin_users') }}" class="action-card">
                 <div class="action-icon"><i class="ti ti-users"></i></div>
@@ -176,7 +211,7 @@
             </a>
             
             <a href="{{ url_for('system_admin.system_admin_companies') }}" class="action-card">
-                <div class="action-icon">🏢</div>
+                <div class="action-icon"><i class="ti ti-building"></i></div>
                 <div class="action-content">
                     <h4>Manage Companies</h4>
                     <p>View and manage all companies in the system</p>
@@ -184,77 +219,145 @@
             </a>
             
             <a href="{{ url_for('system_admin.system_admin_time_entries') }}" class="action-card">
-                <div class="action-icon">⏱️</div>
+                <div class="action-icon"><i class="ti ti-clock"></i></div>
                 <div class="action-content">
                     <h4>View Time Entries</h4>
                     <p>Browse time tracking data across all companies</p>
                 </div>
             </a>
         </div>
+        </div>
     </div>
 </div>
 
 <style>
-.header-section {
-    margin-bottom: 2rem;
+/* Container */
+.settings-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
 }
 
-.subtitle {
-    color: #6c757d;
-    margin-bottom: 1rem;
-}
-
-.stats-section {
-    background: #f8f9fa;
-    border-radius: 8px;
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
     padding: 2rem;
     margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
-.stats-section h3 {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    color: #495057;
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
 }
 
-.stats-grid {
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: rotate 8s linear infinite;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+/* Stats Section */
+.stats-section {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
 }
 
 .stat-card {
     background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
     padding: 1.5rem;
+    border-radius: 12px;
     text-align: center;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
 }
 
-.stat-card h4 {
-    font-size: 2rem;
-    margin: 0 0 0.5rem 0;
-    color: #007bff;
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
-.stat-card p {
-    margin: 0;
-    color: #6c757d;
-    font-weight: 500;
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #667eea;
 }
 
-.settings-section {
+.stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* Cards */
+.card {
     background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 2rem;
-    margin-bottom: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
 }
 
-.settings-section h3 {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    color: #495057;
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-title .icon {
+    font-size: 1.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
 }
 
 .settings-form {
@@ -268,8 +371,9 @@
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
     padding: 1.5rem;
-    border: 1px solid #e9ecef;
+    border: 1px solid #e5e7eb;
     border-radius: 8px;
+    background: #f8f9fa;
 }
 
 .setting-group.full-width {
@@ -295,7 +399,8 @@
 
 .setting-header h4 {
     margin: 0 0 0.5rem 0;
-    color: #495057;
+    color: #1f2937;
+    font-weight: 600;
 }
 
 .setting-header p {
@@ -320,7 +425,7 @@
     position: relative;
     width: 50px;
     height: 24px;
-    background: #ccc;
+    background: #e5e7eb;
     border-radius: 24px;
     transition: background 0.3s;
 }
@@ -335,10 +440,11 @@
     top: 2px;
     left: 2px;
     transition: transform 0.3s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .toggle-label input[type="checkbox"]:checked + .toggle-slider {
-    background: #007bff;
+    background: #667eea;
 }
 
 .toggle-label input[type="checkbox"]:checked + .toggle-slider::before {
@@ -347,7 +453,7 @@
 
 .toggle-text {
     font-weight: 500;
-    color: #495057;
+    color: #1f2937;
 }
 
 .setting-description {
@@ -359,21 +465,9 @@
 .form-actions {
     display: flex;
     gap: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #e9ecef;
-}
-
-.info-section {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-}
-
-.info-section h3 {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    color: #495057;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+    margin-top: 2rem;
 }
 
 .info-grid {
@@ -383,41 +477,62 @@
 }
 
 .info-card {
-    background: white;
-    border: 1px solid #dee2e6;
+    background: #f8f9fa;
+    border: 1px solid #e5e7eb;
     border-radius: 8px;
     padding: 1.5rem;
 }
 
 .info-card h4 {
     margin: 0 0 0.5rem 0;
-    color: #495057;
-    font-size: 1rem;
+    color: #374151;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
 }
 
 .info-card p {
     margin: 0;
-    color: #6c757d;
+    color: #1f2937;
+    font-size: 1.1rem;
+    font-weight: 500;
 }
 
-.danger-section {
-    background: #f8d7da;
-    border: 2px solid #dc3545;
-    border-radius: 8px;
-    padding: 2rem;
-    margin-bottom: 2rem;
+/* Danger Zone */
+.danger-zone {
+    margin-top: 3rem;
+    background: #fef2f2;
+    border: 2px solid #fecaca;
+    border-radius: 12px;
+    overflow: hidden;
 }
 
-.danger-section h3 {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    color: #721c24;
+.danger-header {
+    background: #fee2e2;
+    padding: 1.5rem;
+    border-bottom: 1px solid #fecaca;
+}
+
+.danger-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #991b1b;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.danger-title i {
+    font-size: 1.5rem;
 }
 
 .danger-content {
+    padding: 2rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.5rem;
 }
 
 .danger-item {
@@ -427,82 +542,145 @@
     background: white;
     padding: 1.5rem;
     border-radius: 8px;
-    border: 1px solid #dc3545;
+    border: 1px solid #fecaca;
+    gap: 2rem;
 }
 
 .danger-info h4 {
     margin: 0 0 0.5rem 0;
-    color: #721c24;
+    color: #991b1b;
+    font-weight: 600;
 }
 
 .danger-info p {
     margin: 0;
-    color: #721c24;
+    color: #7f1d1d;
     font-size: 0.9rem;
-}
-
-.actions-section {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 2rem;
-}
-
-.actions-section h3 {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    color: #495057;
+    line-height: 1.5;
 }
 
 .actions-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1rem;
+    gap: 1.5rem;
 }
 
 .action-card {
-    background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 1.5rem;
     display: flex;
-    align-items: center;
-    gap: 1rem;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
     text-decoration: none;
-    color: inherit;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    align-items: center;
 }
 
 .action-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: white;
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
     text-decoration: none;
-    color: inherit;
 }
 
 .action-icon {
-    font-size: 2rem;
-    width: 60px;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f8f9fa;
-    border-radius: 8px;
+    font-size: 2.5rem;
+    flex-shrink: 0;
+}
+
+.action-icon i {
+    font-size: 2.5rem;
+    color: #667eea;
 }
 
 .action-content h4 {
-    margin: 0 0 0.5rem 0;
-    color: #495057;
+    margin: 0 0 0.25rem 0;
+    color: #1f2937;
+    font-weight: 600;
+    font-size: 1.1rem;
 }
 
 .action-content p {
     margin: 0;
-    color: #6c757d;
-    font-size: 0.875rem;
+    color: #6b7280;
+    font-size: 0.9rem;
 }
 
-/* Button styles now centralized in main style.css */
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
 
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-danger {
+    background: #dc2626;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.btn-warning {
+    background: #f59e0b;
+    color: white;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
+    .settings-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
     .setting-group {
         grid-template-columns: 1fr;
     }
@@ -513,5 +691,26 @@
         gap: 1rem;
     }
 }
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: slideIn 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+.card:nth-child(1) { animation-delay: 0.1s; }
+.card:nth-child(2) { animation-delay: 0.2s; }
+.card:nth-child(3) { animation-delay: 0.3s; }
 </style>
 {% endblock %}

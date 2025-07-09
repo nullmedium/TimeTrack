@@ -1,54 +1,69 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="management-container">
-    <div class="management-header">
-        <h1>🎨 Branding Settings</h1>
-        <div class="management-actions">
-            <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary"><i class="ti ti-arrow-left"></i> Back to Dashboard</a>
+<div class="branding-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-palette"></i></span>
+                    Branding Settings
+                </h1>
+                <p class="page-subtitle">Customize the appearance and branding of {{ branding.app_name }}</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">
+                    <i class="ti ti-arrow-left"></i>
+                    Back to Dashboard
+                </a>
+            </div>
         </div>
     </div>
-    
-    <p class="subtitle">Customize the appearance and branding of {{ branding.app_name }}</p>
 
     <!-- Current Branding Preview -->
-    <div class="management-section">
-        <h2>👁️ Current Branding Preview</h2>
-        <div class="management-card branding-preview-card">
-            <div class="card-header">
-                <h3>Live Preview</h3>
-            </div>
-            <div class="card-body">
-                <div class="preview-demo">
-                    <div class="demo-header">
-                        {% if branding.logo_filename %}
-                            <img src="{{ url_for('static', filename='uploads/branding/' + branding.logo_filename) }}" 
-                                 alt="{{ branding.logo_alt_text }}" 
-                                 class="demo-logo">
-                        {% else %}
-                            <span class="demo-text-logo">{{ branding.app_name }}</span>
-                        {% endif %}
-                    </div>
-                    <div class="demo-content">
-                        <p>Welcome to {{ branding.app_name }}</p>
-                        <button class="btn btn-primary" style="background-color: {{ branding.primary_color }}; border-color: {{ branding.primary_color }};">
-                            Sample Button
-                        </button>
-                        <a href="#" style="color: {{ branding.primary_color }};">Sample Link</a>
-                    </div>
+    <div class="card preview-card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span class="icon"><i class="ti ti-eye"></i></span>
+                Current Branding Preview
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="preview-demo">
+                <div class="demo-header">
+                    {% if branding.logo_filename %}
+                        <img src="{{ url_for('static', filename='uploads/branding/' + branding.logo_filename) }}" 
+                             alt="{{ branding.logo_alt_text }}" 
+                             class="demo-logo">
+                    {% else %}
+                        <span class="demo-text-logo">{{ branding.app_name }}</span>
+                    {% endif %}
+                </div>
+                <div class="demo-content">
+                    <p>Welcome to {{ branding.app_name }}</p>
+                    <button class="btn btn-primary" style="background-color: {{ branding.primary_color }}; border-color: {{ branding.primary_color }};">
+                        Sample Button
+                    </button>
+                    <a href="#" style="color: {{ branding.primary_color }};">Sample Link</a>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Branding Settings Form -->
-    <div class="management-section">
-        <h2><i class="ti ti-tool"></i> Branding Configuration</h2>
-        <div class="management-card">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span class="icon"><i class="ti ti-settings"></i></span>
+                Branding Configuration
+            </h2>
+        </div>
+        <div class="card-body">
             <form method="POST" enctype="multipart/form-data" class="settings-form">
                 <!-- Application Name -->
                 <div class="form-section">
-                    <h3>📝 Basic Information</h3>
+                    <h3><i class="ti ti-forms"></i> Basic Information</h3>
                     <div class="form-group">
                         <label for="app_name">Application Name</label>
                         <input type="text" id="app_name" name="app_name" 
@@ -56,7 +71,7 @@
                                class="form-control"
                                placeholder="TimeTrack" 
                                required>
-                        <small class="form-text text-muted">
+                        <small class="form-text">
                             This name will appear in the title, navigation, and throughout the interface.
                         </small>
                     </div>
@@ -67,7 +82,7 @@
                                value="{{ branding.logo_alt_text }}" 
                                class="form-control"
                                placeholder="Company Logo">
-                        <small class="form-text text-muted">
+                        <small class="form-text">
                             Text displayed when the logo cannot be loaded (accessibility).
                         </small>
                     </div>
@@ -75,7 +90,7 @@
 
                 <!-- Visual Assets -->
                 <div class="form-section">
-                    <h3>🖼️ Visual Assets</h3>
+                    <h3><i class="ti ti-photo"></i> Visual Assets</h3>
                     <div class="form-row">
                         <div class="form-group col-md-6">
                             <label for="logo_file">Logo Image</label>
@@ -90,7 +105,7 @@
                                     <span class="asset-label">Current logo</span>
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">
+                            <small class="form-text">
                                 PNG, JPG, GIF, SVG. Recommended: 200x50px
                             </small>
                         </div>
@@ -108,7 +123,7 @@
                                     <span class="asset-label">Current favicon</span>
                                 </div>
                             {% endif %}
-                            <small class="form-text text-muted">
+                            <small class="form-text">
                                 ICO, PNG. Recommended: 16x16px or 32x32px
                             </small>
                         </div>
@@ -117,7 +132,7 @@
 
                 <!-- Theme Settings -->
                 <div class="form-section">
-                    <h3>🎨 Theme Settings</h3>
+                    <h3><i class="ti ti-color-swatch"></i> Theme Settings</h3>
                     <div class="form-group">
                         <label for="primary_color">Primary Color</label>
                         <div class="color-picker-wrapper">
@@ -130,7 +145,7 @@
                                    pattern="^#[0-9A-Fa-f]{6}$"
                                    placeholder="#007bff">
                         </div>
-                        <small class="form-text text-muted">
+                        <small class="form-text">
                             This color will be used for buttons, links, and other UI elements.
                         </small>
                     </div>
@@ -138,7 +153,7 @@
 
                 <!-- Imprint/Legal Page -->
                 <div class="form-section">
-                    <h3>⚖️ Imprint / Legal Page</h3>
+                    <h3><i class="ti ti-scale"></i> Imprint / Legal Page</h3>
                     <div class="form-group">
                         <label class="toggle-label">
                             <input type="checkbox" name="imprint_enabled" id="imprint_enabled"
@@ -146,7 +161,7 @@
                             <span class="toggle-slider"></span>
                             <span class="toggle-text">Enable Imprint Page</span>
                         </label>
-                        <small class="form-text text-muted">
+                        <small class="form-text">
                             When enabled, an "Imprint" link will appear in the footer linking to your custom legal page.
                         </small>
                     </div>
@@ -158,7 +173,7 @@
                                    value="{{ branding.imprint_title or 'Imprint' }}" 
                                    class="form-control"
                                    placeholder="Imprint">
-                            <small class="form-text text-muted">
+                            <small class="form-text">
                                 The title that will be displayed on the imprint page.
                             </small>
                         </div>
@@ -169,7 +184,7 @@
                                       class="form-control content-editor"
                                       rows="15"
                                       placeholder="Enter your imprint/legal information here...">{{ branding.imprint_content or '' }}</textarea>
-                            <small class="form-text text-muted">
+                            <small class="form-text">
                                 You can use HTML to format your content. Common tags: &lt;h2&gt;, &lt;h3&gt;, &lt;p&gt;, &lt;strong&gt;, &lt;br&gt;, &lt;a href=""&gt;
                             </small>
                         </div>
@@ -178,7 +193,10 @@
 
                 <!-- Save Button -->
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">💾 Save Branding Settings</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="ti ti-device-floppy"></i>
+                        Save Branding Settings
+                    </button>
                     <a href="{{ url_for('system_admin.system_admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
                 </div>
             </form>
@@ -187,8 +205,99 @@
 </div>
 
 <style>
-/* Branding-specific styles */
-.branding-preview-card {
+/* Container */
+.branding-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: rotate 8s linear infinite;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+/* Cards */
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e5e7eb;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-title .icon {
+    font-size: 1.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Preview Card */
+.preview-card {
     margin-bottom: 2rem;
 }
 
@@ -202,7 +311,7 @@
 .demo-header {
     margin-bottom: 1.5rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid #e5e7eb;
 }
 
 .demo-logo {
@@ -213,8 +322,8 @@
 
 .demo-text-logo {
     font-size: 1.5rem;
-    font-weight: 600;
-    color: #333;
+    font-weight: 700;
+    color: #1f2937;
 }
 
 .demo-content {
@@ -222,7 +331,7 @@
 }
 
 .demo-content p {
-    color: #6c757d;
+    color: #6b7280;
     margin-bottom: 1rem;
 }
 
@@ -230,12 +339,80 @@
     margin-right: 1rem;
 }
 
-/* Current assets display */
+/* Form Sections */
+.form-section {
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.form-section h3 {
+    margin-bottom: 1rem;
+    color: #1f2937;
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-section h3 i {
+    font-size: 1.25rem;
+}
+
+/* Form Controls */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #374151;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.625rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* File Input */
+.form-control-file {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0;
+    font-size: 0.875rem;
+}
+
+/* Current Assets */
 .current-asset {
     margin-top: 0.5rem;
     padding: 0.75rem;
     background: #f8f9fa;
-    border-radius: 4px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     gap: 1rem;
@@ -255,10 +432,10 @@
 
 .asset-label {
     font-size: 0.875rem;
-    color: #6c757d;
+    color: #6b7280;
 }
 
-/* Color picker styling */
+/* Color Picker */
 .color-picker-wrapper {
     display: flex;
     gap: 0.5rem;
@@ -270,8 +447,8 @@
     width: 60px;
     height: 38px;
     padding: 0.25rem;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
     cursor: pointer;
 }
 
@@ -280,58 +457,8 @@
     font-family: monospace;
 }
 
-/* Form sections */
-.form-section {
-    margin-bottom: 2rem;
-    padding-bottom: 2rem;
-    border-bottom: 1px solid #dee2e6;
-}
-
-.form-section:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-}
-
-.form-section h3 {
-    margin-bottom: 1rem;
-    color: #495057;
-    font-size: 1.1rem;
-    font-weight: 600;
-}
-
-/* File input styling */
-.form-control-file {
-    display: block;
-    width: 100%;
-    padding: 0.375rem 0;
-}
-
-/* Form row for two-column layout */
-.form-row {
-    display: flex;
-    flex-wrap: wrap;
-    margin-right: -0.5rem;
-    margin-left: -0.5rem;
-}
-
-.form-row > .col-md-6 {
-    flex: 0 0 50%;
-    max-width: 50%;
-    padding-right: 0.5rem;
-    padding-left: 0.5rem;
-}
-
-@media (max-width: 768px) {
-    .form-row > .col-md-6 {
-        flex: 0 0 100%;
-        max-width: 100%;
-    }
-}
-
-/* Sync color inputs */
-
-/* Toggle label styling - ensuring proper alignment */
-.form-group .toggle-label {
+/* Toggle Switch */
+.toggle-label {
     display: inline-flex;
     align-items: center;
     gap: 0.75rem;
@@ -349,7 +476,7 @@
     display: inline-block;
     width: 50px;
     height: 24px;
-    background: #ccc;
+    background: #e5e7eb;
     border-radius: 24px;
     transition: background 0.3s;
     flex-shrink: 0;
@@ -365,10 +492,11 @@
     top: 2px;
     left: 2px;
     transition: transform 0.3s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .toggle-label input[type="checkbox"]:checked + .toggle-slider {
-    background: var(--primary-color);
+    background: #667eea;
 }
 
 .toggle-label input[type="checkbox"]:checked + .toggle-slider::before {
@@ -377,18 +505,18 @@
 
 .toggle-text {
     font-weight: 500;
-    color: #495057;
+    color: #1f2937;
     line-height: 1;
 }
 
-/* Content editor styling */
+/* Content Editor */
 .content-editor {
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
     font-size: 0.875rem;
     line-height: 1.5;
     background: #f8f9fa;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
     padding: 0.75rem;
     resize: vertical;
 }
@@ -400,6 +528,108 @@
     border-radius: 8px;
     transition: all 0.3s ease;
 }
+
+/* Form Row */
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-right: -0.5rem;
+    margin-left: -0.5rem;
+}
+
+.form-row > .col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+    margin-top: 2rem;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .branding-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .form-row > .col-md-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: slideIn 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+.card:nth-child(1) { animation-delay: 0.1s; }
+.card:nth-child(2) { animation-delay: 0.2s; }
+.card:nth-child(3) { animation-delay: 0.3s; }
 </style>
 
 <script>
