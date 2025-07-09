@@ -153,11 +153,13 @@ class UserPreferences(db.Model):
     theme = db.Column(db.String(20), default='light')
     language = db.Column(db.String(10), default='en')
     timezone = db.Column(db.String(50), default='UTC')
-    date_format = db.Column(db.String(20), default='YYYY-MM-DD')
+    date_format = db.Column(db.String(20), default='ISO')  # ISO, US, German, etc.
     time_format = db.Column(db.String(10), default='24h')
+    time_format_24h = db.Column(db.Boolean, default=True)  # True for 24h, False for 12h
     
     # Time tracking preferences
-    default_project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+    time_rounding_minutes = db.Column(db.Integer, default=0)  # 0, 5, 10, 15, 30, 60
+    round_to_nearest = db.Column(db.Boolean, default=False)  # False=round down, True=round to nearest
     timer_reminder_enabled = db.Column(db.Boolean, default=True)
     timer_reminder_interval = db.Column(db.Integer, default=60)  # Minutes
     
@@ -169,7 +171,6 @@ class UserPreferences(db.Model):
     
     # Relationships
     user = db.relationship('User', backref=db.backref('preferences', uselist=False))
-    default_project = db.relationship('Project')
 
 
 class UserDashboard(db.Model):

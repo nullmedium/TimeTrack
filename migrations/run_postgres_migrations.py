@@ -19,6 +19,7 @@ POSTGRES_MIGRATIONS = [
     'postgres_only_migration.py',  # Main migration from commit 4214e88 onward
     'add_note_sharing.sql',  # Add note sharing functionality
     'remove_email_preferences.sql',  # Remove unused email preference columns
+    'add_time_preferences.sql',  # Add time formatting and rounding preferences
 ]
 
 
