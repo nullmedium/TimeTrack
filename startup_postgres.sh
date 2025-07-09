@@ -11,26 +11,39 @@ while ! pg_isready -h db -p 5432 -U "$POSTGRES_USER" > /dev/null 2>&1; do
 done
 echo "PostgreSQL is ready!"
 
-# Initialize database tables if they don't exist
-echo "Ensuring database tables exist..."
-python -c "
-from app import app, db
-with app.app_context():
-    db.create_all()
-    print('Database tables created/verified')
-"
-
-# Run PostgreSQL-only migrations
+# Run Flask-Migrate migrations
 echo ""
-echo "=== Running PostgreSQL Migrations ==="
-if [ -f "migrations/run_postgres_migrations.py" ]; then
-    echo "Applying PostgreSQL schema updates..."
-    python migrations/run_postgres_migrations.py
+echo "=== Running Database Migrations ==="
+export FLASK_APP=app.py
+
+# Check if migrations directory exists
+if [ -d "migrations" ]; then
+    echo "Applying database migrations..."
+    flask db upgrade
     if [ $? -ne 0 ]; then
-        echo "⚠️  Some migrations failed, but continuing..."
+        echo "❌ Migration failed! Check the logs above."
+        exit 1
     fi
+    echo "✅ Database migrations completed successfully"
 else
-    echo "PostgreSQL migration runner not found, skipping..."
+    echo "⚠️  No migrations directory found. Initializing Flask-Migrate..."
+    echo "Using baseline from commit 4214e88..."
+    python establish_baseline_4214e88.py
+    if [ $? -ne 0 ]; then
+        echo "❌ Migration initialization failed!"
+        echo "Please run manually: python establish_baseline_4214e88.py"
+        exit 1
+    fi
+    # Stamp the database as being at baseline
+    flask db stamp head
+    echo "✅ Database marked at baseline commit 4214e88"
+fi
+
+# Legacy migration support (can be removed after full transition)
+if [ -f "migrations_old/run_postgres_migrations.py" ]; then
+    echo ""
+    echo "=== Checking Legacy Migrations ==="
+    echo "Found old migration system. Consider removing after confirming Flask-Migrate is working."
 fi
 
 # Start the Flask application with gunicorn

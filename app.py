@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file, abort
+from flask_migrate import Migrate
 from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings, CompanyInvitation, Note, NoteFolder, NoteShare
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
@@ -84,6 +85,9 @@ mail = Mail(app)
 
 # Initialize the database with the app
 db.init_app(app)
+
+# Initialize Flask-Migrate
+migrate = Migrate(app, db)
 
 # Register blueprints
 app.register_blueprint(notes_bp)
