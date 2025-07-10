@@ -163,6 +163,15 @@ def delete_project(project_id):
         
         # Delete all related data in the correct order
         
+        # Delete time entries first (they reference tasks)
+        # Delete by project_id
+        TimeEntry.query.filter_by(project_id=project_id).delete()
+        
+        # Also delete time entries that reference tasks in this project
+        TimeEntry.query.filter(TimeEntry.task_id.in_(
+            db.session.query(Task.id).filter(Task.project_id == project_id)
+        )).delete(synchronize_session=False)
+        
         # Delete comments on tasks in this project
         Comment.query.filter(Comment.task_id.in_(
             db.session.query(Task.id).filter(Task.project_id == project_id)
@@ -182,14 +191,11 @@ def delete_project(project_id):
             )
         ).delete(synchronize_session=False)
         
-        # Delete tasks
+        # Delete tasks (after all references are removed)
         Task.query.filter_by(project_id=project_id).delete()
         
         # Delete sprints
         Sprint.query.filter_by(project_id=project_id).delete()
-        
-        # Delete time entries
-        TimeEntry.query.filter_by(project_id=project_id).delete()
         
         # Finally, delete the project
         project_repo.delete(project)
