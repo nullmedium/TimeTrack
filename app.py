@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file, abort
+from flask_migrate import Migrate
 from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings, CompanyInvitation, Note, NoteFolder, NoteShare
 from data_formatting import (
     format_duration, prepare_export_data, prepare_team_hours_export_data,
@@ -47,6 +48,7 @@ from routes.auth import login_required, admin_required, system_admin_required, r
 
 # Import utility functions
 from utils.auth import is_system_admin, can_access_system_settings
+from security_headers import init_security
 from utils.settings import get_system_setting
 
 # Import analytics data function from export module
@@ -64,6 +66,24 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:/
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_key_for_timetrack')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Session lasts for 7 days
+
+# Fix for HTTPS behind proxy (nginx, load balancer, etc)
+# This ensures forms use https:// URLs when behind a reverse proxy
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(
+    app.wsgi_app,
+    x_for=1,      # Trust X-Forwarded-For
+    x_proto=1,    # Trust X-Forwarded-Proto
+    x_host=1,     # Trust X-Forwarded-Host
+    x_prefix=1    # Trust X-Forwarded-Prefix
+)
+
+# Force HTTPS URL scheme in production
+if not app.debug and os.environ.get('FORCE_HTTPS', 'false').lower() in ['true', '1', 'yes']:
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+# Initialize security headers
+init_security(app)
 
 # Configure Flask-Mail
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.example.com')
@@ -84,6 +104,9 @@ mail = Mail(app)
 
 # Initialize the database with the app
 db.init_app(app)
+
+# Initialize Flask-Migrate
+migrate = Migrate(app, db)
 
 # Register blueprints
 app.register_blueprint(notes_bp)

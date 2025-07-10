@@ -1,0 +1,53 @@
+version: '3.8'
+
+# Debug version of docker-compose for troubleshooting migration issues
+# Usage: docker-compose -f docker-compose.debug.yml up
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://timetrack:timetrack@db:5432/timetrack
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+      # Debug options - uncomment as needed:
+      - DEBUG_MODE=true          # Continue running even if migrations fail
+      # - SKIP_MIGRATIONS=true   # Skip migrations entirely
+    volumes:
+      - .:/app  # Mount entire directory for easy debugging
+    depends_on:
+      - db
+    # Use debug entrypoint that keeps container running
+    entrypoint: ["/app/debug_entrypoint.sh"]
+    stdin_open: true  # Keep stdin open
+    tty: true         # Allocate a pseudo-TTY
+
+  web_safe:
+    build: .
+    ports:
+      - "5001:5000"
+    environment:
+      - DATABASE_URL=postgresql://timetrack:timetrack@db:5432/timetrack
+      - FLASK_APP=app.py
+      - DEBUG_MODE=true  # Won't exit on migration failure
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+    command: ["/app/startup_postgres_safe.sh"]
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=timetrack
+      - POSTGRES_USER=timetrack
+      - POSTGRES_PASSWORD=timetrack
+    ports:
+      - "5432:5432"  # Expose for external debugging
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
