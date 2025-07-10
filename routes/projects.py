@@ -5,7 +5,7 @@ Handles all project-related views and operations
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, g, abort
 from datetime import datetime
-from models import db, Project, Team, ProjectCategory, TimeEntry, Role, Task, User, CompanySettings
+from models import db, Project, Team, ProjectCategory, TimeEntry, Role, Task, User, CompanySettings, Customer
 from models.enums import BillingType
 from routes.auth import role_required, company_required, admin_required
 from utils.validation import FormValidator
@@ -49,6 +49,7 @@ def create_project():
         code = request.form.get('code')
         team_id = request.form.get('team_id') or None
         category_id = request.form.get('category_id') or None
+        customer_id = request.form.get('customer_id') or None
         start_date_str = request.form.get('start_date')
         end_date_str = request.form.get('end_date')
         
@@ -102,6 +103,7 @@ def create_project():
                 company_id=g.user.company_id,
                 team_id=int(team_id) if team_id else None,
                 category_id=int(category_id) if category_id else None,
+                customer_id=int(customer_id) if customer_id else None,
                 start_date=start_date,
                 end_date=end_date,
                 created_by_id=g.user.id,
@@ -115,9 +117,10 @@ def create_project():
         else:
             validator.flash_errors()
 
-    # Get available teams and categories for the form (company-scoped)
+    # Get available teams, categories, and customers for the form (company-scoped)
     teams = Team.query.filter_by(company_id=g.user.company_id).order_by(Team.name).all()
     categories = ProjectCategory.query.filter_by(company_id=g.user.company_id).order_by(ProjectCategory.name).all()
+    customers = Customer.query.filter_by(company_id=g.user.company_id, is_active=True).order_by(Customer.name).all()
     
     # Get company currency
     company_settings = CompanySettings.get_or_create(g.user.company_id)
@@ -128,6 +131,7 @@ def create_project():
                          title='Create Project', 
                          teams=teams, 
                          categories=categories,
+                         customers=customers,
                          currency=currency,
                          currency_symbol=currency_symbol)
 
@@ -150,6 +154,7 @@ def edit_project(project_id):
         code = request.form.get('code')
         team_id = request.form.get('team_id') or None
         category_id = request.form.get('category_id') or None
+        customer_id = request.form.get('customer_id') or None
         is_active = request.form.get('is_active') == 'on'
         start_date_str = request.form.get('start_date')
         end_date_str = request.form.get('end_date')
@@ -203,6 +208,7 @@ def edit_project(project_id):
                 code=code.upper(),
                 team_id=int(team_id) if team_id else None,
                 category_id=int(category_id) if category_id else None,
+                customer_id=int(customer_id) if customer_id else None,
                 is_active=is_active,
                 start_date=start_date,
                 end_date=end_date,
@@ -216,9 +222,10 @@ def edit_project(project_id):
         else:
             validator.flash_errors()
 
-    # Get available teams and categories for the form (company-scoped)
+    # Get available teams, categories, and customers for the form (company-scoped)
     teams = Team.query.filter_by(company_id=g.user.company_id).order_by(Team.name).all()
     categories = ProjectCategory.query.filter_by(company_id=g.user.company_id).order_by(ProjectCategory.name).all()
+    customers = Customer.query.filter_by(company_id=g.user.company_id, is_active=True).order_by(Customer.name).all()
     
     # Get company currency
     company_settings = CompanySettings.get_or_create(g.user.company_id)
@@ -230,6 +237,7 @@ def edit_project(project_id):
                          project=project, 
                          teams=teams, 
                          categories=categories,
+                         customers=customers,
                          currency=currency,
                          currency_symbol=currency_symbol)
 

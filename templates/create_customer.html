@@ -1,0 +1,357 @@
+{% extends "layout.html" %}
+
+{% block title %}New Customer - {{ branding.app_name }}{% endblock %}
+
+{% block content %}
+<div class="company-admin-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-user-plus"></i></span>
+                    Create New Customer
+                </h1>
+                <p class="page-subtitle">Add a new customer to assign to projects and track invoicing</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="content-card">
+                    <form action="{{ url_for('customers.create_customer') }}" method="POST">
+                        <!-- Basic Information -->
+                        <div class="form-section">
+                            <h3 class="section-title">Basic Information</h3>
+                            
+                            <div class="form-row">
+                                <div class="form-group col-md-8">
+                                    <label for="name">Customer Name <span class="required">*</span></label>
+                                    <input type="text" class="form-control" id="name" name="name" 
+                                           required placeholder="Acme Corporation">
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label for="code">Customer Code <span class="required">*</span></label>
+                                    <input type="text" class="form-control" id="code" name="code" 
+                                           required placeholder="ACME001" maxlength="20">
+                                    <small class="form-text text-muted">Unique identifier for this customer</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Contact Information -->
+                        <div class="form-section">
+                            <h3 class="section-title">Contact Information</h3>
+                            
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="email">Email Address</label>
+                                    <input type="email" class="form-control" id="email" name="email" 
+                                           placeholder="contact@acme.com">
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="phone">Phone Number</label>
+                                    <input type="tel" class="form-control" id="phone" name="phone" 
+                                           placeholder="+1 (555) 123-4567">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Address Information -->
+                        <div class="form-section">
+                            <h3 class="section-title">Address</h3>
+                            
+                            <div class="form-group">
+                                <label for="address_line1">Address Line 1</label>
+                                <input type="text" class="form-control" id="address_line1" name="address_line1" 
+                                       placeholder="123 Main Street">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="address_line2">Address Line 2</label>
+                                <input type="text" class="form-control" id="address_line2" name="address_line2" 
+                                       placeholder="Suite 100">
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="city">City</label>
+                                    <input type="text" class="form-control" id="city" name="city" 
+                                           placeholder="New York">
+                                </div>
+                                <div class="form-group col-md-3">
+                                    <label for="state">State/Province</label>
+                                    <input type="text" class="form-control" id="state" name="state" 
+                                           placeholder="NY">
+                                </div>
+                                <div class="form-group col-md-3">
+                                    <label for="postal_code">Postal Code</label>
+                                    <input type="text" class="form-control" id="postal_code" name="postal_code" 
+                                           placeholder="10001">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="country">Country</label>
+                                <input type="text" class="form-control" id="country" name="country" 
+                                       placeholder="United States">
+                            </div>
+                        </div>
+
+                        <!-- Billing Information -->
+                        <div class="form-section">
+                            <h3 class="section-title">Billing Information</h3>
+                            
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label for="billing_email">Billing Email</label>
+                                    <input type="email" class="form-control" id="billing_email" name="billing_email" 
+                                           placeholder="billing@acme.com">
+                                    <small class="form-text text-muted">Email address for invoices</small>
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label for="tax_id">Tax ID</label>
+                                    <input type="text" class="form-control" id="tax_id" name="tax_id" 
+                                           placeholder="XX-XXXXXXX">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="payment_terms">Payment Terms (days)</label>
+                                <input type="number" class="form-control" id="payment_terms" name="payment_terms" 
+                                       value="30" min="0" max="365">
+                                <small class="form-text text-muted">Number of days for payment after invoice</small>
+                            </div>
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="form-section">
+                            <h3 class="section-title">Additional Notes</h3>
+                            
+                            <div class="form-group">
+                                <label for="notes">Notes</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                          placeholder="Any additional information about this customer..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="form-actions">
+                            <a href="{{ url_for('customers.customers') }}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ti ti-device-floppy"></i> Create Customer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.company-admin-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+.content-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.form-section {
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 0.5rem;
+}
+
+.required {
+    color: #dc3545;
+}
+
+.form-control {
+    padding: 0.75rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.15s ease-in-out;
+}
+
+.form-control:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.form-text {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding-top: 2rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: white;
+    color: #666;
+    border: 1px solid #ddd;
+}
+
+.btn-secondary:hover {
+    background: #f8f9fa;
+}
+
+@media (max-width: 768px) {
+    .company-admin-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .page-title {
+        font-size: 1.75rem;
+    }
+    
+    .content-card {
+        padding: 1.5rem;
+    }
+    
+    .form-actions {
+        flex-direction: column-reverse;
+    }
+    
+    .btn {
+        width: 100%;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-generate customer code from name
+    const nameInput = document.getElementById('name');
+    const codeInput = document.getElementById('code');
+    let codeManuallyEdited = false;
+    
+    codeInput.addEventListener('input', function() {
+        codeManuallyEdited = true;
+    });
+    
+    nameInput.addEventListener('input', function() {
+        if (!codeManuallyEdited && this.value) {
+            // Generate code from name (first 4 letters + 001)
+            const baseName = this.value.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 4);
+            if (baseName) {
+                codeInput.value = baseName + '001';
+            }
+        }
+    });
+    
+    // Form validation
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        const name = document.getElementById('name').value.trim();
+        const code = document.getElementById('code').value.trim();
+        
+        if (!name || !code) {
+            e.preventDefault();
+            alert('Please fill in all required fields');
+        }
+    });
+});
+</script>
+{% endblock %}

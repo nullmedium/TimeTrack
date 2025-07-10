@@ -1,0 +1,574 @@
+{% extends "layout.html" %}
+
+{% block title %}Customers - {{ branding.app_name }}{% endblock %}
+
+{% block content %}
+<div class="company-admin-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <span class="page-icon"><i class="ti ti-users"></i></span>
+                    Customers
+                </h1>
+                <p class="page-subtitle">Manage your customers for project assignment and invoicing</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('customers.new_customer') }}" class="btn btn-primary">
+                    <span class="icon">+</span> New Customer
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stats-section">
+            <div class="stat-card">
+                <div class="stat-value">{{ total_customers }}</div>
+                <div class="stat-label">Total Customers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ active_customers }}</div>
+                <div class="stat-label">Active Customers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ customers_with_projects }}</div>
+                <div class="stat-label">With Projects</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customers List -->
+    <div class="container-fluid">
+        <div class="content-card">
+            <!-- Controls -->
+            <div class="controls-section">
+                <div class="search-box">
+                    <i class="ti ti-search"></i>
+                    <input type="text" id="customerSearch" class="form-control" placeholder="Search customers...">
+                </div>
+                <div class="view-toggle">
+                    <button class="btn btn-view active" data-view="grid" title="Grid view">
+                        <i class="ti ti-layout-grid"></i>
+                    </button>
+                    <button class="btn btn-view" data-view="list" title="List view">
+                        <i class="ti ti-list"></i>
+                    </button>
+                </div>
+            </div>
+
+            {% if customers %}
+                <!-- Grid View -->
+                <div id="gridView" class="customers-grid">
+                    {% for customer in customers %}
+                    <div class="customer-card" data-customer-name="{{ customer.name|lower }}" data-customer-code="{{ customer.code|lower }}">
+                        <div class="customer-header">
+                            <h3 class="customer-name">{{ customer.name }}</h3>
+                            <span class="customer-code">{{ customer.code }}</span>
+                        </div>
+
+                        <div class="customer-details">
+                            {% if customer.email %}
+                            <div class="detail-item">
+                                <i class="ti ti-mail"></i>
+                                <span>{{ customer.email }}</span>
+                            </div>
+                            {% endif %}
+                            {% if customer.phone %}
+                            <div class="detail-item">
+                                <i class="ti ti-phone"></i>
+                                <span>{{ customer.phone }}</span>
+                            </div>
+                            {% endif %}
+                            <div class="detail-item">
+                                <i class="ti ti-briefcase"></i>
+                                <span>{{ customer.projects|length }} project{{ 's' if customer.projects|length != 1 else '' }}</span>
+                            </div>
+                        </div>
+
+                        <div class="customer-footer">
+                            <span class="status-badge {{ 'active' if customer.is_active else 'inactive' }}">
+                                {{ 'Active' if customer.is_active else 'Inactive' }}
+                            </span>
+                            <div class="customer-actions">
+                                <a href="{{ url_for('customers.edit_customer', customer_id=customer.id) }}"
+                                   class="btn btn-sm btn-secondary" title="Edit">
+                                    <i class="ti ti-pencil"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- List View -->
+                <div id="listView" class="customers-list" style="display: none;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Contact</th>
+                                <th>Projects</th>
+                                <th>Status</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for customer in customers %}
+                            <tr data-customer-name="{{ customer.name|lower }}" data-customer-code="{{ customer.code|lower }}">
+                                <td>
+                                    <div class="customer-info">
+                                        <strong>{{ customer.name }}</strong>
+                                        <small class="text-muted">{{ customer.code }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="contact-info">
+                                        {% if customer.email %}
+                                        <div><i class="ti ti-mail"></i> {{ customer.email }}</div>
+                                        {% endif %}
+                                        {% if customer.phone %}
+                                        <div><i class="ti ti-phone"></i> {{ customer.phone }}</div>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>{{ customer.projects|length }}</td>
+                                <td>
+                                    <span class="status-badge {{ 'active' if customer.is_active else 'inactive' }}">
+                                        {{ 'Active' if customer.is_active else 'Inactive' }}
+                                    </span>
+                                </td>
+                                <td class="text-right">
+                                    <a href="{{ url_for('customers.edit_customer', customer_id=customer.id) }}"
+                                       class="btn btn-sm btn-secondary">
+                                        <i class="ti ti-pencil"></i> Edit
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="ti ti-users"></i>
+                    <h3>No customers yet</h3>
+                    <p>Create your first customer to start organizing your projects</p>
+                    <a href="{{ url_for('customers.new_customer') }}" class="btn btn-primary">
+                        <i class="ti ti-plus"></i> Create Customer
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.company-admin-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+.header-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.header-actions .btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.header-actions .btn .icon {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.stats-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #667eea;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.content-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.controls-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    gap: 1rem;
+}
+
+.search-box {
+    position: relative;
+    flex: 1;
+    max-width: 400px;
+}
+
+.search-box i {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+}
+
+.search-box input {
+    padding-left: 3rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    height: 40px;
+}
+
+.view-toggle {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-view {
+    padding: 0.5rem;
+    border: 1px solid #e0e0e0;
+    background: white;
+    color: #666;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.btn-view.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+}
+
+.customers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.customer-card {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid #e0e0e0;
+    transition: all 0.2s;
+}
+
+.customer-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.customer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 1rem;
+}
+
+.customer-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #1a1a1a;
+}
+
+.customer-code {
+    background: #e0e0e0;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.customer-details {
+    margin-bottom: 1rem;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    color: #666;
+    font-size: 0.875rem;
+}
+
+.detail-item i {
+    color: #999;
+}
+
+.customer-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-badge.active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.customer-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.customers-list table {
+    width: 100%;
+}
+
+.customers-list th {
+    font-weight: 600;
+    color: #666;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 1rem;
+}
+
+.customers-list td {
+    padding: 1rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.customer-info strong {
+    display: block;
+    color: #1a1a1a;
+}
+
+.customer-info small {
+    color: #999;
+}
+
+.contact-info {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.contact-info div {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.contact-info i {
+    color: #999;
+    font-size: 0.875rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: #e0e0e0;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: #999;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+    .company-admin-container {
+        padding: 1rem;
+    }
+    
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .page-title {
+        font-size: 1.75rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .controls-section {
+        flex-direction: column;
+    }
+
+    .search-box {
+        max-width: none;
+        width: 100%;
+    }
+
+    .customers-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // View toggle functionality
+    const viewButtons = document.querySelectorAll('.btn-view');
+    const gridView = document.getElementById('gridView');
+    const listView = document.getElementById('listView');
+
+    viewButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            viewButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+
+            if (this.dataset.view === 'grid') {
+                gridView.style.display = 'grid';
+                listView.style.display = 'none';
+            } else {
+                gridView.style.display = 'none';
+                listView.style.display = 'block';
+            }
+        });
+    });
+
+    // Search functionality
+    const searchInput = document.getElementById('customerSearch');
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+
+        // Filter grid view
+        const cards = document.querySelectorAll('.customer-card');
+        cards.forEach(card => {
+            const name = card.dataset.customerName;
+            const code = card.dataset.customerCode;
+            if (name.includes(searchTerm) || code.includes(searchTerm)) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        // Filter list view
+        const rows = document.querySelectorAll('.customers-list tbody tr');
+        rows.forEach(row => {
+            const name = row.dataset.customerName;
+            const code = row.dataset.customerCode;
+            if (name.includes(searchTerm) || code.includes(searchTerm)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -18,6 +18,7 @@ from .company import Company, CompanySettings, CompanyWorkConfig
 from .user import User, UserPreferences, UserDashboard
 from .team import Team
 from .project import Project, ProjectCategory
+from .customer import Customer
 from .task import Task, TaskDependency, SubTask, Comment
 from .time_entry import TimeEntry
 from .sprint import Sprint

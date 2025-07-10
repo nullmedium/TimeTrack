@@ -57,6 +57,21 @@
         
         <div class="form-row">
             <div class="form-group">
+                <label for="customer_id">Customer</label>
+                <select id="customer_id" name="customer_id">
+                    <option value="">No Customer</option>
+                    {% for customer in customers %}
+                    <option value="{{ customer.id }}" 
+                            {% if (request.form.customer_id and request.form.customer_id|int == customer.id) or (not request.form.customer_id and project.customer_id == customer.id) %}selected{% endif %}>
+                        {{ customer.name }} ({{ customer.code }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
                 <label class="checkbox-label">
                     <input type="checkbox" name="is_active" 
                            {% if (request.form.is_active and request.form.is_active == 'on') or (not request.form and project.is_active) %}checked{% endif %}>

@@ -37,6 +37,8 @@ from routes.company import companies_bp, setup_company as company_setup
 from routes.company_api import company_api_bp
 from routes.users import users_bp
 from routes.users_api import users_api_bp
+from routes.customers import customers_bp
+from routes.customers_api import customers_api_bp
 from routes.system_admin import system_admin_bp
 from routes.announcements import announcements_bp
 from routes.export import export_bp
@@ -126,6 +128,8 @@ app.register_blueprint(companies_bp)
 app.register_blueprint(company_api_bp)
 app.register_blueprint(users_bp)
 app.register_blueprint(users_api_bp)
+app.register_blueprint(customers_bp)
+app.register_blueprint(customers_api_bp)
 app.register_blueprint(system_admin_bp)
 app.register_blueprint(announcements_bp)
 app.register_blueprint(export_bp)

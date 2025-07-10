@@ -151,6 +151,12 @@
                                         <i class="ti ti-users info-icon"></i>
                                         <span class="info-text">{{ project.team.name if project.team else 'All Teams' }}</span>
                                     </div>
+                                    {% if project.customer %}
+                                    <div class="info-item">
+                                        <i class="ti ti-building info-icon"></i>
+                                        <span class="info-text">{{ project.customer.name }}</span>
+                                    </div>
+                                    {% endif %}
                                     <div class="info-item">
                                         {% if project.billing_type.name == 'NON_BILLABLE' %}
                                             <i class="ti ti-receipt-off info-icon"></i>
@@ -217,6 +223,7 @@
                                 <th>Code</th>
                                 <th>Name</th>
                                 <th>Category</th>
+                                <th>Customer</th>
                                 <th>Team</th>
                                 <th>Status</th>
                                 <th>Billing</th>
@@ -241,6 +248,13 @@
                                             <span class="category-badge" style="background-color: {{ project.category.color }}20; color: {{ project.category.color }};">
                                                 {{ project.category.icon|safe if project.category.icon else '<i class="ti ti-folder"></i>'|safe }} {{ project.category.name }}
                                             </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if project.customer %}
+                                            {{ project.customer.name }}
                                         {% else %}
                                             <span class="text-muted">-</span>
                                         {% endif %}

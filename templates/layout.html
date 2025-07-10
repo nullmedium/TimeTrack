@@ -144,6 +144,7 @@
                     <li><a href="{{ url_for('companies.admin_company') }}" data-tooltip="Company Settings"><i class="nav-icon ti ti-building"></i><span class="nav-text">Company Settings</span></a></li>
                     <li><a href="{{ url_for('invitations.list_invitations') }}" data-tooltip="Invitations"><i class="nav-icon ti ti-mail"></i><span class="nav-text">Invitations</span></a></li>
                     <li><a href="{{ url_for('projects.admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon ti ti-folder"></i><span class="nav-text">Manage Projects</span></a></li>
+                    <li><a href="{{ url_for('customers.customers') }}" data-tooltip="Manage Customers"><i class="nav-icon ti ti-users"></i><span class="nav-text">Manage Customers</span></a></li>
                     {% if g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">System Admin</li>
                     <li><a href="{{ url_for('system_admin.system_admin_dashboard') }}" data-tooltip="System Dashboard"><i class="nav-icon ti ti-world"></i><span class="nav-text">System Dashboard</span></a></li>
@@ -155,6 +156,7 @@
                     <!-- <li><a href="{{ url_for('dashboard') }}" data-tooltip="Dashboard"><i class="nav-icon ti ti-chart-line"></i><span class="nav-text">Dashboard</span></a></li> -->
                     {% if g.user.role == Role.SUPERVISOR %}
                     <li><a href="{{ url_for('projects.admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon ti ti-folder"></i><span class="nav-text">Manage Projects</span></a></li>
+                    <li><a href="{{ url_for('customers.customers') }}" data-tooltip="Manage Customers"><i class="nav-icon ti ti-users"></i><span class="nav-text">Manage Customers</span></a></li>
                     {% endif %}
                     {% endif %}
                 {% else %}

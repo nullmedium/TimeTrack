@@ -28,6 +28,9 @@ class Project(db.Model):
 
     # Project categorization
     category_id = db.Column(db.Integer, db.ForeignKey('project_category.id'), nullable=True)
+    
+    # Customer association (optional)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=True)
 
     # Project dates
     start_date = db.Column(db.Date, nullable=True)
@@ -43,6 +46,7 @@ class Project(db.Model):
     team = db.relationship('Team', backref='projects')
     time_entries = db.relationship('TimeEntry', backref='project', lazy=True)
     category = db.relationship('ProjectCategory', back_populates='projects')
+    customer = db.relationship('Customer', back_populates='projects')
 
     # Unique constraint per company
     __table_args__ = (db.UniqueConstraint('company_id', 'code', name='uq_project_code_per_company'),)
