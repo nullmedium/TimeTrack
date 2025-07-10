@@ -6,10 +6,12 @@ from flask import Blueprint, request, jsonify, g, send_file
 from datetime import datetime, timedelta
 import io
 import json
+import time
 
 from models import db, ReportTemplate, SavedReport, ReportShare, ReportExportHistory
 from analytics.engine import ReportBuilder
 from routes.auth import login_required, admin_required
+from utils.report_export import export_report_to_csv, export_report_to_excel, prepare_report_data_for_export
 
 reports_api = Blueprint('reports_api', __name__)
 
@@ -291,6 +293,13 @@ def export_report(report_id, format):
         if format not in ['pdf', 'excel', 'csv', 'json']:
             return jsonify({'success': False, 'error': 'Invalid format'}), 400
         
+        start_time = time.time()
+        
+        # Get the report
+        report = db.session.query(SavedReport).filter_by(id=report_id).first()
+        if not report:
+            return jsonify({'success': False, 'error': 'Report not found'}), 404
+        
         # Execute report first
         data = request.get_json() or {}
         builder = ReportBuilder(db.session, g.user)
@@ -310,25 +319,58 @@ def export_report(report_id, format):
             additional_filters=data.get('filters')
         )
         
+        # Prepare data for export
+        prepared_result = prepare_report_data_for_export(result)
+        
         # Export based on format
+        response = None
+        file_size = None
+        
         if format == 'json':
             output = io.BytesIO()
-            output.write(json.dumps(result, indent=2).encode())
+            json_data = json.dumps(prepared_result, indent=2).encode()
+            output.write(json_data)
             output.seek(0)
+            file_size = len(json_data)
             
-            return send_file(
+            response = send_file(
                 output,
                 mimetype='application/json',
                 as_attachment=True,
-                download_name=f'report_{report_id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+                download_name=f'report_{report.name.replace(" ", "_")}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
             )
         
-        # For other formats, we'll need to implement exporters
-        # For now, return a placeholder
-        return jsonify({
-            'success': False,
-            'error': f'{format} export not yet implemented'
-        }), 501
+        elif format == 'csv':
+            response = export_report_to_csv(prepared_result, report.name)
+            # Estimate file size for CSV (approximate)
+            if 'data' in prepared_result and prepared_result['data']:
+                file_size = len(str(prepared_result['data'])) * 1.2  # Rough estimate
+        
+        elif format == 'excel':
+            response = export_report_to_excel(prepared_result, report.name)
+            # File size will be calculated after generation
+        
+        elif format == 'pdf':
+            # PDF export would require additional implementation
+            return jsonify({
+                'success': False,
+                'error': 'PDF export not yet implemented'
+            }), 501
+        
+        # Record export history
+        if response:
+            duration_ms = int((time.time() - start_time) * 1000)
+            export_history = ReportExportHistory(
+                report_id=report_id,
+                user_id=g.user.id,
+                export_format=format,
+                file_size=int(file_size) if file_size else None,
+                duration_ms=duration_ms
+            )
+            db.session.add(export_history)
+            db.session.commit()
+        
+        return response
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
