@@ -326,6 +326,8 @@ button {
     padding: 2rem;
     min-height: 100vh;
     transition: margin-left 0.3s ease;
+    max-width: 1400px;
+    margin-right: auto;
 }
 
 /* Full width when no user (no sidebar) */
@@ -1034,12 +1036,343 @@ input[type="time"]::-webkit-datetime-edit {
 
 /* Admin Dashboard Styles */
 .admin-container {
-    max-width: 1200px;
+    max-width: 1600px;
     margin: 0 auto 2rem auto;
     padding: 1.5rem;
     background-color: white;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Common admin page containers - all use same width for consistency */
+.company-admin-container,
+.organization-admin-container,
+.projects-admin-container,
+.companies-admin-container,
+.system-dashboard-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Common Admin Page Styles */
+
+/* Page Headers */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-icon {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0.5rem 0 0 0;
+}
+
+/* Stat Cards */
+.stats-section,
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #667eea;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* Content Cards */
+.content-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+/* Control Sections */
+.controls-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.search-container {
+    position: relative;
+    flex: 1;
+    max-width: 500px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6b7280;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 3rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Button Styles */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #6b7280;
+    border: 2px solid #e5e7eb;
+}
+
+.btn-secondary:hover {
+    background: #f3f4f6;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+/* Badge Styles */
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-active {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.status-inactive {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* Empty States */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 12px;
+    border: 2px dashed #e5e7eb;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.3;
+}
+
+/* Grid Layouts */
+.content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+/* Admin Table Styles */
+.table-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+
+.users-table,
+.projects-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.users-table thead,
+.projects-table thead {
+    background: #f8f9fa;
+}
+
+.users-table th,
+.projects-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.users-table td,
+.projects-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* Modern Form Styles */
+.modern-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.95rem;
+}
+
+/* Responsive Admin Styles */
+@media (max-width: 1024px) {
+    .content-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .company-admin-container,
+    .organization-admin-container,
+    .projects-admin-container,
+    .companies-admin-container,
+    .system-dashboard-container {
+        padding: 1rem;
+    }
+
+    .page-header {
+        padding: 1.5rem;
+    }
+
+    .page-title {
+        font-size: 1.75rem;
+    }
+
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .controls-section {
+        flex-direction: column;
+    }
+
+    .search-container {
+        max-width: none;
+        width: 100%;
+    }
+
+    .stats-section,
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .admin-header {
