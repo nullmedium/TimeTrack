@@ -93,7 +93,7 @@ def upgrade():
     sa.PrimaryKeyConstraint('id')
     )
     op.add_column('company_settings', sa.Column('default_currency', sa.String(length=3), nullable=True))
-    op.add_column('project', sa.Column('billing_type', sa.Enum('NON_BILLABLE', 'HOURLY', 'FIXED_RATE', name='billingtype'), nullable=False))
+    op.add_column('project', sa.Column('billing_type', sa.Enum('NON_BILLABLE', 'HOURLY', 'FIXED_RATE', name='billingtype'), nullable=False, server_default='NON_BILLABLE'))
     op.add_column('project', sa.Column('hourly_rate', sa.Numeric(precision=10, scale=2), nullable=True))
     op.add_column('project', sa.Column('billing_notes', sa.Text(), nullable=True))
     op.add_column('time_entry', sa.Column('is_billable', sa.Boolean(), nullable=True))
