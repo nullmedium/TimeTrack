@@ -69,21 +69,48 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Session lasts fo
 
 # Fix for HTTPS behind proxy (nginx, load balancer, etc)
 # This ensures forms use https:// URLs when behind a reverse proxy
-from werkzeug.middleware.proxy_fix import ProxyFix
-app.wsgi_app = ProxyFix(
-    app.wsgi_app,
-    x_for=1,      # Trust X-Forwarded-For
-    x_proto=1,    # Trust X-Forwarded-Proto
-    x_host=1,     # Trust X-Forwarded-Host
-    x_prefix=1    # Trust X-Forwarded-Prefix
-)
 
-# Force HTTPS URL scheme in production
-if not app.debug and os.environ.get('FORCE_HTTPS', 'false').lower() in ['true', '1', 'yes']:
+if not app.debug and os.environ.get('FORCE_HTTPS', 'false').lower() in ['true', '1', 'yes'] \
+    and os.environ.get('TRUST_PROXY_HEADERS', 'true').lower() in ['true', '1', 'yes']:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=1,      # Trust X-Forwarded-For
+        x_proto=1,    # Trust X-Forwarded-Proto
+        x_host=1,     # Trust X-Forwarded-Host
+        x_prefix=1    # Trust X-Forwarded-Prefix
+    )
+
+    # Force HTTPS URL scheme in production
     app.config['PREFERRED_URL_SCHEME'] = 'https'
 
-# Initialize security headers
-init_security(app)
+    # Initialize security headers
+    init_security(app)
+else:
+    # Explicitly set HTTP for local development
+    app.config['PREFERRED_URL_SCHEME'] = 'http'
+
+# Force HTTP in development
+@app.before_request
+def force_http_scheme():
+    if app.debug or os.environ.get('FLASK_ENV') == 'debug':
+        from flask import request
+        if hasattr(request, 'environ'):
+            request.environ['wsgi.url_scheme'] = 'http'
+
+# Override url_for to force HTTP in development
+if app.debug or os.environ.get('FLASK_ENV') == 'debug':
+    from flask import url_for as original_url_for
+    import functools
+    
+    @functools.wraps(original_url_for)
+    def url_for_http(*args, **kwargs):
+        # Force _scheme to http if _external is True
+        if kwargs.get('_external'):
+            kwargs['_scheme'] = 'http'
+        return original_url_for(*args, **kwargs)
+    
+    app.jinja_env.globals['url_for'] = url_for_http
 
 # Configure Flask-Mail
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.example.com')
