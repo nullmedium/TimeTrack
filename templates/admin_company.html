@@ -309,94 +309,8 @@
 
 <style>
 /* Container */
-.company-admin-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2rem;
-}
 
-/* Page Header */
-.page-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 16px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-    color: white;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-}
-
-.header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 2rem;
-}
-
-.page-title {
-    font-size: 2rem;
-    font-weight: 700;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.page-icon {
-    font-size: 2.5rem;
-    display: inline-block;
-    animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
-}
-
-.page-subtitle {
-    font-size: 1.1rem;
-    opacity: 0.9;
-    margin: 0.5rem 0 0 0;
-}
-
-/* Stats Section */
-.stats-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.stat-card {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    text-align: center;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    transition: all 0.3s ease;
-    position: relative;
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-.stat-value {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    color: #667eea;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 600;
-}
+/* Company Admin specific styles */
 
 .stat-link {
     position: absolute;
@@ -414,72 +328,14 @@
     text-decoration: underline;
 }
 
-/* Content Grid */
-.content-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-}
+/* Company-specific content grid - already defined in common styles */
 
-@media (max-width: 1024px) {
-    .content-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Cards */
-.card {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    border: 1px solid #e5e7eb;
-    margin-bottom: 1.5rem;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
-
-.card:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
-}
-
-.card-header {
-    background: #f8f9fa;
-    padding: 1.5rem;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.card-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin: 0;
-    color: #1f2937;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
+/* Company-specific card styles */
 .card-title .icon {
     font-size: 1.5rem;
 }
 
-.card-body {
-    padding: 1.5rem;
-}
-
-/* Forms */
-.modern-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
+/* Company-specific form styles */
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -490,12 +346,6 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
-}
-
-.form-label {
-    font-weight: 600;
-    color: #374151;
-    font-size: 0.95rem;
 }
 
 .form-control {
@@ -647,30 +497,7 @@ input:checked + .toggle-slider:before {
     max-width: 300px;
 }
 
-/* Buttons */
-.btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    text-decoration: none;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
+/* Company-specific button styles */
 
 .btn-copy {
     background: white;
@@ -690,12 +517,7 @@ input:checked + .toggle-slider:before {
     border-color: #10b981;
 }
 
-/* Quick Actions */
-.action-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-}
+/* Company-specific action grid - already defined in common styles */
 
 .action-item {
     display: flex;
@@ -801,31 +623,14 @@ input:checked + .toggle-slider:before {
     margin: 0;
 }
 
-/* Responsive Design */
+/* Company-specific responsive styles */
 @media (max-width: 768px) {
     .company-admin-container {
         padding: 1rem;
     }
     
-    .page-header {
-        padding: 1.5rem;
-    }
-    
-    .page-title {
-        font-size: 1.75rem;
-    }
-    
-    .header-content {
-        flex-direction: column;
-        text-align: center;
-    }
-    
     .form-row,
     .form-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .action-grid {
         grid-template-columns: 1fr;
     }
     

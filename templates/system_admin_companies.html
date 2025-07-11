@@ -175,99 +175,14 @@
 </div>
 
 <style>
-/* Container */
-.companies-admin-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2rem;
-}
-
-/* Page Header */
-.page-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 16px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-    color: white;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-}
-
-.header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 2rem;
-}
-
-.page-title {
-    font-size: 2rem;
-    font-weight: 700;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.page-icon {
-    font-size: 2.5rem;
-    display: inline-block;
-    animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
-}
-
-.page-subtitle {
-    font-size: 1.1rem;
-    opacity: 0.9;
-    margin: 0.5rem 0 0 0;
-}
+/* System admin companies specific styles */
 
 .header-actions {
     display: flex;
     gap: 1rem;
 }
 
-/* Stats Section */
-.stats-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.stat-card {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    text-align: center;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-.stat-value {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    color: #667eea;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 600;
-}
+/* Stats section styles already in common style.css */
 
 /* Content Section */
 .content-section {
@@ -372,24 +287,7 @@
     color: #065f46;
 }
 
-/* Status Badges */
-.status-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-
-.status-active {
-    background: #d1fae5;
-    color: #065f46;
-}
-
-.status-inactive {
-    background: #fee2e2;
-    color: #991b1b;
-}
+/* Status badges already in common style.css */
 
 /* Table Actions */
 .table-actions {
@@ -473,18 +371,7 @@
     font-size: 0.875rem;
 }
 
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-}
-
-.empty-icon {
-    font-size: 4rem;
-    margin-bottom: 1.5rem;
-    opacity: 0.3;
-}
-
+/* System admin companies specific empty state */
 .empty-title {
     font-size: 1.75rem;
     font-weight: 700;
@@ -498,31 +385,7 @@
     margin-bottom: 2rem;
 }
 
-/* Buttons */
-.btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    text-decoration: none;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
+/* System admin companies specific button styles */
 .btn-secondary {
     background: white;
     color: #667eea;
@@ -534,19 +397,10 @@
     border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Responsive Design */
+/* System admin companies specific responsive styles */
 @media (max-width: 768px) {
     .companies-admin-container {
         padding: 1rem;
-    }
-    
-    .page-header {
-        padding: 1.5rem;
-    }
-    
-    .header-content {
-        flex-direction: column;
-        text-align: center;
     }
     
     .header-actions {

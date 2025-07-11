@@ -345,56 +345,7 @@
 </div>
 
 <style>
-/* Container */
-.projects-admin-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2rem;
-}
-
-/* Page Header */
-.page-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 16px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-    color: white;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-}
-
-.header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 2rem;
-}
-
-.page-title {
-    font-size: 2rem;
-    font-weight: 700;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.page-icon {
-    font-size: 2.5rem;
-    display: inline-block;
-    animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
-}
-
-.page-subtitle {
-    font-size: 1.1rem;
-    opacity: 0.9;
-    margin: 0.5rem 0 0 0;
-}
+/* Projects admin specific styles */
 
 .header-actions {
     display: flex;
@@ -402,43 +353,7 @@
     flex-wrap: wrap;
 }
 
-/* Stats Section */
-.stats-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.stat-card {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    text-align: center;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-.stat-value {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    color: #667eea;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 600;
-}
+/* Stats section styles already in common style.css */
 
 /* Categories Section */
 .categories-section {
@@ -542,23 +457,13 @@
     margin-bottom: 2rem;
 }
 
-.search-container {
-    position: relative;
-    flex: 1;
-    max-width: 500px;
-}
-
+/* Project specific search styles */
 .search-icon {
-    position: absolute;
-    left: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
     font-size: 1.25rem;
     opacity: 0.6;
 }
 
 .search-input {
-    width: 100%;
     padding: 1rem 1rem 1rem 3rem;
     border: 2px solid #e5e7eb;
     border-radius: 12px;
@@ -716,38 +621,7 @@
     margin: 0;
 }
 
-/* List View */
-.table-container {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    overflow: hidden;
-}
-
-.projects-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.projects-table thead {
-    background: #f8f9fa;
-}
-
-.projects-table th {
-    padding: 1rem;
-    text-align: left;
-    font-weight: 600;
-    color: #374151;
-    font-size: 0.875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 2px solid #e5e7eb;
-}
-
-.projects-table td {
-    padding: 1rem;
-    border-bottom: 1px solid #e5e7eb;
-}
+/* Projects table styles already in common style.css */
 
 .projects-table tbody tr:hover {
     background: #f9fafb;
@@ -794,25 +668,9 @@
     margin: 0;
 }
 
-/* Status Badges */
-.status-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-}
+/* Status badges already in common style.css */
 
-.status-active {
-    background: #d1fae5;
-    color: #059669;
-}
-
-.status-inactive {
-    background: #fee2e2;
-    color: #dc2626;
-}
-
+<<<<<<< HEAD
 /* Buttons */
 .btn {
     padding: 0.75rem 1.5rem;
@@ -848,6 +706,34 @@
     background: #f3f4f6;
     border-color: #d1d5db;
 }
+=======
+/* Billing Badges */
+.billing-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.billing-badge.hourly {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.billing-badge.fixed {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.billing-badge i {
+    font-size: 0.875rem;
+}
+
+/* Project-specific button styles */
+>>>>>>> 66d261a (Streamline common CSS styles.)
 
 .btn-edit {
     background: white;
@@ -883,10 +769,7 @@
     color: white;
 }
 
-.btn-sm {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-}
+/* btn-sm already in common style.css */
 
 .btn-action {
     padding: 0.5rem;
@@ -1002,29 +885,11 @@
     justify-content: flex-end;
 }
 
-/* Modern Form in Modal */
-.modern-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
+/* Project-specific form styles */
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
-}
-
-.form-label {
-    font-weight: 600;
-    color: #374151;
-    font-size: 0.95rem;
 }
 
 .form-control {
@@ -1066,15 +931,7 @@
     flex: 1;
 }
 
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-    background: white;
-    border-radius: 12px;
-    border: 2px dashed #e5e7eb;
-}
-
+/* Project-specific empty state */
 .empty-icon {
     font-size: 4rem;
     margin-bottom: 1.5rem;
@@ -1105,23 +962,10 @@
     padding: 3rem;
 }
 
-/* Responsive Design */
+/* Project-specific responsive design */
 @media (max-width: 768px) {
     .projects-admin-container {
         padding: 1rem;
-    }
-    
-    .page-header {
-        padding: 1.5rem;
-    }
-    
-    .page-title {
-        font-size: 1.75rem;
-    }
-    
-    .header-content {
-        flex-direction: column;
-        text-align: center;
     }
     
     .header-actions {
@@ -1134,10 +978,6 @@
     
     .view-controls {
         flex-direction: column;
-    }
-    
-    .search-container {
-        max-width: 100%;
     }
     
     .projects-grid {

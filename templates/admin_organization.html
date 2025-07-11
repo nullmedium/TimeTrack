@@ -466,136 +466,11 @@
 
 <style>
 /* Container */
-.organization-admin-container {
-    max-width: 1600px;
-    margin: 0 auto;
-    padding: 2rem;
-}
 
-/* Page Header */
-.page-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 16px;
-    padding: 2rem;
-    color: white;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-    margin-bottom: 2rem;
-}
-
-.header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 2rem;
-}
-
-.page-title {
-    font-size: 2rem;
-    font-weight: 700;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.page-icon {
-    font-size: 2.5rem;
-    display: inline-block;
-    animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
-}
-
-.page-subtitle {
-    font-size: 1.1rem;
-    opacity: 0.9;
-    margin: 0.5rem 0 0 0;
-}
-
+/* Organization-specific header actions */
 .header-actions {
     display: flex;
     gap: 1rem;
-}
-
-/* Stats Section */
-.stats-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.stat-card {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    text-align: center;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-.stat-value {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    color: #667eea;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 600;
-}
-
-/* Controls Section */
-.controls-section {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 2rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
-}
-
-.search-container {
-    position: relative;
-    flex: 1;
-    max-width: 500px;
-}
-
-.search-icon {
-    position: absolute;
-    left: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #6b7280;
-}
-
-.search-input {
-    width: 100%;
-    padding: 0.75rem 1rem 0.75rem 3rem;
-    border: 2px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .view-controls {
@@ -1078,31 +953,7 @@
     background: #fee2e2;
 }
 
-/* Buttons */
-.btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    text-decoration: none;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
+/* Organization-specific button styles */
 .btn-secondary {
     background: white;
     color: #4b5563;
@@ -1124,15 +975,6 @@
     color: white;
 }
 
-.btn-danger {
-    background: #ef4444;
-    color: white;
-}
-
-.btn-danger:hover {
-    background: #dc2626;
-}
-
 .btn-ghost {
     background: transparent;
     color: #6b7280;
@@ -1141,11 +983,6 @@
 .btn-ghost:hover {
     color: #374151;
     background: #f3f4f6;
-}
-
-.btn-sm {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
 }
 
 .btn-icon,
@@ -1186,21 +1023,7 @@
     border-color: #dc2626;
 }
 
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-    background: white;
-    border-radius: 12px;
-    border: 2px dashed #e5e7eb;
-}
-
-.empty-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
-    opacity: 0.3;
-}
-
+/* Organization-specific empty state */
 .empty-state h3 {
     font-size: 1.5rem;
     font-weight: 600;
@@ -1295,25 +1118,7 @@
     gap: 1rem;
 }
 
-/* Forms */
-.modern-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.form-label {
-    font-weight: 600;
-    color: #374151;
-    font-size: 0.95rem;
-}
-
+/* Organization-specific form styles */
 .form-control {
     padding: 0.75rem 1rem;
     border: 2px solid #e5e7eb;
@@ -1341,7 +1146,7 @@
     margin-top: 0.5rem;
 }
 
-/* Responsive */
+/* Organization-specific responsive styles */
 @media (max-width: 1024px) {
     .teams-grid {
         grid-template-columns: 1fr;
@@ -1351,14 +1156,6 @@
 @media (max-width: 768px) {
     .organization-admin-container {
         padding: 1rem;
-    }
-    
-    .controls-section {
-        flex-direction: column;
-    }
-    
-    .search-container {
-        max-width: 100%;
     }
     
     .view-controls {
@@ -1377,15 +1174,6 @@
     
     .unassigned-users {
         grid-template-columns: 1fr;
-    }
-    
-    .users-table {
-        font-size: 0.875rem;
-    }
-    
-    .users-table th,
-    .users-table td {
-        padding: 0.5rem;
     }
     
     .table-actions {
