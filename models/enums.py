@@ -119,4 +119,5 @@ class BillingType(enum.Enum):
     """Billing type enumeration"""
     NON_BILLABLE = "Non-Billable"
     HOURLY = "Hourly"
+    DAILY_RATE = "Daily Rate"
     FIXED_RATE = "Fixed Rate"

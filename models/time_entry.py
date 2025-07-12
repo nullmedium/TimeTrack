@@ -51,8 +51,13 @@ class TimeEntry(db.Model):
         """Get the effective billing rate (considering project default)"""
         if self.billing_rate is not None:
             return float(self.billing_rate)
-        if self.project and self.project.hourly_rate:
-            return float(self.project.hourly_rate)
+        if self.project:
+            if self.project.billing_type == BillingType.HOURLY and self.project.hourly_rate:
+                return float(self.project.hourly_rate)
+            elif self.project.billing_type == BillingType.DAILY_RATE and self.project.daily_rate:
+                # For daily rate, we'll return the daily rate divided by standard hours
+                # This will be used differently in calculate_billing_amount
+                return float(self.project.daily_rate)
         return 0.0
 
     def calculate_billing_amount(self):
@@ -61,5 +66,15 @@ class TimeEntry(db.Model):
             return 0.0
         
         hours = self.duration / 3600.0  # Convert seconds to hours
-        rate = self.effective_billing_rate
-        return round(hours * rate, 2)
+        
+        if self.project and self.project.billing_type == BillingType.DAILY_RATE:
+            # For daily rate, calculate based on the portion of the day worked
+            # Assuming 8 hours is a standard work day
+            standard_hours_per_day = 8.0
+            days_worked = hours / standard_hours_per_day
+            daily_rate = float(self.project.daily_rate) if self.project.daily_rate else 0
+            return round(days_worked * daily_rate, 2)
+        else:
+            # For hourly rate or custom rate
+            rate = self.effective_billing_rate
+            return round(hours * rate, 2)

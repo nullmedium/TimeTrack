@@ -11,7 +11,7 @@ db = SQLAlchemy()
 # Import all models to maintain backward compatibility
 from .enums import (
     Role, AccountType, WorkRegion, CommentVisibility, 
-    TaskStatus, TaskPriority, SprintStatus, WidgetType, WidgetSize
+    TaskStatus, TaskPriority, SprintStatus, WidgetType, WidgetSize, BillingType
 )
 
 from .company import Company, CompanySettings, CompanyWorkConfig
@@ -30,18 +30,21 @@ from .invitation import CompanyInvitation
 from .note import Note, NoteVisibility, NoteLink, NoteFolder
 from .note_share import NoteShare
 from .reports import ReportTemplate, SavedReport, ReportComponent, ReportShare, ReportExportHistory
+from .invoice import Invoice, InvoiceLineItem, InvoiceStatus
+from .tax_configuration import TaxConfiguration, PricingType
 
 # Make all models available at package level
 __all__ = [
     'db',
     # Enums
     'Role', 'AccountType', 'WorkRegion', 'CommentVisibility',
-    'TaskStatus', 'TaskPriority', 'SprintStatus', 'WidgetType', 'WidgetSize',
+    'TaskStatus', 'TaskPriority', 'SprintStatus', 'WidgetType', 'WidgetSize', 'BillingType',
     # Models
     'Company', 'CompanySettings', 'CompanyWorkConfig',
     'User', 'UserPreferences', 'UserDashboard',
     'Team',
     'Project', 'ProjectCategory',
+    'Customer',
     'Task', 'TaskDependency', 'SubTask', 'Comment',
     'TimeEntry',
     'Sprint',
@@ -51,5 +54,7 @@ __all__ = [
     'WorkConfig',
     'CompanyInvitation',
     'Note', 'NoteVisibility', 'NoteLink', 'NoteFolder', 'NoteShare',
-    'ReportTemplate', 'SavedReport', 'ReportComponent', 'ReportShare', 'ReportExportHistory'
+    'ReportTemplate', 'SavedReport', 'ReportComponent', 'ReportShare', 'ReportExportHistory',
+    'Invoice', 'InvoiceLineItem', 'InvoiceStatus',
+    'TaxConfiguration', 'PricingType'
 ]

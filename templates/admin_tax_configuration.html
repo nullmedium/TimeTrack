@@ -1,0 +1,356 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="ti ti-receipt-tax page-icon"></i>
+            Tax Configuration
+        </h1>
+        <p class="page-subtitle">Manage country-specific tax rates and pricing settings</p>
+    </div>
+
+    <!-- Pricing Type Settings -->
+    <div class="settings-card">
+        <h3 class="section-title">Pricing Type</h3>
+        <form method="POST" action="{{ url_for('tax_config.update_pricing_type') }}" class="pricing-form">
+            <div class="form-group">
+                <label>Select how prices are displayed in your invoices:</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="pricing_type" value="net" 
+                               {% if company_settings.pricing_type == 'net' %}checked{% endif %}>
+                        <span class="radio-text">
+                            <strong>Net Pricing</strong>
+                            <small>Prices exclude tax (tax is added to the subtotal)</small>
+                        </span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="pricing_type" value="gross" 
+                               {% if company_settings.pricing_type == 'gross' %}checked{% endif %}>
+                        <span class="radio-text">
+                            <strong>Gross Pricing</strong>
+                            <small>Prices include tax (tax is calculated from the total)</small>
+                        </span>
+                    </label>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Update Pricing Type</button>
+        </form>
+    </div>
+
+    <!-- Tax Configurations -->
+    <div class="settings-card">
+        <div class="card-header">
+            <h3 class="section-title">Tax Configurations</h3>
+            <a href="{{ url_for('tax_config.add_tax_configuration') }}" class="btn btn-primary">
+                <i class="ti ti-plus"></i> Add Tax Configuration
+            </a>
+        </div>
+
+        {% if configurations %}
+        <div class="tax-config-table">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Country</th>
+                        <th>Tax Name</th>
+                        <th>Standard Rate</th>
+                        <th>Reduced Rate</th>
+                        <th>Status</th>
+                        <th>Default</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for config in configurations %}
+                    <tr>
+                        <td>
+                            <div class="country-info">
+                                <span class="country-flag">{{ config.country_code }}</span>
+                                <span>{{ config.country_name }}</span>
+                            </div>
+                        </td>
+                        <td>{{ config.tax_name }}</td>
+                        <td>{{ config.standard_tax_rate }}%</td>
+                        <td>
+                            {% if config.reduced_tax_rate %}
+                                {{ config.reduced_tax_rate }}%
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if config.is_active %}
+                                <span class="badge badge-success">Active</span>
+                            {% else %}
+                                <span class="badge badge-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if config.is_default %}
+                                <span class="badge badge-primary">Default</span>
+                            {% else %}
+                                <form method="POST" action="{{ url_for('tax_config.set_default_tax_configuration', config_id=config.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-outline">Set Default</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{{ url_for('tax_config.edit_tax_configuration', config_id=config.id) }}" 
+                                   class="btn btn-sm btn-secondary">
+                                    <i class="ti ti-pencil"></i>
+                                </a>
+                                {% if not config.invoices %}
+                                <form method="POST" action="{{ url_for('tax_config.delete_tax_configuration', config_id=config.id) }}" 
+                                      style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this tax configuration?');">
+                                    <button type="submit" class="btn btn-sm btn-danger">
+                                        <i class="ti ti-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="ti ti-receipt-off empty-icon"></i>
+            <p>No tax configurations set up yet.</p>
+            <a href="{{ url_for('tax_config.add_tax_configuration') }}" class="btn btn-primary">
+                Add Your First Tax Configuration
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.admin-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.page-header {
+    margin-bottom: 30px;
+}
+
+
+.settings-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 25px;
+    margin-bottom: 20px;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    color: #374151;
+}
+
+.pricing-form {
+    max-width: 600px;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.radio-label {
+    display: flex;
+    align-items: flex-start;
+    padding: 15px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.radio-label:hover {
+    border-color: #667eea;
+    background: #f9fafb;
+}
+
+.radio-label input[type="radio"] {
+    margin-right: 10px;
+    margin-top: 3px;
+}
+
+.radio-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.radio-text strong {
+    font-size: 16px;
+    color: #111827;
+}
+
+.radio-text small {
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.tax-config-table {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th {
+    background-color: #f9fafb;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.table td {
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.country-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.country-flag {
+    display: inline-block;
+    padding: 2px 6px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-success {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.badge-secondary {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+.badge-primary {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.btn-group {
+    display: flex;
+    gap: 5px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #5a67d8;
+}
+
+.btn-secondary {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.btn-secondary:hover {
+    background: #d1d5db;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid #d1d5db;
+    color: #4b5563;
+}
+
+.btn-outline:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.empty-icon {
+    font-size: 64px;
+    color: #d1d5db;
+    margin-bottom: 16px;
+}
+
+.empty-state p {
+    color: #6b7280;
+    margin-bottom: 24px;
+}
+
+.text-muted {
+    color: #9ca3af;
+}
+</style>
+{% endblock %}

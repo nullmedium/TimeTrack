@@ -67,6 +67,10 @@ class CompanySettings(db.Model):
     # Currency settings
     default_currency = db.Column(db.String(3), default='USD')
     
+    # Pricing settings
+    pricing_type = db.Column(db.String(10), default='net')  # 'net' or 'gross'
+    default_tax_configuration_id = db.Column(db.Integer, db.ForeignKey('tax_configurations.id'), nullable=True)
+    
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     

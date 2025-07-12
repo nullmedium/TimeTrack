@@ -43,6 +43,9 @@ services:
       - MAIL_USERNAME=${MAIL_USERNAME}
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       - MAIL_DEFAULT_SENDER=${MAIL_DEFAULT_SENDER}
+      - FLASK_DEBUG=${FLASK_DEBUG}
+      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS}
+      - FORCE_HTTPS=${FORCE_HTTPS}
     depends_on:
       db:
         condition: service_healthy

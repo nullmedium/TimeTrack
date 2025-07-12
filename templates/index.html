@@ -1,5 +1,64 @@
 {% extends "layout.html" %}
 
+{% block meta_description %}{{ g.branding.app_name if g.branding else 'TimeTrack' }} - Free enterprise time tracking software with project management, team collaboration, billing & invoicing. Track time, manage projects, generate reports. Open-source & self-hosted.{% endblock %}
+
+{% block meta_keywords %}time tracking software, project time tracker, team time management, billing and invoicing, enterprise time tracking, open source time tracker, self-hosted time tracking, project management software, team productivity tools, work hours tracker{% endblock %}
+
+{% block og_title %}{{ g.branding.app_name if g.branding else 'TimeTrack' }} - Enterprise Time Tracking & Project Management{% endblock %}
+
+{% block og_description %}Transform your team's productivity with intelligent time tracking, real-time analytics, project management, and automated billing. Free, open-source, and enterprise-ready.{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "{{ g.branding.app_name if g.branding else 'TimeTrack' }}",
+    "url": "{{ request.host_url }}",
+    "description": "Free enterprise time tracking software with project management, team collaboration, billing & invoicing.",
+    "potentialAction": {
+        "@type": "SearchAction",
+        "@context": "https://schema.org",
+        "target": "{{ request.host_url }}search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+    }
+}
+</script>
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+        {
+            "@type": "Question",
+            "name": "What is TimeTrack?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "TimeTrack is a comprehensive, open-source time tracking and project management software that helps teams track work hours, manage projects, collaborate, and handle billing/invoicing - all in one platform."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "Is TimeTrack really free?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes! TimeTrack is 100% free and open-source. You can use our hosted version at no cost or self-host it on your own servers. There are no hidden fees, no user limits, and all features are included."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "What features does TimeTrack include?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "TimeTrack includes one-click time tracking, project management, sprint planning, team collaboration, billing & invoicing, custom reporting, multi-company support, two-factor authentication, and GDPR compliance features."
+            }
+        }
+    ]
+}
+</script>
+{% endblock %}
+
 {% block content %}
 {% if not g.user %}
 
@@ -8,8 +67,8 @@
     <!-- Hero Section -->
     <section class="splash-hero">
         <div class="hero-content">
-            <h1 class="hero-title">Transform Your Productivity</h1>
-            <p class="hero-subtitle">Experience the future of time management with {{ g.branding.app_name if g.branding else 'TimeTrack' }}'s intelligent tracking system</p>
+            <h1 class="hero-title">Enterprise Time Tracking & Project Management Software</h1>
+            <p class="hero-subtitle">Track time effortlessly, manage projects seamlessly, and boost team productivity with {{ g.branding.app_name if g.branding else 'TimeTrack' }} - the open-source solution trusted by teams worldwide</p>
             <div class="cta-buttons">
                 <a href="{{ url_for('register') }}" class="btn-primary">Get Started Free</a>
                 <a href="{{ url_for('login') }}" class="btn-secondary">Sign In</a>
@@ -100,38 +159,38 @@
     </section>
 
     <!-- Features Grid -->
-    <section class="features-grid">
-        <h2 class="section-title">Powerful Features for Modern Teams</h2>
+    <section class="features-grid" id="features">
+        <h2 class="section-title">Powerful Time Tracking Features for Modern Teams</h2>
         <div class="feature-cards">
             <div class="feature-card">
                 <div class="feature-icon"><i class="ti ti-bolt"></i></div>
-                <h3>Lightning Fast</h3>
-                <p>Start tracking in seconds with our intuitive one-click interface</p>
+                <h3>Lightning Fast Time Tracking</h3>
+                <p>Start tracking work hours in seconds with our intuitive one-click time tracking interface. No complex setup required.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon"><i class="ti ti-chart-bar"></i></div>
-                <h3>Advanced Analytics</h3>
-                <p>Gain insights with comprehensive reports and visual dashboards</p>
+                <h3>Advanced Time Analytics & Reporting</h3>
+                <p>Gain productivity insights with comprehensive time reports, visual dashboards, and exportable data in CSV, Excel, and PDF formats.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon"><i class="ti ti-run"></i></div>
-                <h3>Sprint Management</h3>
-                <p>Organize work into sprints with agile project tracking</p>
+                <h3>Agile Sprint & Project Management</h3>
+                <p>Organize work into sprints with agile project tracking. Perfect for software development teams using Scrum or Kanban.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon"><i class="ti ti-users"></i></div>
-                <h3>Team Collaboration</h3>
-                <p>Manage teams, projects, and resources all in one place</p>
+                <h3>Team Time Management & Collaboration</h3>
+                <p>Manage team schedules, track project time budgets, and collaborate on tasks - all in one centralized platform.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon"><i class="ti ti-lock"></i></div>
-                <h3>Enterprise Security</h3>
-                <p>Bank-level encryption with role-based access control</p>
+                <h3>Enterprise-Grade Security & Compliance</h3>
+                <p>Bank-level encryption with role-based access control (RBAC), two-factor authentication (2FA), and GDPR compliance.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon"><i class="ti ti-world"></i></div>
-                <h3>Multi-Company Support</h3>
-                <p>Perfect for agencies managing multiple client accounts</p>
+                <h3>Multi-Tenant Time Tracking</h3>
+                <p>Perfect for agencies and consultants managing multiple client accounts with separate time tracking, billing, and reporting.</p>
             </div>
         </div>
     </section>

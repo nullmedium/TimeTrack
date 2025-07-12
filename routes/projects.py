@@ -58,6 +58,7 @@ def create_project():
         if not billing_type:
             billing_type = 'NON_BILLABLE'
         hourly_rate = request.form.get('hourly_rate')
+        daily_rate = request.form.get('daily_rate')
         billing_notes = request.form.get('billing_notes')
 
         # Validate required fields
@@ -78,6 +79,8 @@ def create_project():
         
         if billing_type == 'HOURLY' and not hourly_rate:
             validator.add_error('Hourly rate is required for hourly billing')
+        elif billing_type == 'DAILY_RATE' and not daily_rate:
+            validator.add_error('Daily rate is required for daily rate billing')
         
         if hourly_rate:
             try:
@@ -86,6 +89,14 @@ def create_project():
                     validator.add_error('Hourly rate must be positive')
             except ValueError:
                 validator.add_error('Invalid hourly rate')
+        
+        if daily_rate:
+            try:
+                daily_rate = float(daily_rate)
+                if daily_rate < 0:
+                    validator.add_error('Daily rate must be positive')
+            except ValueError:
+                validator.add_error('Invalid daily rate')
 
         # Parse dates
         start_date = validator.parse_date(start_date_str, 'Start date')
@@ -109,6 +120,7 @@ def create_project():
                 created_by_id=g.user.id,
                 billing_type=billing_type_enum,
                 hourly_rate=hourly_rate if hourly_rate else None,
+                daily_rate=daily_rate if daily_rate else None,
                 billing_notes=billing_notes
             )
             project_repo.save()
@@ -164,6 +176,7 @@ def edit_project(project_id):
         if not billing_type:
             billing_type = 'NON_BILLABLE'
         hourly_rate = request.form.get('hourly_rate')
+        daily_rate = request.form.get('daily_rate')
         billing_notes = request.form.get('billing_notes')
 
         # Validate required fields
@@ -192,6 +205,8 @@ def edit_project(project_id):
         
         if billing_type == 'HOURLY' and not hourly_rate:
             validator.add_error('Hourly rate is required for hourly billing')
+        elif billing_type == 'DAILY_RATE' and not daily_rate:
+            validator.add_error('Daily rate is required for daily rate billing')
         
         if hourly_rate:
             try:
@@ -200,6 +215,14 @@ def edit_project(project_id):
                     validator.add_error('Hourly rate must be positive')
             except ValueError:
                 validator.add_error('Invalid hourly rate')
+        
+        if daily_rate:
+            try:
+                daily_rate = float(daily_rate)
+                if daily_rate < 0:
+                    validator.add_error('Daily rate must be positive')
+            except ValueError:
+                validator.add_error('Invalid daily rate')
 
         if validator.is_valid():
             project_repo.update(project,
@@ -214,6 +237,7 @@ def edit_project(project_id):
                 end_date=end_date,
                 billing_type=billing_type_enum,
                 hourly_rate=hourly_rate if hourly_rate else None,
+                daily_rate=daily_rate if daily_rate else None,
                 billing_notes=billing_notes
             )
             project_repo.save()

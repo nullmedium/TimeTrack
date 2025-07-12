@@ -164,6 +164,9 @@
                                         {% elif project.billing_type.name == 'HOURLY' %}
                                             <i class="ti ti-clock-dollar info-icon"></i>
                                             <span class="info-text">{% if project.hourly_rate %}{{ currency_symbol }}{{ "%.2f"|format(project.hourly_rate) }}/hr{% else %}Hourly{% endif %}</span>
+                                        {% elif project.billing_type.name == 'DAILY_RATE' %}
+                                            <i class="ti ti-calendar-dollar info-icon"></i>
+                                            <span class="info-text">{% if project.daily_rate %}{{ currency_symbol }}{{ "%.2f"|format(project.daily_rate) }}/day{% else %}Daily Rate{% endif %}</span>
                                         {% else %}
                                             <i class="ti ti-receipt info-icon"></i>
                                             <span class="info-text">Fixed Rate</span>
@@ -272,6 +275,11 @@
                                             <span class="billing-badge hourly">
                                                 <i class="ti ti-clock-dollar"></i>
                                                 {% if project.hourly_rate %}{{ currency_symbol }}{{ "%.2f"|format(project.hourly_rate) }}/hr{% else %}Hourly{% endif %}
+                                            </span>
+                                        {% elif project.billing_type.name == 'DAILY_RATE' %}
+                                            <span class="billing-badge daily">
+                                                <i class="ti ti-calendar-dollar"></i>
+                                                {% if project.daily_rate %}{{ currency_symbol }}{{ "%.2f"|format(project.daily_rate) }}/day{% else %}Daily Rate{% endif %}
                                             </span>
                                         {% else %}
                                             <span class="billing-badge fixed">
@@ -726,6 +734,11 @@
 .billing-badge.hourly {
     background: #dbeafe;
     color: #1e40af;
+}
+
+.billing-badge.daily {
+    background: #e0e7ff;
+    color: #4338ca;
 }
 
 .billing-badge.fixed {

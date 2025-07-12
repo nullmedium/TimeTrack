@@ -102,15 +102,25 @@
                 <select id="billing_type" name="billing_type" required onchange="toggleBillingRate()">
                     <option value="NON_BILLABLE" {% if (request.form.billing_type == 'NON_BILLABLE') or (not request.form.billing_type and project.billing_type.name == 'NON_BILLABLE') %}selected{% endif %}>Non-Billable</option>
                     <option value="HOURLY" {% if (request.form.billing_type == 'HOURLY') or (not request.form.billing_type and project.billing_type.name == 'HOURLY') %}selected{% endif %}>Hourly</option>
+                    <option value="DAILY_RATE" {% if (request.form.billing_type == 'DAILY_RATE') or (not request.form.billing_type and project.billing_type.name == 'DAILY_RATE') %}selected{% endif %}>Daily Rate</option>
                     <option value="FIXED_RATE" {% if (request.form.billing_type == 'FIXED_RATE') or (not request.form.billing_type and project.billing_type.name == 'FIXED_RATE') %}selected{% endif %}>Fixed Rate</option>
                 </select>
             </div>
             
-            <div class="form-group">
+            <div class="form-group" id="hourly_rate_group">
                 <label for="hourly_rate">Hourly Rate ({{ currency }})</label>
                 <input type="number" id="hourly_rate" name="hourly_rate" 
                        step="0.01" min="0" max="99999999.99"
                        value="{{ request.form.hourly_rate if request.form.hourly_rate else (project.hourly_rate if project.hourly_rate else '') }}"
+                       placeholder="0.00">
+                <small class="form-text">Currency: {{ currency_symbol }} ({{ currency }})</small>
+            </div>
+            
+            <div class="form-group" id="daily_rate_group" style="display: none;">
+                <label for="daily_rate">Daily Rate ({{ currency }})</label>
+                <input type="number" id="daily_rate" name="daily_rate" 
+                       step="0.01" min="0" max="99999999.99"
+                       value="{{ request.form.daily_rate if request.form.daily_rate else (project.daily_rate if project.daily_rate else '') }}"
                        placeholder="0.00">
                 <small class="form-text">Currency: {{ currency_symbol }} ({{ currency }})</small>
             </div>
@@ -319,22 +329,38 @@ document.getElementById('code').addEventListener('input', function(e) {
     e.target.value = e.target.value.toUpperCase();
 });
 
-// Toggle hourly rate field based on billing type
+// Toggle rate fields based on billing type
 function toggleBillingRate() {
     const billingType = document.getElementById('billing_type').value;
+    const hourlyRateGroup = document.getElementById('hourly_rate_group');
+    const dailyRateGroup = document.getElementById('daily_rate_group');
     const hourlyRateField = document.getElementById('hourly_rate');
+    const dailyRateField = document.getElementById('daily_rate');
     const hourlyRateLabel = hourlyRateField.previousElementSibling;
+    const dailyRateLabel = dailyRateField.previousElementSibling;
     const currency = '{{ currency }}';
     
+    // Hide all rate fields first
+    hourlyRateGroup.style.display = 'none';
+    dailyRateGroup.style.display = 'none';
+    hourlyRateField.required = false;
+    dailyRateField.required = false;
+    
     if (billingType === 'HOURLY') {
+        hourlyRateGroup.style.display = 'block';
         hourlyRateField.required = true;
         hourlyRateLabel.innerHTML = `Hourly Rate (${currency}) *`;
-    } else {
-        hourlyRateField.required = false;
-        hourlyRateLabel.innerHTML = `Hourly Rate (${currency})`;
-        if (billingType === 'NON_BILLABLE') {
-            hourlyRateField.value = '';
-        }
+    } else if (billingType === 'DAILY_RATE') {
+        dailyRateGroup.style.display = 'block';
+        dailyRateField.required = true;
+        dailyRateLabel.innerHTML = `Daily Rate (${currency}) *`;
+    } else if (billingType === 'FIXED_RATE') {
+        // For fixed rate, we might want to show a total amount field in the future
+        // For now, just hide both rate fields
+    } else if (billingType === 'NON_BILLABLE') {
+        // Clear values for non-billable
+        hourlyRateField.value = '';
+        dailyRateField.value = '';
     }
 }
 

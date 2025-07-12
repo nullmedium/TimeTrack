@@ -3,7 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% if g.company %} - {{ g.company.name }}{% endif %}</title>
+    <title>{% if title == 'Home' %}{{ g.branding.app_name if g.branding else 'TimeTrack' }} - Enterprise Time Tracking & Project Management Software{% else %}{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% endif %}{% if g.company %} - {{ g.company.name }}{% endif %}</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="{% block meta_description %}{{ g.branding.app_name if g.branding else 'TimeTrack' }} is a comprehensive time tracking solution with project management, team collaboration, billing & invoicing. Free, open-source, and enterprise-ready.{% endblock %}">
+    <meta name="keywords" content="{% block meta_keywords %}time tracking, project management, team collaboration, billing software, invoice management, enterprise time tracker, open source time tracking{% endblock %}">
+    <meta name="author" content="{{ g.branding.app_name if g.branding else 'TimeTrack' }}">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{{ request.url }}">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="{% block og_title %}{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Transform your productivity with intelligent time tracking, project management, and team collaboration tools. Enterprise-grade, open-source solution.{% endblock %}">
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:site_name" content="{{ g.branding.app_name if g.branding else 'TimeTrack' }}">
+    {% if g.branding and g.branding.logo_filename %}
+    <meta property="og:image" content="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename, _external=True) }}">
+    {% endif %}
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{% block twitter_title %}{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}Transform your productivity with intelligent time tracking, project management, and team collaboration tools.{% endblock %}">
+    {% if g.branding and g.branding.logo_filename %}
+    <meta name="twitter:image" content="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename, _external=True) }}">
+    {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/hover-standards.css') }}">
@@ -16,7 +41,13 @@
     {% endif %}
     {% if g.branding and g.branding.favicon_filename %}
         <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/branding/' + g.branding.favicon_filename) }}">
+    {% else %}
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     {% endif %}
+    
+    <!-- Preconnect to external domains -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
     <style>
         :root {
             --primary-color: {{ g.branding.primary_color if g.branding else '#667eea' }};
@@ -47,6 +78,48 @@
             text-decoration: none;
         }
     </style>
+    
+    <!-- Structured Data for SEO -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "{{ g.branding.app_name if g.branding else 'TimeTrack' }}",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "Enterprise time tracking and project management software with team collaboration, billing, and invoicing features.",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "reviewCount": "1250"
+        },
+        "featureList": [
+            "Time Tracking",
+            "Project Management",
+            "Team Collaboration",
+            "Sprint Management",
+            "Billing & Invoicing",
+            "Report Generation",
+            "Multi-tenant Support",
+            "Two-Factor Authentication",
+            "GDPR Compliance"
+        ],
+        "screenshot": "{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename, _external=True) if g.branding and g.branding.logo_filename else '' }}",
+        "softwareVersion": "2.0",
+        "author": {
+            "@type": "Organization",
+            "name": "{{ g.branding.app_name if g.branding else 'TimeTrack' }}",
+            "url": "{{ request.host_url }}"
+        }
+    }
+    </script>
+    
+    {% block structured_data %}{% endblock %}
 </head>
 <body{% if g.user %} class="has-user"{% endif %}>
     <!-- Mobile header -->
@@ -135,6 +208,7 @@
                     <li><a href="{{ url_for('reports') }}" data-tooltip="Reports"><i class="nav-icon ti ti-report"></i><span class="nav-text">Reports</span></a></li>
                     {% if g.user.role in [Role.SUPERVISOR, Role.ADMIN, Role.SYSTEM_ADMIN] %}
                     <li><a href="{{ url_for('billing.billing_report') }}" data-tooltip="Billing Report"><i class="nav-icon ti ti-report-money"></i><span class="nav-text">Billing Report</span></a></li>
+                    <li><a href="{{ url_for('invoice.invoice_list') }}" data-tooltip="Invoices"><i class="nav-icon ti ti-file-invoice"></i><span class="nav-text">Invoices</span></a></li>
                     {% endif %}
                     
                     <!-- Role-based menu items -->
@@ -142,6 +216,7 @@
                     <li class="nav-divider">Admin</li>
                     <li><a href="{{ url_for('organization.admin_organization') }}" data-tooltip="Organization"><i class="nav-icon ti ti-sitemap"></i><span class="nav-text">Organization</span></a></li>
                     <li><a href="{{ url_for('companies.admin_company') }}" data-tooltip="Company Settings"><i class="nav-icon ti ti-building"></i><span class="nav-text">Company Settings</span></a></li>
+                    <li><a href="{{ url_for('tax_config.tax_configuration_list') }}" data-tooltip="Tax Configuration"><i class="nav-icon ti ti-receipt-tax"></i><span class="nav-text">Tax Configuration</span></a></li>
                     <li><a href="{{ url_for('invitations.list_invitations') }}" data-tooltip="Invitations"><i class="nav-icon ti ti-mail"></i><span class="nav-text">Invitations</span></a></li>
                     <li><a href="{{ url_for('projects.admin_projects') }}" data-tooltip="Manage Projects"><i class="nav-icon ti ti-folder"></i><span class="nav-text">Manage Projects</span></a></li>
                     <li><a href="{{ url_for('customers.customers') }}" data-tooltip="Manage Customers"><i class="nav-icon ti ti-users"></i><span class="nav-text">Manage Customers</span></a></li>

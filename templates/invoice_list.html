@@ -1,0 +1,302 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="invoice-list-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 class="page-title">
+                    <i class="ti ti-file-invoice page-icon"></i>
+                    Invoices
+                </h1>
+                <p class="page-subtitle">Manage customer invoices</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('invoice.new_invoice') }}" class="btn btn-primary">
+                    <i class="ti ti-plus"></i> New Invoice
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="filters-card">
+        <form method="GET" action="{{ url_for('invoice.invoice_list') }}" id="filterForm">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label for="status-filter">Status</label>
+                    <select id="status-filter" name="status" class="form-control" onchange="this.form.submit()">
+                        <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All Statuses</option>
+                        <option value="{{ InvoiceStatus.DRAFT }}" {% if selected_status == InvoiceStatus.DRAFT %}selected{% endif %}>Draft</option>
+                        <option value="{{ InvoiceStatus.SENT }}" {% if selected_status == InvoiceStatus.SENT %}selected{% endif %}>Sent</option>
+                        <option value="{{ InvoiceStatus.PAID }}" {% if selected_status == InvoiceStatus.PAID %}selected{% endif %}>Paid</option>
+                        <option value="{{ InvoiceStatus.OVERDUE }}" {% if selected_status == InvoiceStatus.OVERDUE %}selected{% endif %}>Overdue</option>
+                        <option value="{{ InvoiceStatus.CANCELLED }}" {% if selected_status == InvoiceStatus.CANCELLED %}selected{% endif %}>Cancelled</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="customer-filter">Customer</label>
+                    <select id="customer-filter" name="customer_id" class="form-control" onchange="this.form.submit()">
+                        <option value="">All Customers</option>
+                        {% for customer in customers %}
+                        <option value="{{ customer.id }}" {% if customer.id == selected_customer_id %}selected{% endif %}>
+                            {{ customer.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Invoices Table -->
+    <div class="content-card">
+        {% if invoices %}
+        <div class="data-table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Customer</th>
+                        <th>Date</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                        <th class="text-right">Amount</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for invoice in invoices %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('invoice.view_invoice', invoice_id=invoice.id) }}" class="invoice-link">
+                                {{ invoice.invoice_number }}
+                            </a>
+                        </td>
+                        <td>{{ invoice.customer.name }}</td>
+                        <td>{{ invoice.invoice_date.strftime('%b %d, %Y') }}</td>
+                        <td>{{ invoice.due_date.strftime('%b %d, %Y') }}</td>
+                        <td>
+                            <span class="badge badge-{{ 
+                                'secondary' if invoice.status == InvoiceStatus.DRAFT else
+                                'info' if invoice.status == InvoiceStatus.SENT else
+                                'success' if invoice.status == InvoiceStatus.PAID else
+                                'danger' if invoice.status == InvoiceStatus.OVERDUE else
+                                'warning'
+                            }}">
+                                {{ invoice.status|title }}
+                            </span>
+                        </td>
+                        <td class="text-right">{{ format_money(invoice.total_amount, currency_symbol) }}</td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{{ url_for('invoice.view_invoice', invoice_id=invoice.id) }}" class="btn btn-outline-primary" title="View">
+                                    <i class="ti ti-eye"></i>
+                                </a>
+                                <a href="{{ url_for('invoice.download_invoice_pdf', invoice_id=invoice.id) }}" class="btn btn-outline-secondary" title="Download PDF">
+                                    <i class="ti ti-download"></i>
+                                </a>
+                                {% if invoice.status == InvoiceStatus.DRAFT %}
+                                <a href="{{ url_for('invoice.edit_invoice', invoice_id=invoice.id) }}" class="btn btn-outline-warning" title="Edit">
+                                    <i class="ti ti-edit"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="ti ti-file-invoice empty-icon"></i>
+            <h3>No invoices found</h3>
+            <p>Create your first invoice to get started</p>
+            <a href="{{ url_for('invoice.new_invoice') }}" class="btn btn-primary">
+                <i class="ti ti-plus"></i> Create Invoice
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.invoice-list-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.page-header {
+    margin-bottom: 30px;
+}
+
+.page-subtitle {
+    font-size: 14px;
+}
+
+.filters-card, .content-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.filter-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.invoice-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.invoice-link:hover {
+    text-decoration: underline;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.empty-icon {
+    font-size: 64px;
+    color: #e5e7eb;
+    margin-bottom: 20px;
+}
+
+.empty-state h3 {
+    color: #374151;
+    margin-bottom: 10px;
+}
+
+.empty-state p {
+    color: #6b7280;
+    margin-bottom: 20px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    border-radius: 4px;
+}
+
+.badge-secondary {
+    background-color: #6b7280;
+    color: white;
+}
+
+.badge-info {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.badge-success {
+    background-color: #10b981;
+    color: white;
+}
+
+.badge-danger {
+    background-color: #ef4444;
+    color: white;
+}
+
+.badge-warning {
+    background-color: #f59e0b;
+    color: white;
+}
+
+/* Data Tables */
+.data-table-container {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th {
+    background: #f9fafb;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #4b5563;
+    border-bottom: 2px solid #e5e7eb;
+    white-space: nowrap;
+}
+
+.data-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.data-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+/* Column specific widths for better spacing */
+.data-table th:nth-child(1),
+.data-table td:nth-child(1) {
+    width: 15%; /* Invoice # */
+}
+
+.data-table th:nth-child(2),
+.data-table td:nth-child(2) {
+    width: 25%; /* Customer */
+}
+
+.data-table th:nth-child(3),
+.data-table td:nth-child(3) {
+    width: 12%; /* Date */
+}
+
+.data-table th:nth-child(4),
+.data-table td:nth-child(4) {
+    width: 12%; /* Due Date */
+}
+
+.data-table th:nth-child(5),
+.data-table td:nth-child(5) {
+    width: 12%; /* Status */
+}
+
+.data-table th:nth-child(6),
+.data-table td:nth-child(6) {
+    width: 12%; /* Amount */
+    text-align: right;
+}
+
+.data-table th:nth-child(7),
+.data-table td:nth-child(7) {
+    width: 12%; /* Actions */
+    text-align: center;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,305 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="form-container">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="ti ti-receipt-tax page-icon"></i>
+            {% if config %}Edit{% else %}Add{% endif %} Tax Configuration
+        </h1>
+        <p class="page-subtitle">Configure tax rates for a specific country</p>
+    </div>
+
+    <form method="POST" class="tax-form">
+        <div class="form-card">
+            <h3 class="section-title">Country Information</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="country_code">Country Code *</label>
+                    {% if config %}
+                        <input type="text" id="country_code" name="country_code" class="form-control" 
+                               value="{{ config.country_code }}" readonly>
+                    {% else %}
+                        <input type="text" id="country_code" name="country_code" class="form-control" 
+                               maxlength="2" placeholder="US" required onchange="updateFromDefault()">
+                        <small class="form-help">2-letter ISO code (e.g., US, GB, DE)</small>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    <label for="country_name">Country Name *</label>
+                    <input type="text" id="country_name" name="country_name" class="form-control" 
+                           value="{{ config.country_name if config else '' }}" required>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <h3 class="section-title">Tax Rates</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="standard_tax_rate">Standard Tax Rate (%) *</label>
+                    <input type="number" id="standard_tax_rate" name="standard_tax_rate" class="form-control" 
+                           value="{{ config.standard_tax_rate if config else '' }}" 
+                           min="0" max="100" step="0.01" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="reduced_tax_rate">Reduced Tax Rate (%)</label>
+                    <input type="number" id="reduced_tax_rate" name="reduced_tax_rate" class="form-control" 
+                           value="{{ config.reduced_tax_rate if config else '' }}" 
+                           min="0" max="100" step="0.01">
+                    <small class="form-help">Optional reduced rate for specific goods/services</small>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="tax_name">Tax Name *</label>
+                <input type="text" id="tax_name" name="tax_name" class="form-control" 
+                       value="{{ config.tax_name if config else '' }}" 
+                       placeholder="e.g., VAT, GST, Sales Tax" required>
+                <small class="form-help">The name of the tax as it appears on invoices</small>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <h3 class="section-title">Settings</h3>
+            
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="is_default" 
+                           {% if config and config.is_default %}checked{% endif %}>
+                    <span>Set as default tax configuration</span>
+                </label>
+                
+                <label class="checkbox-label">
+                    <input type="checkbox" name="is_active" 
+                           {% if not config or config.is_active %}checked{% endif %}>
+                    <span>Active (available for use)</span>
+                </label>
+            </div>
+        </div>
+
+        {% if not config and default_configs %}
+        <div class="form-card">
+            <h3 class="section-title">Quick Setup</h3>
+            <p class="help-text">Select a country to pre-fill with default values:</p>
+            
+            <div class="default-configs">
+                {% for dc in default_configs %}
+                <button type="button" class="country-button" 
+                        onclick="fillDefaults('{{ dc.country_code }}', '{{ dc.country_name }}', {{ dc.standard_tax_rate }}, {{ dc.reduced_tax_rate or 'null' }}, '{{ dc.tax_name }}')">
+                    <span class="country-code">{{ dc.country_code }}</span>
+                    <span class="country-name">{{ dc.country_name }}</span>
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+            <a href="{{ url_for('tax_config.tax_configuration_list') }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="ti ti-device-floppy"></i> 
+                {% if config %}Update{% else %}Add{% endif %} Configuration
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+.form-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.page-header {
+    margin-bottom: 30px;
+}
+
+
+.form-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 25px;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #374151;
+}
+
+.form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    flex: 1;
+    margin-bottom: 20px;
+}
+
+.form-row .form-group {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.15s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-control[readonly] {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+}
+
+.form-help {
+    display: block;
+    margin-top: 5px;
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.checkbox-label span {
+    font-size: 14px;
+    color: #374151;
+}
+
+.help-text {
+    margin-bottom: 15px;
+    color: #6b7280;
+}
+
+.default-configs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.country-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.country-button:hover {
+    background: #f3f4f6;
+    border-color: #667eea;
+}
+
+.country-code {
+    font-size: 24px;
+    font-weight: 600;
+    color: #667eea;
+    margin-bottom: 5px;
+}
+
+.country-name {
+    font-size: 13px;
+    color: #374151;
+    text-align: center;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 30px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #5a67d8;
+}
+
+.btn-secondary {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.btn-secondary:hover {
+    background: #d1d5db;
+}
+</style>
+
+<script>
+function fillDefaults(code, name, standardRate, reducedRate, taxName) {
+    document.getElementById('country_code').value = code;
+    document.getElementById('country_name').value = name;
+    document.getElementById('standard_tax_rate').value = standardRate;
+    document.getElementById('reduced_tax_rate').value = reducedRate || '';
+    document.getElementById('tax_name').value = taxName;
+}
+
+function updateFromDefault() {
+    // This could be enhanced to auto-fill based on country code
+    const code = document.getElementById('country_code').value.toUpperCase();
+    document.getElementById('country_code').value = code;
+}
+</script>
+{% endblock %}

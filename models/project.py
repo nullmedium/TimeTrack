@@ -39,6 +39,7 @@ class Project(db.Model):
     # Billing configuration
     billing_type = db.Column(db.Enum(BillingType), default=BillingType.NON_BILLABLE, nullable=False)
     hourly_rate = db.Column(db.Numeric(10, 2), nullable=True)  # Up to 99999999.99
+    daily_rate = db.Column(db.Numeric(10, 2), nullable=True)  # For daily rate billing
     billing_notes = db.Column(db.Text, nullable=True)
 
     # Relationships

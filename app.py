@@ -19,6 +19,9 @@ from flask_mail import Mail, Message
 from dotenv import load_dotenv
 from password_utils import PasswordValidator
 from werkzeug.security import check_password_hash
+from captcha.image import ImageCaptcha
+import random
+import string
 
 # Import blueprints
 from routes.notes import notes_bp
@@ -69,6 +72,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:/
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_key_for_timetrack')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Session lasts for 7 days
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 # Fix for HTTPS behind proxy (nginx, load balancer, etc)
 # This ensures forms use https:// URLs when behind a reverse proxy
@@ -174,6 +180,14 @@ app.register_blueprint(reports_api)
 # Import and register billing blueprint
 from routes.billing import billing_bp
 app.register_blueprint(billing_bp)
+
+# Import and register invoice blueprint
+from routes.invoice import invoice_bp
+app.register_blueprint(invoice_bp)
+
+# Import and register tax configuration blueprint
+from routes.tax_configuration import tax_config_bp
+app.register_blueprint(tax_config_bp)
 
 # Register template filters
 register_template_filters(app)
@@ -356,6 +370,63 @@ def setup():
     """Company setup route - delegates to imported function"""
     return company_setup()
 
+@app.route('/robots.txt')
+def robots_txt():
+    """Generate robots.txt for search engines"""
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /admin/",
+        "Disallow: /api/",
+        "Disallow: /export/",
+        "Disallow: /profile/",
+        "Disallow: /config/",
+        "Disallow: /teams/",
+        "Disallow: /projects/",
+        "Disallow: /logout",
+        f"Sitemap: {request.host_url}sitemap.xml",
+        "",
+        "# TimeTrack - Open Source Time Tracking Software",
+        "# https://github.com/nullmedium/TimeTrack"
+    ]
+    return Response('\n'.join(lines), mimetype='text/plain')
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    """Generate XML sitemap for search engines"""
+    pages = []
+    
+    # Static pages accessible without login
+    static_pages = [
+        {'loc': '/', 'priority': '1.0', 'changefreq': 'daily'},
+        {'loc': '/login', 'priority': '0.8', 'changefreq': 'monthly'},
+        {'loc': '/register', 'priority': '0.9', 'changefreq': 'monthly'},
+        {'loc': '/forgot_password', 'priority': '0.5', 'changefreq': 'monthly'},
+    ]
+    
+    for page in static_pages:
+        pages.append({
+            'loc': request.host_url[:-1] + page['loc'],
+            'lastmod': datetime.now().strftime('%Y-%m-%d'),
+            'priority': page['priority'],
+            'changefreq': page['changefreq']
+        })
+    
+    sitemap_xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    sitemap_xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    
+    for page in pages:
+        sitemap_xml += '  <url>\n'
+        sitemap_xml += f'    <loc>{page["loc"]}</loc>\n'
+        sitemap_xml += f'    <lastmod>{page["lastmod"]}</lastmod>\n'
+        sitemap_xml += f'    <changefreq>{page["changefreq"]}</changefreq>\n'
+        sitemap_xml += f'    <priority>{page["priority"]}</priority>\n'
+        sitemap_xml += '  </url>\n'
+    
+    sitemap_xml += '</urlset>'
+    
+    return Response(sitemap_xml, mimetype='application/xml')
+
 @app.route('/')
 def home():
     if g.user:
@@ -435,11 +506,62 @@ def home():
     else:
         return render_template('index.html', title='Home')
 
+@app.route('/captcha/<captcha_id>')
+def generate_captcha(captcha_id):
+    """Generate a captcha image with ID-based approach"""
+    # Use the captcha_id as a seed for consistent generation
+    random.seed(captcha_id)
+    
+    # Generate text based on the seed
+    captcha_text = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    
+    # Reset random seed
+    random.seed()
+    
+    app.logger.info(f"Generated captcha for ID {captcha_id}: {captcha_text}")
+    
+    # Generate image
+    image_captcha = ImageCaptcha()
+    data = image_captcha.generate(captcha_text)
+    
+    return Response(data.read(), mimetype='image/png')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'GET':
+        # Generate a unique captcha ID for this session
+        captcha_id = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+        session['captcha_id'] = captcha_id
+        return render_template('login.html', title='Login', captcha_id=captcha_id)
+    
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        captcha_input = request.form.get('captcha')
+        captcha_id = session.get('captcha_id', '')
+        
+        # Regenerate the expected captcha text using the same seed
+        if captcha_id:
+            random.seed(captcha_id)
+            expected_captcha = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            random.seed()
+            
+            app.logger.info(f"Expected captcha: {expected_captcha}, User input: {captcha_input}")
+            
+            if not captcha_input or expected_captcha.upper() != captcha_input.upper():
+                flash('Invalid captcha. Please try again.', 'error')
+                # Generate new captcha ID for retry
+                new_captcha_id = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+                session['captcha_id'] = new_captcha_id
+                return render_template('login.html', title='Login', captcha_id=new_captcha_id)
+        else:
+            flash('Session expired. Please try again.', 'error')
+            captcha_id = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+            session['captcha_id'] = captcha_id
+            return render_template('login.html', title='Login', captcha_id=captcha_id)
+        
+        # Clear captcha ID after validation
+        session.pop('captcha_id', None)
 
         user = User.query.filter_by(username=username).first()
 
@@ -509,8 +631,15 @@ def login():
         )
 
         flash('Invalid username or password', 'error')
-
-    return render_template('login.html', title='Login')
+        # Generate new captcha ID for retry
+        new_captcha_id = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+        session['captcha_id'] = new_captcha_id
+        return render_template('login.html', title='Login', captcha_id=new_captcha_id)
+    
+    # This should not be reached, but just in case
+    captcha_id = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+    session['captcha_id'] = captcha_id
+    return render_template('login.html', title='Login', captcha_id=captcha_id)
 
 @app.route('/logout')
 def logout():
