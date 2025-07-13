@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('sidebar');
     const sidebarToggle = document.getElementById('sidebar-toggle');
     const mobileNavToggle = document.getElementById('mobile-nav-toggle');
-    const mobileOverlay = document.getElementById('mobile-overlay');
+    const mobileOverlay = document.getElementById('mobile-nav-overlay');
     
     // Desktop sidebar toggle
     if (sidebarToggle) {
@@ -27,18 +27,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Mobile navigation toggle
     if (mobileNavToggle) {
         mobileNavToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('mobile-open');
+            sidebar.classList.toggle('active');
             mobileOverlay.classList.toggle('active');
             mobileNavToggle.classList.toggle('active');
+            document.body.classList.toggle('mobile-nav-open');
         });
     }
     
     // Close mobile sidebar when clicking overlay
     if (mobileOverlay) {
         mobileOverlay.addEventListener('click', function() {
-            sidebar.classList.remove('mobile-open');
+            sidebar.classList.remove('active');
             mobileOverlay.classList.remove('active');
             if (mobileNavToggle) mobileNavToggle.classList.remove('active');
+            document.body.classList.remove('mobile-nav-open');
         });
     }
     

@@ -1,5 +1,64 @@
 {% extends "layout.html" %}
 
+{% block meta_description %}{{ g.branding.app_name if g.branding else 'TimeTrack' }} - Free enterprise time tracking software with project management, team collaboration, billing & invoicing. Track time, manage projects, generate reports. Open-source & self-hosted.{% endblock %}
+
+{% block meta_keywords %}time tracking software, project time tracker, team time management, billing and invoicing, enterprise time tracking, open source time tracker, self-hosted time tracking, project management software, team productivity tools, work hours tracker{% endblock %}
+
+{% block og_title %}{{ g.branding.app_name if g.branding else 'TimeTrack' }} - Enterprise Time Tracking & Project Management{% endblock %}
+
+{% block og_description %}Transform your team's productivity with intelligent time tracking, real-time analytics, project management, and automated billing. Free, open-source, and enterprise-ready.{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "{{ g.branding.app_name if g.branding else 'TimeTrack' }}",
+    "url": "{{ request.host_url }}",
+    "description": "Free enterprise time tracking software with project management, team collaboration, billing & invoicing.",
+    "potentialAction": {
+        "@type": "SearchAction",
+        "@context": "https://schema.org",
+        "target": "{{ request.host_url }}search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+    }
+}
+</script>
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+        {
+            "@type": "Question",
+            "name": "What is TimeTrack?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "TimeTrack is a comprehensive, open-source time tracking and project management software that helps teams track work hours, manage projects, collaborate, and handle billing/invoicing - all in one platform."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "Is TimeTrack really free?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes! TimeTrack is 100% free and open-source. You can use our hosted version at no cost or self-host it on your own servers. There are no hidden fees, no user limits, and all features are included."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "What features does TimeTrack include?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "TimeTrack includes one-click time tracking, project management, sprint planning, team collaboration, billing & invoicing, custom reporting, multi-company support, two-factor authentication, and GDPR compliance features."
+            }
+        }
+    ]
+}
+</script>
+{% endblock %}
+
 {% block content %}
 {% if not g.user %}
 

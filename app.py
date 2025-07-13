@@ -290,6 +290,63 @@ def setup():
     """Company setup route - delegates to imported function"""
     return company_setup()
 
+@app.route('/robots.txt')
+def robots_txt():
+    """Generate robots.txt for search engines"""
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /admin/",
+        "Disallow: /api/",
+        "Disallow: /export/",
+        "Disallow: /profile/",
+        "Disallow: /config/",
+        "Disallow: /teams/",
+        "Disallow: /projects/",
+        "Disallow: /logout",
+        f"Sitemap: {request.host_url}sitemap.xml",
+        "",
+        "# TimeTrack - Open Source Time Tracking Software",
+        "# https://github.com/nullmedium/TimeTrack"
+    ]
+    return Response('\n'.join(lines), mimetype='text/plain')
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    """Generate XML sitemap for search engines"""
+    pages = []
+    
+    # Static pages accessible without login
+    static_pages = [
+        {'loc': '/', 'priority': '1.0', 'changefreq': 'daily'},
+        {'loc': '/login', 'priority': '0.8', 'changefreq': 'monthly'},
+        {'loc': '/register', 'priority': '0.9', 'changefreq': 'monthly'},
+        {'loc': '/forgot_password', 'priority': '0.5', 'changefreq': 'monthly'},
+    ]
+    
+    for page in static_pages:
+        pages.append({
+            'loc': request.host_url[:-1] + page['loc'],
+            'lastmod': datetime.now().strftime('%Y-%m-%d'),
+            'priority': page['priority'],
+            'changefreq': page['changefreq']
+        })
+    
+    sitemap_xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    sitemap_xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    
+    for page in pages:
+        sitemap_xml += '  <url>\n'
+        sitemap_xml += f'    <loc>{page["loc"]}</loc>\n'
+        sitemap_xml += f'    <lastmod>{page["lastmod"]}</lastmod>\n'
+        sitemap_xml += f'    <changefreq>{page["changefreq"]}</changefreq>\n'
+        sitemap_xml += f'    <priority>{page["priority"]}</priority>\n'
+        sitemap_xml += '  </url>\n'
+    
+    sitemap_xml += '</urlset>'
+    
+    return Response(sitemap_xml, mimetype='application/xml')
+
 @app.route('/')
 def home():
     if g.user:

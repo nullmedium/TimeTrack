@@ -220,7 +220,7 @@
                         <tr data-entry-id="{{ entry.id }}" class="entry-row">
                             <td>
                                 <div class="date-cell">
-                                    <span class="date-day">{{ entry.arrival_time.strftime('%d') }}</span>
+                                    <span class="date-day">{{ entry.arrival_time.day }}</span>
                                     <span class="date-month">{{ entry.arrival_time.strftime('%b') }}</span>
                                 </div>
                             </td>
@@ -304,7 +304,7 @@
                 <div class="entry-card" data-entry-id="{{ entry.id }}">
                     <div class="entry-header">
                         <div class="entry-date">
-                            {{ entry.arrival_time.strftime('%d %b %Y') }}
+                            {{ entry.arrival_time|format_date }}
                         </div>
                         <div class="entry-duration">
                             {{ entry.duration|format_duration if entry.duration is not none else 'Active' }}

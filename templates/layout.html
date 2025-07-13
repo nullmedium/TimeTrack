@@ -3,11 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% if g.company %} - {{ g.company.name }}{% endif %}</title>
+    <title>{% if title == 'Home' %}{{ g.branding.app_name if g.branding else 'TimeTrack' }} - Enterprise Time Tracking & Project Management Software{% else %}{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% endif %}{% if g.company %} - {{ g.company.name }}{% endif %}</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="{% block meta_description %}{{ g.branding.app_name if g.branding else 'TimeTrack' }} is a comprehensive time tracking solution with project management, team collaboration, billing & invoicing. Free, open-source, and enterprise-ready.{% endblock %}">
+    <meta name="keywords" content="{% block meta_keywords %}time tracking, project management, team collaboration, billing software, invoice management, enterprise time tracker, open source time tracking{% endblock %}">
+    <meta name="author" content="{{ g.branding.app_name if g.branding else 'TimeTrack' }}">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{{ request.url }}">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="{% block og_title %}{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Transform your productivity with intelligent time tracking, project management, and team collaboration tools. Enterprise-grade, open-source solution.{% endblock %}">
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:site_name" content="{{ g.branding.app_name if g.branding else 'TimeTrack' }}">
+    {% if g.branding and g.branding.logo_filename %}
+    <meta property="og:image" content="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename, _external=True) }}">
+    {% endif %}
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{% block twitter_title %}{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}Transform your productivity with intelligent time tracking, project management, and team collaboration tools.{% endblock %}">
+    {% if g.branding and g.branding.logo_filename %}
+    <meta name="twitter:image" content="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename, _external=True) }}">
+    {% endif %}
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/hover-standards.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile-optimized.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile-forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile-bottom-nav.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/iconfont/tabler-icons.min.css">
+    
+    <!-- PWA Support -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
     {% if g.user %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/time-tracking.css') }}">
     {% endif %}
@@ -46,9 +82,25 @@
             color: inherit;
             text-decoration: none;
         }
+        /* Fix mobile hamburger menu visibility */
+        @media (max-width: 768px) {
+            #mobile-nav-toggle span {
+                background-color: var(--primary-color, #667eea) !important;
+                display: block !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+            }
+        }
     </style>
 </head>
-<body{% if g.user %} class="has-user"{% endif %}>
+<body{% if g.user %} class="has-user has-bottom-nav"{% endif %}>
+    {% if g.user and g.user.preferences %}
+    <!-- User preferences for JavaScript -->
+    <div id="user-preferences" style="display: none;" 
+         data-date-format="{{ g.user.preferences.date_format }}"
+         data-time-format-24h="{{ g.user.preferences.time_format_24h|lower }}">
+    </div>
+    {% endif %}
     <!-- Mobile header -->
     {% if g.user %}
     <header class="mobile-header">
@@ -69,6 +121,7 @@
             <span></span>
         </button>
     </header>
+    <div class="mobile-nav-overlay" id="mobile-nav-overlay"></div>
     {% endif %}
 
     <!-- Sidebar navigation -->
@@ -245,10 +298,44 @@
             </div>
         </div>
     </footer>
+    
+    <!-- Mobile Bottom Navigation -->
+    {% if g.user %}
+    <nav class="mobile-bottom-nav">
+        <a href="{{ url_for('home') }}" class="bottom-nav-item {% if request.endpoint == 'home' %}active{% endif %}">
+            <i class="ti ti-home"></i>
+            <span>Home</span>
+        </a>
+        <a href="{{ url_for('projects.admin_projects') }}" class="bottom-nav-item {% if 'project' in request.endpoint %}active{% endif %}">
+            <i class="ti ti-clipboard-list"></i>
+            <span>Projects</span>
+        </a>
+        <a href="{{ url_for('time_tracking') }}" class="bottom-nav-item nav-fab {% if 'time' in request.endpoint %}active{% endif %}">
+            <div class="fab-button">
+                <i class="ti ti-clock"></i>
+            </div>
+            <span>Time</span>
+        </a>
+        <a href="{{ url_for('notes.notes_list') }}" class="bottom-nav-item {% if 'note' in request.endpoint %}active{% endif %}">
+            <i class="ti ti-notes"></i>
+            <span>Notes</span>
+        </a>
+        <a href="{{ url_for('profile') }}" class="bottom-nav-item {% if request.endpoint == 'profile' %}active{% endif %}">
+            <i class="ti ti-user"></i>
+            <span>Profile</span>
+        </a>
+    </nav>
+    {% endif %}
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
     <script src="{{ url_for('static', filename='js/password-strength.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mobile-tables.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/date-formatter.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/date-picker-enhancer.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mobile-gestures.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mobile-pull-refresh.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mobile-performance.js') }}"></script>
     {% if g.user %}
     <script src="{{ url_for('static', filename='js/user-dropdown.js') }}"></script>
     <script>

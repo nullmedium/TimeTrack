@@ -35,6 +35,15 @@
                         Updated {{ note.updated_at|format_date }}
                     </span>
                     {% endif %}
+                    {% if note.folder %}
+                    <span class="meta-divider">•</span>
+                    <span class="folder">
+                        <span class="icon"><i class="ti ti-folder"></i></span>
+                        <a href="{{ url_for('notes.notes_list', folder=note.folder) }}" class="folder-link">
+                            {{ note.folder }}
+                        </a>
+                    </span>
+                    {% endif %}
                 </div>
             </div>
             <div class="header-actions">
@@ -89,23 +98,9 @@
     </div>
 
     <!-- Note Metadata Card -->
-    {% if note.project or note.task or note.tags or note.folder %}
+    {% if note.project or note.task or note.tags %}
     <div class="metadata-card">
         <div class="metadata-grid">
-            {% if note.folder %}
-            <div class="metadata-item">
-                <span class="metadata-label">
-                    <span class="icon"><i class="ti ti-folder"></i></span>
-                    Folder
-                </span>
-                <span class="metadata-value">
-                    <a href="{{ url_for('notes.notes_list', folder=note.folder) }}" class="metadata-link">
-                        {{ note.folder }}
-                    </a>
-                </span>
-            </div>
-            {% endif %}
-            
             {% if note.project %}
             <div class="metadata-item">
                 <span class="metadata-label">
@@ -399,6 +394,18 @@
 
 .meta-divider {
     color: rgba(255, 255, 255, 0.5);
+}
+
+.folder-link {
+    color: white;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    transition: border-color 0.2s ease;
+}
+
+.folder-link:hover {
+    color: white;
+    border-bottom-color: rgba(255, 255, 255, 0.8);
 }
 
 .pin-badge {

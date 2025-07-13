@@ -8,7 +8,7 @@
         {% if active_entry %}
             <div class="active-timer">
                 <h2>Currently Working</h2>
-                <p>Started at: {{ active_entry.arrival_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                <p>Started at: {{ active_entry.arrival_time|format_datetime }}</p>
                 <div id="timer" data-start="{{ active_entry.arrival_time.timestamp() }}">00:00:00</div>
                 <button id="leave-btn" class="leave-btn" data-id="{{ active_entry.id }}">Leave</button>
             </div>
@@ -35,11 +35,11 @@
             </thead>
             <tbody id="time-history-body">
                 {% for entry in history %}
-                <tr data-entry-id="{{ entry.id }}">
-                    <td>{{ entry.arrival_time.strftime('%Y-%m-%d') }}</td>
-                    <td>{{ entry.arrival_time.strftime('%H:%M:%S') }}</td>
-                    <td>{{ entry.departure_time.strftime('%H:%M:%S') if entry.departure_time else 'Active' }}</td>
-                    <td>{{ (entry.duration // 3600)|string + 'h ' + ((entry.duration % 3600) // 60)|string + 'm' if entry.duration else 'N/A' }}</td>
+                <tr data-entry-id="{{ entry.id }}" data-iso-date="{{ entry.arrival_time.strftime('%Y-%m-%d') }}">
+                    <td>{{ entry.arrival_time|format_date }}</td>
+                    <td>{{ entry.arrival_time|format_time }}</td>
+                    <td>{{ entry.departure_time|format_time if entry.departure_time else 'Active' }}</td>
+                    <td>{{ entry.duration|format_duration if entry.duration else 'N/A' }}</td>
                     <td>
                         <button class="edit-entry-btn" data-id="{{ entry.id }}">Edit</button>
                         <button class="delete-entry-btn" data-id="{{ entry.id }}">Delete</button>
@@ -107,17 +107,18 @@
                 const arrivalTimeStr = cells[1].textContent;
                 const departureTimeStr = cells[2].textContent !== 'Active' ? cells[2].textContent : '';
 
-                // Parse date and time
-                const arrivalDate = new Date(`${dateStr}T${arrivalTimeStr}`);
+                // For edit form, we need ISO format (YYYY-MM-DD)
+                // Parse the displayed date back to ISO format
+                const entryRow = document.querySelector(`tr[data-entry-id="${entryId}"]`);
+                const isoDate = entryRow.dataset.isoDate || dateStr;
 
                 // Set values in the form
                 document.getElementById('edit-entry-id').value = entryId;
-                document.getElementById('edit-arrival-date').value = dateStr;
+                document.getElementById('edit-arrival-date').value = isoDate;
                 document.getElementById('edit-arrival-time').value = arrivalTimeStr;
 
                 if (departureTimeStr) {
-                    const departureDate = new Date(`${dateStr}T${departureTimeStr}`);
-                    document.getElementById('edit-departure-date').value = dateStr;
+                    document.getElementById('edit-departure-date').value = isoDate;
                     document.getElementById('edit-departure-time').value = departureTimeStr;
                 } else {
                     document.getElementById('edit-departure-date').value = '';

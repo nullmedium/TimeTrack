@@ -12,7 +12,7 @@
         <p class="section-description">
             These policies are set by your administrator and apply to all employees.
             {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
-            <a href="{{ url_for('admin_work_policies') }}">Click here to modify these settings</a>.
+            <a href="{{ url_for('companies.admin_company') }}">Click here to modify these settings</a>.
             {% endif %}
         </p>
         
@@ -25,18 +25,10 @@
             </div>
             <div class="policy-item">
                 <strong>Break Policy:</strong> 
-                {% if company_config.mandatory_break_minutes > 0 %}
+                {% if company_config.require_breaks %}
                     {{ company_config.break_duration_minutes }} minutes after {{ company_config.break_after_hours }} hours
                 {% else %}
                     No mandatory breaks
-                {% endif %}
-            </div>
-            <div class="policy-item">
-                <strong>Additional Break:</strong>
-                {% if company_config.additional_break_minutes > 0 %}
-                    {{ company_config.additional_break_minutes }} minutes after {{ company_config.additional_break_threshold_hours }} hours
-                {% else %}
-                    No additional breaks
                 {% endif %}
             </div>
         </div>

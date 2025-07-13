@@ -1,0 +1,495 @@
+/* Mobile Form Enhancements for TimeTrack */
+/* This file contains mobile-specific form optimizations */
+
+/* ===== Form Container Improvements ===== */
+@media (max-width: 768px) {
+    /* Form wrapper adjustments */
+    .form-container,
+    .auth-container,
+    .profile-container {
+        padding: var(--mobile-edge-padding);
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    /* Form sections with better spacing */
+    .form-section {
+        margin-bottom: 24px;
+        padding: 16px;
+        background: var(--bg-light);
+        border-radius: 12px;
+    }
+    
+    .form-section-title {
+        font-size: 1.125rem;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-color);
+    }
+}
+
+/* ===== Enhanced Input Fields ===== */
+@media (max-width: 768px) {
+    /* Base input improvements */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    input[type="search"],
+    input[type="url"],
+    select,
+    textarea {
+        width: 100%;
+        min-height: var(--mobile-input-height);
+        padding: 14px 16px;
+        font-size: 16px; /* Prevents zoom on iOS */
+        border: 2px solid var(--border-color);
+        transition: border-color 0.2s ease;
+        -webkit-appearance: none;
+        border-radius: 8px;
+        background-color: var(--bg-light);
+    }
+    
+    /* Focus states with better visibility */
+    input:focus,
+    select:focus,
+    textarea:focus {
+        border-color: var(--primary-color);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    /* Textarea specific */
+    textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+    
+    /* Select dropdown improvements */
+    select {
+        background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23667eea' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 16px center;
+        padding-right: 40px;
+    }
+    
+    /* Checkbox and radio improvements */
+    input[type="checkbox"],
+    input[type="radio"] {
+        width: 24px;
+        height: 24px;
+        margin-right: 12px;
+        flex-shrink: 0;
+        cursor: pointer;
+    }
+    
+    /* Label improvements for checkboxes/radios */
+    .checkbox-wrapper,
+    .radio-wrapper {
+        display: flex;
+        align-items: center;
+        min-height: var(--mobile-touch-target);
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    .checkbox-wrapper label,
+    .radio-wrapper label {
+        cursor: pointer;
+        flex: 1;
+    }
+}
+
+/* ===== Form Labels and Helpers ===== */
+@media (max-width: 768px) {
+    /* Label styling */
+    label,
+    .form-label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        font-size: 14px;
+    }
+    
+    /* Required field indicator */
+    label.required::after,
+    .form-label.required::after {
+        content: " *";
+        color: var(--danger);
+    }
+    
+    /* Help text */
+    .form-help,
+    .help-text {
+        display: block;
+        margin-top: 4px;
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+    
+    /* Error messages */
+    .form-error,
+    .error-message {
+        display: block;
+        margin-top: 4px;
+        font-size: 13px;
+        color: var(--danger);
+    }
+    
+    /* Input with error state */
+    .has-error input,
+    .has-error select,
+    .has-error textarea {
+        border-color: var(--danger);
+    }
+}
+
+/* ===== Form Groups and Layouts ===== */
+@media (max-width: 768px) {
+    /* Form group spacing */
+    .form-group,
+    .mb-3 {
+        margin-bottom: 20px;
+    }
+    
+    /* Stack form columns on mobile */
+    .form-row,
+    .row {
+        display: block;
+    }
+    
+    .form-row > *,
+    .row > * {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    
+    .form-row > *:last-child,
+    .row > *:last-child {
+        margin-bottom: 0;
+    }
+    
+    /* Inline form groups */
+    .form-inline {
+        display: block;
+    }
+    
+    .form-inline > * {
+        width: 100%;
+        margin-bottom: 12px;
+    }
+}
+
+/* ===== Button Groups and Actions ===== */
+@media (max-width: 768px) {
+    /* Form action buttons */
+    .form-actions,
+    .button-group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 24px;
+    }
+    
+    .form-actions .btn,
+    .button-group .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    /* Primary action emphasis */
+    .form-actions .btn-primary,
+    .button-group .btn-primary {
+        order: -1; /* Move primary button to top */
+    }
+    
+    /* Horizontal button groups on larger mobiles */
+    @media (min-width: 480px) {
+        .form-actions.horizontal,
+        .button-group.horizontal {
+            flex-direction: row;
+        }
+        
+        .form-actions.horizontal .btn,
+        .button-group.horizontal .btn {
+            flex: 1;
+        }
+    }
+}
+
+/* ===== File Upload Enhancements ===== */
+@media (max-width: 768px) {
+    /* File input styling */
+    input[type="file"] {
+        width: 100%;
+        padding: 12px;
+        border: 2px dashed var(--border-color);
+        border-radius: 8px;
+        background: var(--bg-light);
+    }
+    
+    /* Custom file upload area */
+    .file-upload-area {
+        position: relative;
+        padding: 32px 16px;
+        border: 2px dashed var(--primary-color);
+        border-radius: 12px;
+        text-align: center;
+        background: rgba(102, 126, 234, 0.05);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .file-upload-area:hover,
+    .file-upload-area.drag-over {
+        background: rgba(102, 126, 234, 0.1);
+        border-color: var(--primary-color);
+    }
+    
+    .file-upload-area input[type="file"] {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+}
+
+/* ===== Search and Filter Forms ===== */
+@media (max-width: 768px) {
+    /* Search input with icon */
+    .search-wrapper {
+        position: relative;
+    }
+    
+    .search-wrapper input[type="search"] {
+        padding-left: 44px;
+    }
+    
+    .search-wrapper .search-icon {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+    }
+    
+    /* Filter form improvements */
+    .filter-form {
+        background: var(--bg-light);
+        padding: 16px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+    }
+    
+    .filter-toggle {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 16px;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+    }
+    
+    .filter-content {
+        display: none;
+    }
+    
+    .filter-content.show {
+        display: block;
+    }
+}
+
+/* ===== Keyboard and Focus Management ===== */
+@media (max-width: 768px) {
+    /* Adjust layout when keyboard is visible */
+    .keyboard-visible .form-actions {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--bg-light);
+        padding: 16px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        z-index: 100;
+    }
+    
+    /* Tab focus indicators */
+    .form-tab-nav {
+        display: flex;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .form-tab-nav button {
+        flex-shrink: 0;
+        padding: 12px 20px;
+        border: none;
+        background: none;
+        font-size: 16px;
+        color: var(--text-secondary);
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s ease;
+    }
+    
+    .form-tab-nav button.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+    }
+}
+
+/* ===== Time Entry Form Specific ===== */
+@media (max-width: 768px) {
+    /* Timer display adjustments */
+    .timer-form {
+        text-align: center;
+    }
+    
+    .timer-display {
+        font-size: clamp(2.5rem, 10vw, 4rem);
+        margin: 20px 0;
+    }
+    
+    /* Project/task selectors */
+    .time-entry-selectors {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    
+    /* Timer controls */
+    .timer-controls {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+    }
+    
+    .timer-controls .btn {
+        flex: 1;
+        max-width: 160px;
+    }
+}
+
+/* ===== Login/Register Form Specific ===== */
+@media (max-width: 768px) {
+    /* Auth forms centering */
+    .auth-wrapper {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        padding: 20px;
+    }
+    
+    .auth-form {
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+    
+    /* Registration type selector */
+    .registration-type-selector {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+    
+    .registration-type-option {
+        padding: 16px;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .registration-type-option.active {
+        border-color: var(--primary-color);
+        background: rgba(102, 126, 234, 0.05);
+    }
+}
+
+/* ===== Progressive Enhancement ===== */
+@media (max-width: 768px) {
+    /* Collapsible form sections */
+    .collapsible-section {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        margin-bottom: 16px;
+        overflow: hidden;
+    }
+    
+    .collapsible-header {
+        padding: 16px;
+        background: var(--bg-light);
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    .collapsible-header::after {
+        content: "▼";
+        transition: transform 0.2s ease;
+    }
+    
+    .collapsible-section.collapsed .collapsible-header::after {
+        transform: rotate(-90deg);
+    }
+    
+    .collapsible-content {
+        padding: 16px;
+        display: block;
+    }
+    
+    .collapsible-section.collapsed .collapsible-content {
+        display: none;
+    }
+}
+
+/* ===== Accessibility Improvements ===== */
+@media (max-width: 768px) {
+    /* Skip to form content link */
+    .skip-to-form {
+        position: absolute;
+        top: -40px;
+        left: 0;
+        background: var(--primary-color);
+        color: white;
+        padding: 8px 16px;
+        text-decoration: none;
+        border-radius: 0 0 8px 0;
+        z-index: 1000;
+    }
+    
+    .skip-to-form:focus {
+        top: 0;
+    }
+    
+    /* Focus visible improvements */
+    *:focus-visible {
+        outline: 3px solid var(--primary-color);
+        outline-offset: 2px;
+    }
+    
+    /* Reduced motion support */
+    @media (prefers-reduced-motion: reduce) {
+        * {
+            transition-duration: 0.01ms !important;
+        }
+    }
+}

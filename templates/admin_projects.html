@@ -240,8 +240,8 @@
                                     </td>
                                     <td class="date-cell">
                                         {% if project.start_date %}
-                                            {{ project.start_date.strftime('%Y-%m-%d') }}
-                                            {% if project.end_date %}<br>to {{ project.end_date.strftime('%Y-%m-%d') }}{% endif %}
+                                            {{ project.start_date|format_date }}
+                                            {% if project.end_date %}<br>to {{ project.end_date|format_date }}{% endif %}
                                         {% else %}
                                             -
                                         {% endif %}

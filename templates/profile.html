@@ -158,7 +158,7 @@
                         </div>
                         <div class="info-item">
                             <span class="info-label">Member Since</span>
-                            <span class="info-value">{{ user.created_at.strftime('%B %d, %Y') }}</span>
+                            <span class="info-value">{{ user.created_at|format_date }}</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Account Type</span>

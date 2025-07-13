@@ -114,7 +114,7 @@
                                 <span class="info-icon"><i class="ti ti-calendar"></i></span>
                                 <div class="info-content">
                                     <label class="info-label">Created</label>
-                                    <span class="info-value">{{ company.created_at.strftime('%B %d, %Y at %I:%M %p') }}</span>
+                                    <span class="info-value">{{ company.created_at|format_datetime }}</span>
                                 </div>
                             </div>
                         </div>
