@@ -456,11 +456,16 @@ def system_admin_health():
         func.date(SystemEvent.timestamp) == today
     ).count()
     
-    # Calculate 24-hour error count
+    # Calculate 24-hour error and warning counts
     yesterday = now - timedelta(days=1)
     error_count_24h = SystemEvent.query.filter(
         SystemEvent.timestamp >= yesterday,
         SystemEvent.severity == 'error'
+    ).count()
+    
+    warning_count_24h = SystemEvent.query.filter(
+        SystemEvent.timestamp >= yesterday,
+        SystemEvent.severity == 'warning'
     ).count()
 
     # Log the health check
@@ -484,7 +489,8 @@ def system_admin_health():
                          db_error=db_error,
                          uptime_duration=uptime_duration,
                          today_events=today_events,
-                         error_count_24h=error_count_24h)
+                         error_count_24h=error_count_24h,
+                         warning_count_24h=warning_count_24h)
 
 
 @system_admin_bp.route('/branding', methods=['GET', 'POST'])
