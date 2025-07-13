@@ -11,43 +11,59 @@ while ! pg_isready -h db -p 5432 -U "$POSTGRES_USER" > /dev/null 2>&1; do
 done
 echo "PostgreSQL is ready!"
 
-# SQLite to PostgreSQL migration is now handled by the migration system below
+# Run Flask-Migrate migrations
+echo ""
+echo "=== Running Database Migrations ==="
+export FLASK_APP=app.py
 
-# Initialize database tables if they don't exist
-echo "Ensuring database tables exist..."
-python -c "
+# Check if migrations directory exists
+if [ -d "migrations" ]; then
+    echo "Applying database migrations..."
+    flask db upgrade
+    if [ $? -ne 0 ]; then
+        echo "❌ Migration failed! Check the logs above."
+        exit 1
+    fi
+    echo "✅ Database migrations completed successfully"
+else
+    echo "⚠️  No migrations directory found. Initializing Flask-Migrate..."
+    
+    # Use Docker-friendly initialization (no Git required)
+    python docker_migrate_init.py
+    if [ $? -ne 0 ]; then
+        echo "❌ Migration initialization failed!"
+        exit 1
+    fi
+    
+    # Check if database has existing tables
+    python -c "
 from app import app, db
 with app.app_context():
-    db.create_all()
-    print('Database tables created/verified')
-"
-
-# Run all database schema migrations
-echo ""
-echo "=== Running Database Schema Migrations ==="
-if [ -d "migrations" ] && [ -f "migrations/run_all_db_migrations.py" ]; then
-    echo "Checking and applying database schema updates..."
-    python migrations/run_all_db_migrations.py
-    if [ $? -ne 0 ]; then
-        echo "⚠️  Some database migrations had issues, but continuing..."
+    inspector = db.inspect(db.engine)
+    tables = [t for t in inspector.get_table_names() if t != 'alembic_version']
+    if tables:
+        print('has_tables')
+" > /tmp/db_check.txt
+    
+    if grep -q "has_tables" /tmp/db_check.txt 2>/dev/null; then
+        echo "📊 Existing database detected. Marking as current..."
+        flask db stamp head
+        echo "✅ Database marked as current"
+    else
+        echo "🆕 Empty database detected. Creating tables..."
+        flask db upgrade
+        echo "✅ Database tables created"
     fi
-else
-    echo "No migrations directory found, skipping database migrations..."
+    
+    rm -f /tmp/db_check.txt
 fi
 
-# Run code migrations to update code for model changes
-echo ""
-echo "=== Running Code Migrations ==="
-echo "Code migrations temporarily disabled for debugging"
-# if [ -d "migrations" ] && [ -f "migrations/run_code_migrations.py" ]; then
-#     echo "Checking and applying code updates for model changes..."
-#     python migrations/run_code_migrations.py
-#     if [ $? -ne 0 ]; then
-#         echo "⚠️  Code migrations had issues, but continuing..."
-#     fi
-# else
-#     echo "No migrations directory found, skipping code migrations..."
-# fi
+# Legacy migration support (can be removed after full transition)
+if [ -f "migrations_old/run_all_db_migrations.py" ]; then
+    echo ""
+    echo "=== Checking Legacy Migrations ==="
+    echo "Found old migration system. Consider removing after confirming Flask-Migrate is working."
+fi
 
 # Start the Flask application with gunicorn
 echo ""
