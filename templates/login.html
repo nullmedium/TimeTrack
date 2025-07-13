@@ -47,6 +47,12 @@
             <button type="submit" class="btn btn-primary">Sign In</button>
         </div>
         
+        <div class="auth-links" style="margin-bottom: 1rem;">
+            <p>
+                <a href="{{ url_for('forgot_password') }}">Forgot your password?</a>
+            </p>
+        </div>
+        
         <div class="social-divider">
             <span>New to {{ g.branding.app_name if g.branding else 'TimeTrack' }}?</span>
         </div>

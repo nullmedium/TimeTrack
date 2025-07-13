@@ -3,13 +3,13 @@ Security headers middleware for Flask.
 Add this to ensure secure form submission and prevent security warnings.
 """
 
-from flask import request
+from flask import request, current_app
 
 def add_security_headers(response):
     """Add security headers to all responses."""
     
     # Force HTTPS for all resources
-    if request.is_secure or not request.app.debug:
+    if request.is_secure or not current_app.debug:
         # Strict Transport Security - force HTTPS for 1 year
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         

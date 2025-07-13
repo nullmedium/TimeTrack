@@ -909,6 +909,106 @@ def verify_email(token):
 
     return redirect(url_for('login'))
 
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    """Handle forgot password requests"""
+    if request.method == 'POST':
+        username_or_email = request.form.get('username_or_email', '').strip()
+        
+        if not username_or_email:
+            flash('Please enter your username or email address.', 'error')
+            return render_template('forgot_password.html', title='Forgot Password')
+        
+        # Try to find user by username or email
+        user = User.query.filter(
+            db.or_(
+                User.username == username_or_email,
+                User.email == username_or_email
+            )
+        ).first()
+        
+        if user and user.email:
+            # Generate reset token
+            token = user.generate_password_reset_token()
+            
+            # Send reset email
+            reset_url = url_for('reset_password', token=token, _external=True)
+            msg = Message(
+                f'Password Reset Request - {g.branding.app_name if g.branding else "TimeTrack"}',
+                recipients=[user.email]
+            )
+            msg.body = f'''Hello {user.username},
+
+You have requested to reset your password for {g.branding.app_name if g.branding else "TimeTrack"}.
+
+To reset your password, please click on the link below:
+{reset_url}
+
+This link will expire in 1 hour.
+
+If you did not request a password reset, please ignore this email.
+
+Best regards,
+The {g.branding.app_name if g.branding else "TimeTrack"} Team
+'''
+            
+            try:
+                mail.send(msg)
+                logger.info(f"Password reset email sent to user {user.username}")
+            except Exception as e:
+                logger.error(f"Failed to send password reset email: {str(e)}")
+                flash('Failed to send reset email. Please contact support.', 'error')
+                return render_template('forgot_password.html', title='Forgot Password')
+        
+        # Always show success message to prevent user enumeration
+        flash('If an account exists with that username or email address, we have sent a password reset link.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('forgot_password.html', title='Forgot Password')
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Handle password reset with token"""
+    # Find user by reset token
+    user = User.query.filter_by(password_reset_token=token).first()
+    
+    if not user or not user.verify_password_reset_token(token):
+        flash('Invalid or expired reset link.', 'error')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        # Validate input
+        error = None
+        if not password:
+            error = 'Password is required'
+        elif password != confirm_password:
+            error = 'Passwords do not match'
+        
+        # Validate password strength
+        if not error:
+            validator = PasswordValidator()
+            is_valid, password_errors = validator.validate(password)
+            if not is_valid:
+                error = password_errors[0]
+        
+        if error:
+            flash(error, 'error')
+            return render_template('reset_password.html', token=token, title='Reset Password')
+        
+        # Update password
+        user.set_password(password)
+        user.clear_password_reset_token()
+        db.session.commit()
+        
+        logger.info(f"Password reset successful for user {user.username}")
+        flash('Your password has been reset successfully. Please log in with your new password.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('reset_password.html', token=token, title='Reset Password')
+
 @app.route('/dashboard')
 @role_required(Role.TEAM_MEMBER)
 @company_required

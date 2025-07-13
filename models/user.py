@@ -48,6 +48,10 @@ class User(db.Model):
     
     # Avatar field
     avatar_url = db.Column(db.String(255), nullable=True)  # URL to user's avatar image
+    
+    # Password reset fields
+    password_reset_token = db.Column(db.String(100), unique=True, nullable=True)
+    password_reset_expiry = db.Column(db.DateTime, nullable=True)
 
     # Relationships
     time_entries = db.relationship('TimeEntry', backref='user', lazy=True)
@@ -139,6 +143,28 @@ class User(db.Model):
         elif self.username:
             return self.username[:2].upper()
         return "??"
+    
+    def generate_password_reset_token(self):
+        """Generate a password reset token"""
+        token = secrets.token_urlsafe(32)
+        self.password_reset_token = token
+        self.password_reset_expiry = datetime.utcnow() + timedelta(hours=1)
+        db.session.commit()
+        return token
+    
+    def verify_password_reset_token(self, token):
+        """Verify if the password reset token is valid"""
+        if not self.password_reset_token or self.password_reset_token != token:
+            return False
+        if not self.password_reset_expiry or datetime.utcnow() > self.password_reset_expiry:
+            return False
+        return True
+    
+    def clear_password_reset_token(self):
+        """Clear the password reset token after use"""
+        self.password_reset_token = None
+        self.password_reset_expiry = None
+        db.session.commit()
 
     def __repr__(self):
         return f'<User {self.username}>'

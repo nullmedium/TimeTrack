@@ -1,6 +1,6 @@
 # TimeTrack
 
-TimeTrack is a comprehensive web-based time tracking application built with Flask that provides enterprise-level time management capabilities for teams and organizations. The application features role-based access control, project management, team collaboration, and secure authentication.
+TimeTrack is a comprehensive web-based time tracking application built with Flask that provides enterprise-level time management capabilities for teams and organizations. The application features multi-tenancy support, role-based access control, project management, team collaboration, billing/invoicing, and secure authentication with 2FA and password reset functionality. It includes a Progressive Web App (PWA) interface with mobile-optimized features.
 
 ## Features
 
@@ -13,59 +13,99 @@ TimeTrack is a comprehensive web-based time tracking application built with Flas
 
 ### User Management & Security
 - **Two-Factor Authentication (2FA)**: TOTP-based authentication with QR codes
-- **Role-Based Access Control**: Admin, Supervisor, Team Leader, and Team Member roles
-- **User Administration**: Create, edit, block/unblock users with verification system
-- **Profile Management**: Update email, password, and personal settings
+- **Password Reset**: Secure email-based password recovery (1-hour token expiry)
+- **Role-Based Access Control**: System Admin, Admin, Supervisor, Team Leader, and Team Member roles
+- **Multi-Tenancy**: Complete data isolation between companies
+- **User Administration**: Create, edit, block/unblock users with email verification
+- **Profile Management**: Update email, password, avatar, and personal settings
+- **Company Invitations**: Invite users to join your company via email
 
 ### Team & Project Management
 - **Team Management**: Create teams, assign members, and track team hours
-- **Project Management**: Create projects with codes, assign to teams, set active/inactive status
+- **Project Management**: Create projects with codes, categories, billing types (hourly/daily/fixed)
+- **Sprint Management**: Agile sprint planning and tracking
+- **Task Management**: Create and manage tasks with subtasks and dependencies
+- **Notes System**: Create, organize, and share notes with folder structure
 - **Team Hours Tracking**: View team member working hours with date filtering
 - **Project Assignment**: Flexible project-team assignments and access control
 
 ### Export & Reporting
-- **Multiple Export Formats**: CSV and Excel export capabilities
+- **Multiple Export Formats**: CSV, Excel, and PDF export capabilities
 - **Individual Time Export**: Personal time entries with date range selection
 - **Team Hours Export**: Export team member hours with filtering options
+- **Invoice Generation**: Create and export invoices with tax configurations
+- **Analytics Dashboard**: Visual analytics with charts and statistics
 - **Quick Export Options**: Today, week, month, or all-time data exports
 
 ### Administrative Features
+- **Company Management**: Multi-company support with separate settings
 - **Admin Dashboard**: System overview with user, team, and activity statistics
-- **System Settings**: Configure registration settings and global preferences
+- **System Settings**: Configure registration, email verification, tracking scripts
+- **Work Configuration**: Set work hours, break rules, and rounding preferences
+- **Tax Configuration**: Country-specific tax rates for invoicing
+- **Branding**: Custom logos, colors, and application naming
 - **User Administration**: Complete user lifecycle management
 - **Team & Project Administration**: Full CRUD operations for teams and projects
+- **System Admin Tools**: Multi-company oversight and system health monitoring
 
 ## Tech Stack
 
 - **Backend**: Flask 2.0.1 with SQLAlchemy ORM
-- **Database**: SQLite with comprehensive relational schema
-- **Authentication**: Flask session management with 2FA support
-- **Frontend**: Responsive HTML, CSS, JavaScript with real-time updates
-- **Security**: TOTP-based two-factor authentication, role-based access control
-- **Export**: CSV and Excel export capabilities
-- **Dependencies**: See Pipfile for complete dependency list
+- **Database**: PostgreSQL (production)
+- **Migrations**: Flask-Migrate (Alembic-based) with custom helpers
+- **Authentication**: Session-based with 2FA and password reset via Flask-Mail
+- **Frontend**: Server-side Jinja2 templates with vanilla JavaScript
+- **Mobile**: Progressive Web App (PWA) with mobile-optimized UI
+- **Export**: Pandas for CSV/Excel, ReportLab for PDF generation
+- **Containerization**: Docker and Docker Compose for easy deployment
+- **Dependencies**: See requirements.txt for complete dependency list
 
 ## Installation
 
 ### Prerequisites
 
-- Python 3.12
-- pip or pipenv
+- Python 3.9+
+- PostgreSQL 15+ (for production)
+- Docker & Docker Compose (recommended)
 
-### Setup with pipenv (recommended)
+### Quick Start with Docker (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/nullmedium/TimeTrack.git
 cd TimeTrack
 
-# Install dependencies using pipenv
-pipenv install
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env with your settings
 
-# Activate the virtual environment
-pipenv shell
+# Start the application
+docker-compose up -d
 
-# Run the application (migrations run automatically on first startup)
+# Access at http://localhost:5000
+```
+
+### Local Development Setup
+
+```bash
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set environment variables
+export DATABASE_URL="postgresql://user:pass@localhost/timetrack"
+export SECRET_KEY="your-secret-key"
+export MAIL_SERVER="smtp.example.com"
+# ... other environment variables
+
+# Run migrations
+python create_migration.py "Initial setup"
+python apply_migration.py
+
+# Run the application
 python app.py
 ```
 
@@ -81,22 +121,60 @@ python app.py
 
 ### Database Migrations
 
-**Automatic Migration System**: All database migrations now run automatically when the application starts. No manual migration scripts need to be run.
+**Flask-Migrate System**: The application uses Flask-Migrate (Alembic-based) for database version control.
 
-The integrated migration system handles:
-- Database schema creation for new installations
-- Automatic schema updates for existing databases
-- User table enhancements (verification, roles, teams, 2FA)
-- Project and team management table creation
-- Sample data initialization
-- Data integrity maintenance during upgrades
+```bash
+# Create a new migration
+python create_migration.py "Description of changes"
+
+# Apply migrations
+python apply_migration.py
+
+# Check migration status
+python check_migration_state.py
+
+# For Docker environments
+docker exec timetrack-timetrack-1 python create_migration.py "Description"
+docker exec timetrack-timetrack-1 python apply_migration.py
+```
+
+The migration system handles:
+- Automatic schema updates on container startup
+- PostgreSQL-specific features (enums, constraints)
+- Safe rollback capabilities
+- Multi-tenancy data isolation
+- Preservation of existing data during schema changes
 
 ### Configuration
 
-The application can be configured through:
-- **Admin Dashboard**: System-wide settings and user management
-- **User Profiles**: Individual work hour and break preferences
-- **Environment Variables**: Database and Flask configuration
+#### Environment Variables
+
+```bash
+# Database
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+
+# Flask
+SECRET_KEY=your-secret-key-here
+FLASK_ENV=development  # or production
+
+# Email (required for invitations and password reset)
+MAIL_SERVER=smtp.example.com
+MAIL_PORT=587
+MAIL_USE_TLS=true
+MAIL_USERNAME=your-email@example.com
+MAIL_PASSWORD=your-password
+
+# Optional
+FORCE_HTTPS=true  # Force HTTPS in production
+TRUST_PROXY_HEADERS=true  # When behind reverse proxy
+```
+
+#### Application Settings
+
+- **Company Settings**: Work hours, break requirements, time rounding
+- **User Preferences**: Date/time formats, timezone, UI preferences
+- **System Settings**: Registration, email verification, tracking scripts
+- **Branding**: Custom logos, colors, and naming
 
 ## Usage
 
@@ -123,36 +201,152 @@ The application can be configured through:
 ## Security Features
 
 - **Two-Factor Authentication**: TOTP-based 2FA with QR code setup
-- **Role-Based Access Control**: Four distinct user roles with appropriate permissions
-- **Session Management**: Secure login/logout with "remember me" functionality
-- **Data Validation**: Comprehensive input validation and error handling
-- **Account Verification**: Email verification system for new accounts
+- **Password Reset**: Secure email-based recovery with time-limited tokens
+- **Role-Based Access Control**: Five distinct user roles with granular permissions
+- **Multi-Tenancy**: Complete data isolation between companies
+- **Session Management**: Secure sessions with configurable lifetime
+- **Email Verification**: Optional email verification for new accounts
+- **Password Strength**: Enforced password complexity requirements
+- **Security Headers**: HSTS, CSP, X-Frame-Options, and more
+- **Input Validation**: Comprehensive server-side validation
+- **CSRF Protection**: Built-in Flask CSRF protection
+
+## Features for Mobile Users
+
+- **Progressive Web App**: Install TimeTrack as an app on mobile devices
+- **Mobile Navigation**: Bottom navigation bar and hamburger menu
+- **Touch Optimization**: 44px minimum touch targets throughout
+- **Responsive Tables**: Automatic card view on small screens
+- **Mobile Gestures**: Swipe navigation and pull-to-refresh
+- **Date/Time Pickers**: Mobile-friendly pickers respecting user preferences
+- **Offline Support**: Basic offline functionality with service workers
+- **Performance**: Lazy loading and optimized for mobile networks
+
+## Project Structure
+
+```
+TimeTrack/
+├── app.py                 # Main Flask application
+├── models/               # Database models organized by domain
+│   ├── user.py          # User, Role, UserPreferences
+│   ├── company.py       # Company, CompanySettings
+│   ├── project.py       # Project, ProjectCategory
+│   ├── time_entry.py    # TimeEntry model
+│   └── ...              # Other domain models
+├── routes/              # Blueprint-based route handlers
+│   ├── auth.py         # Authentication routes
+│   ├── projects.py     # Project management
+│   ├── teams.py        # Team management
+│   └── ...             # Other route modules
+├── templates/           # Jinja2 templates
+├── static/             # CSS, JS, images
+│   ├── css/           # Stylesheets including mobile
+│   ├── js/            # JavaScript including PWA support
+│   └── manifest.json  # PWA manifest
+├── migrations/         # Flask-Migrate/Alembic migrations
+├── docker-compose.yml  # Docker configuration
+└── requirements.txt    # Python dependencies
+```
 
 ## API Endpoints
 
-The application provides various endpoints for different user roles:
-- `/admin/*`: Administrative functions (Admin only)
-- `/supervisor/*`: Supervisor functions (Supervisor+ roles)
-- `/team/*`: Team management (Team Leader+ roles)
-- `/export/*`: Data export functionality
-- `/auth/*`: Authentication and profile management
+Key application routes organized by function:
+- `/` - Home dashboard
+- `/login`, `/logout`, `/register` - Authentication
+- `/forgot_password`, `/reset_password/<token>` - Password recovery
+- `/time-tracking` - Main time tracking interface
+- `/projects/*` - Project management
+- `/teams/*` - Team management
+- `/tasks/*` - Task and sprint management
+- `/notes/*` - Notes system
+- `/invoices/*` - Billing and invoicing
+- `/export/*` - Data export functionality
+- `/admin/*` - Administrative functions
+- `/system-admin/*` - System administration (multi-company)
 
-## File Structure
+## Deployment
 
-- `app.py`: Main Flask application with integrated migration system
-- `models.py`: Database models and relationships
-- `templates/`: HTML templates for all pages
-- `static/`: CSS and JavaScript files
-- `migrate_*.py`: Legacy migration scripts (no longer needed)
+### Production Deployment with Docker
+
+```bash
+# Clone and configure
+git clone https://github.com/nullmedium/TimeTrack.git
+cd TimeTrack
+cp .env.example .env
+# Edit .env with production values
+
+# Build and start
+docker-compose -f docker-compose.yml up -d
+
+# View logs
+docker-compose logs -f
+
+# Backup database
+docker exec timetrack-db-1 pg_dump -U timetrack timetrack > backup.sql
+```
+
+### Reverse Proxy Configuration (Nginx)
+
+```nginx
+server {
+    listen 80;
+    server_name timetrack.example.com;
+    
+    location / {
+        proxy_pass http://localhost:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Migration Errors**
+   - Check current state: `python check_migration_state.py`
+   - View migration history: `flask db history`
+   - Fix revision conflicts in alembic_version table
+
+2. **Docker Issues**
+   - Container not starting: `docker logs timetrack-timetrack-1`
+   - Database connection: Ensure PostgreSQL is healthy
+   - Permission errors: Check volume permissions
+
+3. **Email Not Sending**
+   - Verify MAIL_* environment variables
+   - Check firewall rules for SMTP port
+   - Enable "less secure apps" if using Gmail
+
+4. **2FA Issues**
+   - Ensure system time is synchronized
+   - QR code not scanning: Check for firewall blocking images
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Guidelines
+
+- Follow PEP 8 for Python code
+- Write tests for new features
+- Update documentation as needed
+- Ensure migrations are reversible
+- Test on both PostgreSQL and SQLite
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Flask community for the excellent framework
+- Contributors and testers
+- Open source projects that made this possible
