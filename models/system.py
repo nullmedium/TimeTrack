@@ -130,3 +130,53 @@ class SystemEvent(db.Model):
         ).delete()
         db.session.commit()
         return deleted_count
+
+    @staticmethod
+    def get_system_health_summary():
+        """Get a summary of system health based on recent events"""
+        from sqlalchemy import func
+        
+        # Get event counts by severity for the last 24 hours
+        yesterday = datetime.now() - timedelta(days=1)
+        
+        severity_counts = db.session.query(
+            SystemEvent.severity,
+            func.count(SystemEvent.id).label('count')
+        ).filter(
+            SystemEvent.timestamp >= yesterday
+        ).group_by(SystemEvent.severity).all()
+        
+        # Convert to dictionary
+        summary = {
+            'critical': 0,
+            'error': 0,
+            'warning': 0,
+            'info': 0
+        }
+        
+        for severity, count in severity_counts:
+            if severity in summary:
+                summary[severity] = count
+        
+        # Determine overall health status
+        if summary['critical'] > 0:
+            summary['status'] = 'critical'
+        elif summary['error'] > 5:
+            summary['status'] = 'unhealthy'
+        elif summary['warning'] > 10:
+            summary['status'] = 'warning'
+        else:
+            summary['status'] = 'healthy'
+        
+        summary['last_24h_total'] = sum(summary.values()) - (1 if 'status' in summary else 0)
+        
+        return summary
+
+    @staticmethod
+    def get_events_by_severity(severity, days=7, limit=100):
+        """Get events filtered by severity level"""
+        since = datetime.now() - timedelta(days=days)
+        return SystemEvent.query.filter(
+            SystemEvent.timestamp >= since,
+            SystemEvent.severity == severity
+        ).order_by(SystemEvent.timestamp.desc()).limit(limit).all()
