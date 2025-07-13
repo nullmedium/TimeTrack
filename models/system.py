@@ -158,6 +158,9 @@ class SystemEvent(db.Model):
             if severity in summary:
                 summary[severity] = count
         
+        # Calculate total before adding status
+        total_events = summary['critical'] + summary['error'] + summary['warning'] + summary['info']
+        
         # Determine overall health status
         if summary['critical'] > 0:
             summary['status'] = 'critical'
@@ -168,7 +171,7 @@ class SystemEvent(db.Model):
         else:
             summary['status'] = 'healthy'
         
-        summary['last_24h_total'] = sum(summary.values()) - (1 if 'status' in summary else 0)
+        summary['last_24h_total'] = total_events
         
         return summary
 
