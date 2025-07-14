@@ -2,9 +2,31 @@
 
 /* Reset for splash page */
 .splash-container {
-    margin: -2rem -2rem 0 -2rem;
+    margin: 0;
     padding: 0;
     font-family: inherit;
+    width: 100%;
+}
+
+/* Override main-content restrictions for splash page */
+body:not(.has-user) .main-content {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+}
+
+/* Ensure splash container takes full width */
+body:not(.has-user) {
+    overflow-x: hidden;
+}
+
+/* Remove any container restrictions on sections */
+.splash-container section {
+    width: 100%;
+    max-width: none;
 }
 
 /* Hero Section */
@@ -180,6 +202,8 @@
 .features-grid {
     padding: 5rem 2rem;
     background: #f8f9fa;
+    width: 100%;
+    margin: 0;
 }
 
 .section-title {
@@ -210,6 +234,9 @@
     gap: 2rem;
     max-width: 1200px;
     margin: 0 auto;
+    width: 100%;
+    padding: 0 2rem;
+    box-sizing: border-box;
 }
 
 .feature-card {
@@ -259,6 +286,8 @@
     flex-wrap: wrap;
     gap: 2rem;
     position: relative;
+    width: 100%;
+    margin: 0;
 }
 
 /* Add subtle overlay for better text contrast */
@@ -309,6 +338,8 @@
 .testimonials {
     padding: 5rem 2rem;
     background: #f9fafb;
+    width: 100%;
+    margin: 0;
 }
 
 .testimonial-grid {
@@ -368,6 +399,8 @@
 .pricing {
     padding: 5rem 2rem;
     background: #f3f4f6;
+    width: 100%;
+    margin: 0;
 }
 
 .pricing-cards {
@@ -484,6 +517,8 @@
     color: white;
     padding: 5rem 2rem;
     text-align: center;
+    width: 100%;
+    margin: 0;
 }
 
 .final-cta h2 {
