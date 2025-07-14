@@ -1180,6 +1180,158 @@
         flex-direction: column;
     }
 }
+
+/* Dark mode support for team components */
+[data-theme="dark"] .view-btn {
+    background: var(--bg-secondary);
+    border-color: var(--border-primary);
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .view-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+[data-theme="dark"] .view-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .team-card {
+    background: var(--bg-secondary);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .team-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .team-header {
+    background: var(--bg-tertiary);
+    border-bottom-color: var(--border-primary);
+}
+
+[data-theme="dark"] .team-name {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .team-description {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .team-stats {
+    border-bottom-color: var(--border-primary);
+}
+
+[data-theme="dark"] .team-stat {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .member-item:hover {
+    background: var(--bg-hover);
+}
+
+[data-theme="dark"] .member-name {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .member-role {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .more-members {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .empty-members {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .unassigned-section {
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .section-title {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .unassigned-user {
+    background: var(--bg-secondary);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .user-name {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .user-email {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .users-table-container {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .users-table tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+[data-theme="dark"] .users-table td {
+    border-bottom-color: var(--border-primary);
+}
+
+[data-theme="dark"] .form-control {
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-primary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .form-control:focus {
+    background-color: var(--bg-secondary);
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .form-hint {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .modal-content {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .modal-header {
+    border-bottom-color: var(--border-primary);
+}
+
+[data-theme="dark"] .modal-title {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .modal-close {
+    color: var(--text-secondary);
+    background: transparent;
+}
+
+[data-theme="dark"] .modal-close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .modal-footer {
+    border-top-color: var(--border-primary);
+}
+
+[data-theme="dark"] .empty-state {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .empty-state h3 {
+    color: var(--text-primary);
+}
 </style>
 
 <script>

@@ -580,3 +580,119 @@ textarea.form-control {
     height: 48px; /* Match input height */
     top: 0;
 }
+
+/* Dark Mode Styles for Auth Pages */
+[data-theme="dark"] body.auth-page {
+    background: linear-gradient(135deg, #2d3561 0%, #3b2451 100%);
+}
+
+[data-theme="dark"] .auth-container {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .auth-header h1 {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .auth-header p {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .form-group label {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .form-control {
+    background-color: var(--bg-input);
+    border-color: var(--border-primary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .form-control:focus {
+    background-color: var(--bg-input);
+    border-color: var(--primary-color);
+    color: var(--text-primary);
+    box-shadow: 0 0 0 0.2rem rgba(122, 141, 245, 0.25);
+}
+
+[data-theme="dark"] .form-control::placeholder {
+    color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .input-icon i {
+    color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .auth-divider {
+    color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .auth-divider::before,
+[data-theme="dark"] .auth-divider::after {
+    background-color: var(--border-primary);
+}
+
+[data-theme="dark"] .auth-footer {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .auth-footer a {
+    color: var(--primary-color);
+}
+
+[data-theme="dark"] .form-text {
+    color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .progress-step-number {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .progress-step.active .progress-step-number {
+    background: var(--primary-color);
+    color: white;
+}
+
+[data-theme="dark"] .progress-step-label {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .invite-info {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .invite-info strong {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .company-info-card {
+    background-color: var(--bg-secondary);
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .password-strength-bar {
+    background-color: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .password-requirements li {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .password-requirements li.valid {
+    color: var(--success-color);
+}
+
+[data-theme="dark"] .social-buttons .btn-outline-dark {
+    background-color: transparent;
+    color: var(--text-primary);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .social-buttons .btn-outline-dark:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--border-hover);
+}

@@ -1,0 +1,201 @@
+<!-- EXAMPLE: Before and After Table Consolidation -->
+
+<!-- ============================================
+     BEFORE: Using old data-table class
+     ============================================ -->
+<div class="old-implementation">
+    <h3>BEFORE (Current Implementation)</h3>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Company</th>
+                    <th>Type</th>
+                    <th>Users</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <div class="company-cell">
+                            <div class="company-name">Acme Corp</div>
+                            <div class="company-slug">acme-corp</div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge badge-company">Company</span>
+                    </td>
+                    <td>
+                        <div class="stat-cell">
+                            <span class="stat-number">25</span>
+                            <span class="stat-label">users</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="status-badge status-active">Active</span>
+                    </td>
+                    <td>
+                        <div class="table-actions">
+                            <a href="#" class="btn btn-sm btn-primary">View</a>
+                            <a href="#" class="btn btn-sm btn-secondary">Edit</a>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ============================================
+     AFTER: Using new consolidated table classes
+     ============================================ -->
+<div class="new-implementation">
+    <h3>AFTER (Consolidated Implementation)</h3>
+    <div class="table-container">
+        <div class="table-responsive">
+            <table class="table table--hover table--admin">
+                <thead>
+                    <tr>
+                        <th>Company</th>
+                        <th>Type</th>
+                        <th>Users</th>
+                        <th>Status</th>
+                        <th class="actions-cell">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td data-label="Company">
+                            <div class="company-cell">
+                                <div class="company-name">Acme Corp</div>
+                                <div class="company-slug">acme-corp</div>
+                            </div>
+                        </td>
+                        <td data-label="Type">
+                            <span class="table-badge table-badge--info">Company</span>
+                        </td>
+                        <td data-label="Users">
+                            <div class="stat-cell">
+                                <span class="stat-number">25</span>
+                                <span class="stat-label">users</span>
+                            </div>
+                        </td>
+                        <td data-label="Status">
+                            <span class="table-badge table-badge--success">Active</span>
+                        </td>
+                        <td data-label="Actions" class="actions-cell">
+                            <div class="table-actions">
+                                <a href="#" class="btn btn--sm btn--primary">View</a>
+                                <a href="#" class="btn btn--sm">Edit</a>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     MOBILE-OPTIMIZED VERSION
+     ============================================ -->
+<div class="mobile-optimized">
+    <h3>Mobile-Optimized Version</h3>
+    <div class="table-container">
+        <table class="table table--hover table--mobile-stack">
+            <thead>
+                <tr>
+                    <th>Company</th>
+                    <th>Type</th>
+                    <th>Users</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td data-label="Company">
+                        <div class="company-cell">
+                            <div class="company-name">Acme Corp</div>
+                            <div class="company-slug">acme-corp</div>
+                        </div>
+                    </td>
+                    <td data-label="Type">
+                        <span class="table-badge table-badge--info">Company</span>
+                    </td>
+                    <td data-label="Users">25 users</td>
+                    <td data-label="Status">
+                        <span class="table-badge table-badge--success">Active</span>
+                    </td>
+                    <td data-label="Actions">
+                        <div class="table-actions">
+                            <a href="#" class="btn btn--sm btn--primary">View</a>
+                            <a href="#" class="btn btn--sm">Edit</a>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ============================================
+     KEY IMPROVEMENTS
+     ============================================ -->
+<div class="improvements">
+    <h3>Key Improvements with Consolidated Tables:</h3>
+    <ul>
+        <li><strong>Consistent Styling:</strong> All tables use the same base .table class</li>
+        <li><strong>Modular Modifiers:</strong> Add features with modifier classes (--hover, --striped, --compact)</li>
+        <li><strong>Mobile Responsive:</strong> Built-in mobile stacking with data-label attributes</li>
+        <li><strong>Semantic Badges:</strong> Unified badge system with color variants</li>
+        <li><strong>CSS Variables:</strong> Easy theming and dark mode support</li>
+        <li><strong>Reduced CSS:</strong> No duplicate styles across different table types</li>
+        <li><strong>Better Accessibility:</strong> Proper semantic markup and ARIA support</li>
+    </ul>
+</div>
+
+<!-- ============================================
+     CSS CLASSES COMPARISON
+     ============================================ -->
+<div class="comparison">
+    <h3>CSS Classes Comparison</h3>
+    <table class="table table--compact table--bordered">
+        <thead>
+            <tr>
+                <th>Old Class</th>
+                <th>New Class</th>
+                <th>Purpose</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>data-table</code></td>
+                <td><code>table table--hover</code></td>
+                <td>Basic data table with hover</td>
+            </tr>
+            <tr>
+                <td><code>users-table</code></td>
+                <td><code>table table--hover table--admin</code></td>
+                <td>Admin user management table</td>
+            </tr>
+            <tr>
+                <td><code>entries-table</code></td>
+                <td><code>table table--hover table--time-entries</code></td>
+                <td>Time tracking entries</td>
+            </tr>
+            <tr>
+                <td><code>status-badge status-active</code></td>
+                <td><code>table-badge table-badge--success</code></td>
+                <td>Status indicators</td>
+            </tr>
+            <tr>
+                <td><code>badge badge-company</code></td>
+                <td><code>table-badge table-badge--info</code></td>
+                <td>Type badges</td>
+            </tr>
+        </tbody>
+    </table>
+</div>

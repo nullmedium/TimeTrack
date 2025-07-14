@@ -768,3 +768,217 @@
         padding: 0.5rem;
     }
 }
+
+/* Dark Mode Styles for Time Tracking */
+[data-theme="dark"] .timer-card {
+    background-color: var(--bg-card);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .timer-card.active {
+    border-color: var(--success-color);
+    background-color: var(--bg-card);
+}
+
+[data-theme="dark"] .timer-value {
+    color: var(--primary-color);
+}
+
+[data-theme="dark"] .timer-info {
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .timer-controls {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .btn-stop {
+    background-color: var(--error-color);
+    border-color: var(--error-color);
+    color: white;
+}
+
+[data-theme="dark"] .btn-stop:hover {
+    background-color: #ef4444;
+    border-color: #ef4444;
+}
+
+[data-theme="dark"] .entries-section {
+    background-color: var(--bg-card);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .entries-header {
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .filter-controls {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .search-input {
+    background-color: var(--bg-input);
+    border-color: var(--border-primary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .search-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(122, 141, 245, 0.1);
+}
+
+[data-theme="dark"] .entries-card {
+    background-color: var(--bg-card);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .entries-card:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .entry-header {
+    border-color: var(--border-secondary);
+}
+
+[data-theme="dark"] .entry-date {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .entry-project {
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .entry-time {
+    color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .entry-duration {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .entry-actions .btn {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-primary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .entry-actions .btn:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--border-hover);
+}
+
+[data-theme="dark"] .entry-actions .btn-danger {
+    background-color: transparent;
+    border-color: var(--error-color);
+    color: var(--error-color);
+}
+
+[data-theme="dark"] .entry-actions .btn-danger:hover {
+    background-color: var(--error-color);
+    color: white;
+}
+
+[data-theme="dark"] .entries-table {
+    background-color: var(--bg-card);
+}
+
+[data-theme="dark"] .entries-table thead {
+    background-color: var(--table-header-bg);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .entries-table th {
+    color: var(--text-primary);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .entries-table td {
+    border-color: var(--border-secondary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .entries-table tbody tr:hover {
+    background-color: var(--table-row-hover);
+}
+
+[data-theme="dark"] .total-row {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .modal {
+    background-color: rgba(0, 0, 0, 0.75);
+}
+
+[data-theme="dark"] .modal-content {
+    background-color: var(--bg-modal);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .modal-header {
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .modal-title {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .modal-close {
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .modal-close:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .modal-footer {
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .form-label {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select {
+    background-color: var(--bg-input);
+    border-color: var(--border-primary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] .form-select:focus {
+    background-color: var(--bg-input);
+    border-color: var(--primary-color);
+    color: var(--text-primary);
+    box-shadow: 0 0 0 3px rgba(122, 141, 245, 0.1);
+}
+
+[data-theme="dark"] .stats-grid {
+    gap: 1.5rem;
+}
+
+[data-theme="dark"] .stat-card {
+    background-color: var(--bg-card);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .stat-icon {
+    background-color: var(--bg-secondary);
+}
+
+[data-theme="dark"] .stat-label {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .stat-value {
+    color: var(--text-primary);
+}

@@ -30,6 +30,15 @@
     <meta name="twitter:image" content="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename, _external=True) }}">
     {% endif %}
 
+    <!-- Prevent flash of incorrect theme -->
+    <script>
+        // Apply saved theme immediately
+        (function() {
+            const savedTheme = localStorage.getItem('timetrack-theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/hover-standards.css') }}">
@@ -37,6 +46,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile-forms.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile-bottom-nav.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tablet-optimized.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dark-mode.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/iconfont/tabler-icons.min.css">
 
     <!-- PWA Support -->
@@ -335,6 +345,7 @@
     </nav>
     {% endif %}
 
+    <script src="{{ url_for('static', filename='js/theme-switcher.js') }}"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
     <script src="{{ url_for('static', filename='js/password-strength.js') }}"></script>

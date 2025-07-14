@@ -1,0 +1,410 @@
+/* Consolidated Table Styles for TimeTrack */
+/* This file provides a unified approach to table styling across the application */
+
+/* ========================================
+   CSS VARIABLES FOR TABLES
+   ======================================== */
+:root {
+    /* Table Colors - Light Mode */
+    --table-bg: #ffffff;
+    --table-header-bg: #f8f9fa;
+    --table-border-color: #e5e7eb;
+    --table-header-text: #374151;
+    --table-body-text: #1f2937;
+    --table-hover-bg: #f8f9fa;
+    --table-stripe-bg: #f9fafb;
+    --table-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    
+    /* Table Spacing */
+    --table-cell-padding: 1rem;
+    --table-cell-padding-compact: 0.5rem;
+    --table-border-width: 1px;
+    --table-header-border-width: 2px;
+    
+    /* Table Typography */
+    --table-font-size: 1rem;
+    --table-font-size-sm: 0.875rem;
+    --table-header-font-weight: 600;
+}
+
+/* Dark mode variables are already defined in dark-mode.css */
+
+/* ========================================
+   BASE TABLE STYLES
+   ======================================== */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--table-bg);
+    color: var(--table-body-text);
+    font-size: var(--table-font-size);
+}
+
+/* Table Container */
+.table-container {
+    background: var(--table-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--table-shadow);
+    border: 1px solid var(--table-border-color);
+    margin-bottom: 2rem;
+}
+
+/* Responsive wrapper */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -1rem;
+    padding: 0 1rem;
+}
+
+@media (min-width: 769px) {
+    .table-responsive {
+        margin: 0;
+        padding: 0;
+    }
+}
+
+/* Table Headers */
+.table thead th {
+    background-color: var(--table-header-bg);
+    color: var(--table-header-text);
+    font-weight: var(--table-header-font-weight);
+    text-align: left;
+    padding: var(--table-cell-padding);
+    border-bottom: var(--table-header-border-width) solid var(--table-border-color);
+    white-space: nowrap;
+}
+
+/* Table Body */
+.table tbody td {
+    padding: var(--table-cell-padding);
+    border-bottom: var(--table-border-width) solid var(--table-border-color);
+    vertical-align: middle;
+}
+
+/* Remove last row border */
+.table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* ========================================
+   TABLE MODIFIERS
+   ======================================== */
+
+/* Hover Effect */
+.table--hover tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.table--hover tbody tr:hover {
+    background-color: var(--table-hover-bg);
+}
+
+/* Striped Rows */
+.table--striped tbody tr:nth-child(even) {
+    background-color: var(--table-stripe-bg);
+}
+
+/* Compact Table */
+.table--compact thead th,
+.table--compact tbody td {
+    padding: var(--table-cell-padding-compact);
+}
+
+/* Bordered Table */
+.table--bordered {
+    border: var(--table-border-width) solid var(--table-border-color);
+}
+
+.table--bordered thead th,
+.table--bordered tbody td {
+    border: var(--table-border-width) solid var(--table-border-color);
+}
+
+/* Small Font Size */
+.table--sm {
+    font-size: var(--table-font-size-sm);
+}
+
+/* Fixed Layout */
+.table--fixed {
+    table-layout: fixed;
+}
+
+/* Scrollable Body */
+.table--scroll-body {
+    display: block;
+}
+
+.table--scroll-body thead,
+.table--scroll-body tbody {
+    display: block;
+}
+
+.table--scroll-body tbody {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.table--scroll-body thead th,
+.table--scroll-body tbody td {
+    width: 25%; /* Adjust based on column count */
+}
+
+/* ========================================
+   SPECIALIZED TABLE STYLES
+   ======================================== */
+
+/* Time Entries Table */
+.table--time-entries .date-cell {
+    text-align: center;
+    width: 80px;
+}
+
+.table--time-entries .date-day {
+    font-size: 1.25rem;
+    font-weight: 700;
+    display: block;
+}
+
+.table--time-entries .date-month {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    display: block;
+}
+
+.table--time-entries .time-cell {
+    font-family: 'Monaco', 'Courier New', monospace;
+    white-space: nowrap;
+}
+
+.table--time-entries .duration-cell {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+/* Admin Tables */
+.table--admin {
+    box-shadow: var(--table-shadow);
+}
+
+.table--admin thead th {
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
+/* Data Tables */
+.table--data {
+    min-width: 600px;
+}
+
+.table--data .actions-cell {
+    width: 150px;
+    text-align: right;
+}
+
+/* ========================================
+   TABLE COMPONENTS
+   ======================================== */
+
+/* Table Actions */
+.table-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.table-actions .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Table Avatar */
+.table-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 0.75rem;
+    vertical-align: middle;
+}
+
+/* Table Badges */
+.table-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+/* Status Badges */
+.table-badge--success {
+    background: var(--success-bg);
+    color: var(--success-color);
+}
+
+.table-badge--warning {
+    background: var(--warning-bg);
+    color: var(--warning-color);
+}
+
+.table-badge--error {
+    background: var(--error-bg);
+    color: var(--error-color);
+}
+
+.table-badge--info {
+    background: var(--info-bg);
+    color: var(--info-color);
+}
+
+/* Empty State */
+.table-empty {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+}
+
+.table-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.table-empty-message {
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
+}
+
+/* ========================================
+   MOBILE OPTIMIZATIONS
+   ======================================== */
+@media (max-width: 768px) {
+    /* Stack table on mobile */
+    .table--mobile-stack thead {
+        display: none;
+    }
+    
+    .table--mobile-stack tbody tr {
+        display: block;
+        margin-bottom: 1rem;
+        border: 1px solid var(--table-border-color);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    
+    .table--mobile-stack tbody td {
+        display: block;
+        border: none;
+        padding: 0.25rem 0;
+    }
+    
+    .table--mobile-stack tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        display: inline-block;
+        width: 40%;
+        margin-right: 1rem;
+        color: var(--text-secondary);
+    }
+    
+    /* Mobile font adjustments */
+    .table {
+        font-size: 0.875rem;
+    }
+    
+    .table thead th,
+    .table tbody td {
+        padding: 0.75rem 0.5rem;
+    }
+}
+
+/* ========================================
+   DARK MODE SUPPORT
+   ======================================== */
+[data-theme="dark"] .table {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .table thead th {
+    background-color: var(--table-header-bg);
+    color: var(--text-heading);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .table tbody td {
+    border-color: var(--border-secondary);
+}
+
+[data-theme="dark"] .table--hover tbody tr:hover {
+    background-color: var(--table-row-hover);
+}
+
+[data-theme="dark"] .table--striped tbody tr:nth-child(even) {
+    background-color: var(--table-row-stripe);
+}
+
+[data-theme="dark"] .table-container {
+    background: var(--bg-card);
+    border-color: var(--border-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================
+   MIGRATION CLASSES
+   ======================================== */
+/* These classes map old table classes to new consolidated ones */
+/* They can be removed once all templates are updated */
+
+.data-table,
+.entries-table,
+.users-table,
+.projects-table,
+.time-history {
+    @extend .table;
+    @extend .table--hover;
+}
+
+.entries-table {
+    @extend .table--time-entries;
+}
+
+.users-table,
+.projects-table {
+    @extend .table--admin;
+}
+
+/* For backwards compatibility without @extend (CSS-only) */
+.data-table,
+.entries-table,
+.users-table,
+.projects-table,
+.time-history {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--table-bg);
+    color: var(--table-body-text);
+    font-size: var(--table-font-size);
+}
+
+/* Copy hover styles */
+.data-table tbody tr,
+.entries-table tbody tr,
+.users-table tbody tr,
+.projects-table tbody tr,
+.time-history tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.data-table tbody tr:hover,
+.entries-table tbody tr:hover,
+.users-table tbody tr:hover,
+.projects-table tbody tr:hover,
+.time-history tbody tr:hover {
+    background-color: var(--table-hover-bg);
+}
