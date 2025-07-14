@@ -50,6 +50,7 @@
     {% endif %}
     {% if not g.user %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/splash.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/splash-mobile.css') }}">
     {% endif %}
     {% if g.branding and g.branding.favicon_filename %}
         <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/branding/' + g.branding.favicon_filename) }}">
