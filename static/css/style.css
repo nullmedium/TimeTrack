@@ -2620,19 +2620,7 @@ input[type="time"]::-webkit-datetime-edit {
     margin: 0 auto;
 }
 
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid #e9ecef;
-}
-
-.page-header h2 {
-    margin: 0;
-    color: #333;
-}
+/* Page header styles moved to Common Admin Page Styles section above */
 
 .page-actions {
     display: flex;
