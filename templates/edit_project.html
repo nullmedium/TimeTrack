@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="timetrack-container">
+<div class="page-container">
     <h2>Edit Project: {{ project.name }}</h2>
     
     <form method="POST" action="{{ url_for('projects.edit_project', project_id=project.id) }}" class="project-form">
