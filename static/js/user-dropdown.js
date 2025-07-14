@@ -31,6 +31,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (userDropdownModal && !userDropdownModal.contains(e.target) && !userDropdownToggle.contains(e.target)) {
+            // Don't close if we're clicking on the mobile overlay
+            if (e.target.id === 'mobile-nav-overlay' || e.target.classList.contains('mobile-overlay')) {
+                return;
+            }
             userDropdownModal.classList.remove('active');
         }
     });

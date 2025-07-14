@@ -44,11 +44,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Close mobile sidebar when clicking on navigation links
+    // Close mobile sidebar when clicking on navigation links (but not user dropdown)
     if (sidebar) {
         const navLinks = sidebar.querySelectorAll('a');
         navLinks.forEach(link => {
-            link.addEventListener('click', function() {
+            link.addEventListener('click', function(e) {
+                // Don't close if clicking user dropdown toggle
+                if (link.id === 'user-dropdown-toggle' || link.closest('#user-dropdown-modal')) {
+                    return;
+                }
+                
                 if (window.innerWidth <= 1024) {
                     sidebar.classList.remove('mobile-open');
                     mobileOverlay.classList.remove('active');

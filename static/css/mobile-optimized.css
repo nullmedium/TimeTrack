@@ -125,6 +125,25 @@
         visibility: visible;
     }
     
+    /* ===== User Dropdown for Mobile ===== */
+    .user-dropdown-modal {
+        z-index: 350 !important; /* Higher than sidebar */
+    }
+    
+    .sidebar.active .user-dropdown-modal.active,
+    .sidebar.mobile-open .user-dropdown-modal.active {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        right: auto !important;
+        transform: translate(-50%, -50%) !important;
+        max-width: 90%;
+        width: 280px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        border-radius: 12px;
+        background: white;
+    }
+    
     /* Mobile menu toggle button */
     .mobile-menu-toggle,
     .mobile-nav-toggle,
