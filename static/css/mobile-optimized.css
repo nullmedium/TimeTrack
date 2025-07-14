@@ -213,11 +213,13 @@
     }
     
     .mobile-nav-brand a {
-        color: inherit;
+        color: var(--primary-color, #667eea) !important;
         text-decoration: none;
         display: flex;
         align-items: center;
         gap: 8px;
+        font-size: 18px;
+        font-weight: 600;
     }
     
     .mobile-logo {

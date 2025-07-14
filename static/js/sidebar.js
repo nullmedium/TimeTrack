@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Mobile navigation toggle
     if (mobileNavToggle) {
         mobileNavToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('active');
+            sidebar.classList.toggle('mobile-open');
             mobileOverlay.classList.toggle('active');
             mobileNavToggle.classList.toggle('active');
             document.body.classList.toggle('mobile-nav-open');
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Close mobile sidebar when clicking overlay
     if (mobileOverlay) {
         mobileOverlay.addEventListener('click', function() {
-            sidebar.classList.remove('active');
+            sidebar.classList.remove('mobile-open');
             mobileOverlay.classList.remove('active');
             if (mobileNavToggle) mobileNavToggle.classList.remove('active');
             document.body.classList.remove('mobile-nav-open');

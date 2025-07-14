@@ -1,0 +1,506 @@
+/* Tablet-Optimized CSS for TimeTrack */
+/* This file contains tablet-specific styles for iPad and similar devices */
+
+/* ===== Tablet Breakpoint (768px - 1024px) ===== */
+@media (min-width: 769px) and (max-width: 1024px) {
+    /* ===== Layout Adjustments ===== */
+    body {
+        font-size: 16px;
+    }
+    
+    /* ===== Sidebar for Tablets ===== */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        transform: translateX(-100%);
+        width: 280px;
+        height: 100vh;
+        border-radius: 0;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 300;
+        box-shadow: 2px 0 20px rgba(0,0,0,0.15);
+    }
+    
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    /* Show mobile header for tablets */
+    .mobile-header {
+        display: flex !important;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        background: #ffffff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        padding: 12px 20px;
+        height: 64px;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+    
+    /* Larger branding for tablets */
+    .mobile-nav-brand {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--primary-color, #667eea);
+    }
+    
+    .mobile-nav-brand a {
+        color: var(--primary-color, #667eea) !important;
+        text-decoration: none;
+        font-size: 20px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .mobile-logo {
+        max-height: 36px;
+        max-width: 180px;
+    }
+    
+    /* Main content adjustments */
+    .main-content {
+        margin-left: 0;
+        padding: 2rem;
+        padding-top: calc(64px + 2rem);
+        min-height: 100vh;
+    }
+    
+    /* Footer adjustments */
+    footer {
+        margin-left: 0;
+    }
+    
+    /* Mobile overlay for sidebar */
+    .mobile-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        z-index: 299;
+    }
+    
+    .mobile-overlay.active {
+        display: block;
+    }
+    
+    /* ===== Container Widths ===== */
+    .timetrack-container,
+    .admin-container,
+    .config-container,
+    .table-container,
+    .team-summary-container,
+    .management-container,
+    .analytics-container {
+        max-width: 100%;
+        padding: 1.5rem;
+        margin: 0 auto 2rem auto;
+    }
+    
+    /* ===== Typography Scaling ===== */
+    h1 {
+        font-size: 2rem;
+    }
+    
+    h2 {
+        font-size: 1.75rem;
+    }
+    
+    h3 {
+        font-size: 1.5rem;
+    }
+    
+    /* ===== Form Elements ===== */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    select,
+    textarea {
+        font-size: 16px; /* Prevent zoom on iOS */
+        padding: 12px 16px;
+        min-height: 48px;
+    }
+    
+    /* ===== Buttons ===== */
+    .btn,
+    button {
+        min-height: 48px;
+        padding: 12px 24px;
+        font-size: 16px;
+    }
+    
+    /* ===== Grid Layouts ===== */
+    .features {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+    
+    .admin-panel {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+    
+    .export-options {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+    
+    .management-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    
+    /* ===== Table Responsiveness ===== */
+    .data-table {
+        font-size: 15px;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 12px;
+    }
+    
+    /* ===== Card Components ===== */
+    .card {
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .admin-card,
+    .management-card {
+        width: 100%;
+    }
+    
+    /* ===== Modal Adjustments ===== */
+    .modal-content {
+        margin: 5% auto;
+        width: 90%;
+        max-width: 600px;
+    }
+    
+    /* ===== Navigation Improvements ===== */
+    .mobile-nav-toggle {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .mobile-nav-toggle span {
+        width: 28px;
+        height: 3px;
+        background-color: var(--primary-color, #667eea) !important;
+    }
+    
+    /* ===== Page Headers ===== */
+    .page-header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        color: white;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    
+    .header-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        width: 100%;
+    }
+    
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: white;
+    }
+    
+    .page-subtitle {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        color: white;
+        margin-top: 0.25rem;
+    }
+    
+    .page-icon {
+        font-size: 2rem;
+        color: white;
+    }
+    
+    .page-actions {
+        flex-direction: row;
+        gap: 1rem;
+    }
+    
+    /* Ensure buttons in header look good */
+    .page-header .btn {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        backdrop-filter: blur(10px);
+    }
+    
+    .page-header .btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* ===== Filter Panels ===== */
+    .filter-panel {
+        padding: 1.5rem;
+    }
+    
+    .filter-row {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .filter-group {
+        min-width: 200px;
+        flex: 1;
+    }
+    
+    /* ===== Analytics View ===== */
+    .analytics-header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .mode-switcher {
+        flex-direction: row;
+    }
+    
+    .view-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .tab-btn {
+        flex: 0 0 auto;
+        padding: 0.75rem 1.25rem;
+    }
+    
+    .charts-container {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    /* ===== Time Tracking Specific ===== */
+    .timer-section {
+        padding: 2rem;
+    }
+    
+    #timer {
+        font-size: 2.5rem;
+    }
+    
+    .button-group {
+        flex-direction: row;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .button-group .btn {
+        min-width: 140px;
+    }
+    
+    /* ===== Email Nag Banner ===== */
+    .email-nag-content {
+        flex-direction: row;
+        align-items: center;
+    }
+    
+    /* ===== Export Buttons ===== */
+    #export-buttons .quick-export-buttons {
+        flex-direction: row;
+        justify-content: center;
+    }
+    
+    /* ===== Bottom Navigation - Hide on tablets ===== */
+    .mobile-bottom-nav {
+        display: none;
+    }
+    
+    .has-bottom-nav .content {
+        padding-bottom: 2rem !important;
+    }
+    
+    /* ===== Announcement Styles ===== */
+    .announcement-header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    /* ===== Dashboard Widgets ===== */
+    .widget {
+        padding: 1.25rem;
+    }
+    
+    /* ===== Team Hours Table ===== */
+    .team-hours-table {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* ===== Sidebar Toggle - Hide on tablets ===== */
+    .sidebar-toggle {
+        display: none;
+    }
+}
+
+/* ===== Landscape Tablets (1024px width in landscape) ===== */
+@media (min-width: 769px) and (max-width: 1024px) and (orientation: landscape) {
+    /* Optimize for landscape tablet viewing */
+    .mobile-header {
+        height: 56px;
+        padding: 8px 20px;
+    }
+    
+    .main-content {
+        padding-top: calc(56px + 1.5rem);
+    }
+    
+    /* Compact page header for landscape */
+    .page-header {
+        padding: 1.5rem;
+    }
+    
+    .page-title {
+        font-size: 1.5rem;
+    }
+    
+    .header-content {
+        gap: 1rem;
+    }
+    
+    /* Side-by-side layouts for landscape */
+    .features,
+    .admin-panel,
+    .export-options,
+    .management-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    /* Compact timer display */
+    #timer {
+        font-size: 2rem;
+    }
+    
+    .timer-section {
+        padding: 1.5rem;
+    }
+}
+
+/* ===== iPad Pro Specific (1024px exactly) ===== */
+@media (width: 1024px) {
+    /* Ensure proper layout for iPad Pro in portrait */
+    .mobile-header {
+        display: flex !important;
+    }
+    
+    .sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .main-content {
+        margin-left: 0;
+        padding-top: calc(64px + 2rem);
+    }
+}
+
+/* ===== Touch Enhancements for Tablets ===== */
+@media (min-width: 769px) and (max-width: 1024px) {
+    /* Larger touch targets */
+    a, button, .btn, input, select, textarea {
+        min-height: 44px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Table row height for better touch */
+    .data-table tr {
+        min-height: 48px;
+    }
+    
+    .data-table td {
+        padding: 14px 12px;
+    }
+    
+    /* Improved hover states for touch */
+    @media (hover: none) {
+        .btn:hover,
+        a:hover {
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn:active,
+        a:active {
+            transform: scale(0.98);
+            opacity: 0.9;
+        }
+    }
+}
+
+/* ===== Utility Classes for Tablets ===== */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .hide-on-tablet {
+        display: none !important;
+    }
+    
+    .show-on-tablet {
+        display: block !important;
+    }
+    
+    .tablet-full-width {
+        width: 100% !important;
+    }
+    
+    .tablet-half-width {
+        width: 50% !important;
+    }
+    
+    .tablet-text-center {
+        text-align: center !important;
+    }
+}
