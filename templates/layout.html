@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% if title == 'Home' %}{{ g.branding.app_name if g.branding else 'TimeTrack' }} - Enterprise Time Tracking & Project Management Software{% else %}{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% endif %}{% if g.company %} - {{ g.company.name }}{% endif %}</title>
-    
+
     <!-- SEO Meta Tags -->
     <meta name="description" content="{% block meta_description %}{{ g.branding.app_name if g.branding else 'TimeTrack' }} is a comprehensive time tracking solution with project management, team collaboration, billing & invoicing. Free, open-source, and enterprise-ready.{% endblock %}">
     <meta name="keywords" content="{% block meta_keywords %}time tracking, project management, team collaboration, billing software, invoice management, enterprise time tracker, open source time tracking{% endblock %}">
     <meta name="author" content="{{ g.branding.app_name if g.branding else 'TimeTrack' }}">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="{{ request.url }}">
-    
+
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="{% block og_title %}{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% endblock %}">
     <meta property="og:description" content="{% block og_description %}Transform your productivity with intelligent time tracking, project management, and team collaboration tools. Enterprise-grade, open-source solution.{% endblock %}">
@@ -21,7 +21,7 @@
     {% if g.branding and g.branding.logo_filename %}
     <meta property="og:image" content="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename, _external=True) }}">
     {% endif %}
-    
+
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{% block twitter_title %}{{ title }} - {{ g.branding.app_name if g.branding else 'TimeTrack' }}{% endblock %}">
@@ -38,7 +38,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile-bottom-nav.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tablet-optimized.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/iconfont/tabler-icons.min.css">
-    
+
     <!-- PWA Support -->
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#667eea">
@@ -54,6 +54,12 @@
     {% endif %}
     {% if g.branding and g.branding.favicon_filename %}
         <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='uploads/branding/' + g.branding.favicon_filename) }}">
+    {% else %}
+        <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+        <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+        <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+        <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
     {% endif %}
     <style>
         :root {
@@ -98,7 +104,7 @@
 <body{% if g.user %} class="has-user has-bottom-nav"{% endif %}>
     {% if g.user and g.user.preferences %}
     <!-- User preferences for JavaScript -->
-    <div id="user-preferences" style="display: none;" 
+    <div id="user-preferences" style="display: none;"
          data-date-format="{{ g.user.preferences.date_format }}"
          data-time-format-24h="{{ g.user.preferences.time_format_24h|lower }}">
     </div>
@@ -109,8 +115,8 @@
         <div class="mobile-nav-brand">
             <a href="{{ url_for('home') }}">
                 {% if g.branding and g.branding.logo_filename %}
-                    <img src="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename) }}" 
-                         alt="{{ g.branding.logo_alt_text }}" 
+                    <img src="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename) }}"
+                         alt="{{ g.branding.logo_alt_text }}"
                          class="mobile-logo">
                 {% else %}
                     {{ g.branding.app_name if g.branding else 'TimeTrack' }}
@@ -133,8 +139,8 @@
             <!-- <h2>
                 <a href="{{ url_for('home') }}">
                     {% if g.branding and g.branding.logo_filename %}
-                        <img src="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename) }}" 
-                             alt="{{ g.branding.logo_alt_text }}" 
+                        <img src="{{ url_for('static', filename='uploads/branding/' + g.branding.logo_filename) }}"
+                             alt="{{ g.branding.logo_alt_text }}"
                              class="sidebar-logo">
                     {% else %}
                         {{ g.branding.app_name if g.branding else 'TimeTrack' }}
@@ -153,7 +159,7 @@
             <img src="{{ g.user.get_avatar_url(32) }}" alt="{{ g.user.username }}" class="user-avatar">
             <span class="nav-text">{{ g.user.username }}<span class="dropdown-arrow">▼</span></span>
             </a>
-            
+
             <!-- User Dropdown Context Menu -->
             <div class="user-dropdown-modal" id="user-dropdown-modal">
                 <div class="user-dropdown-header">
@@ -187,7 +193,7 @@
                     <li><a href="{{ url_for('sprints.sprint_management') }}" data-tooltip="Sprint Management"><i class="nav-icon ti ti-run"></i><span class="nav-text">Sprints</span></a></li>
                     <li><a href="{{ url_for('notes.notes_list') }}" data-tooltip="Notes"><i class="nav-icon ti ti-notes"></i><span class="nav-text">Notes</span></a></li>
                     <li><a href="{{ url_for('analytics') }}" data-tooltip="Time Analytics"><i class="nav-icon ti ti-chart-bar"></i><span class="nav-text">Analytics</span></a></li>
-                    
+
                     <!-- Role-based menu items -->
                     {% if g.user.role == Role.ADMIN or g.user.role == Role.SYSTEM_ADMIN %}
                     <li class="nav-divider">Admin</li>
@@ -257,7 +263,7 @@
                 </div>
             {% endif %}
         {% endwith %}
-        
+
         <!-- Email Nag Screens -->
         {% if g.show_email_nag %}
             <div class="email-nag-banner">
@@ -282,7 +288,7 @@
                 </div>
             </div>
         {% endif %}
-        
+
         {% block content %}{% endblock %}
     </main>
 
@@ -300,7 +306,7 @@
             </div>
         </div>
     </footer>
-    
+
     <!-- Mobile Bottom Navigation -->
     {% if g.user %}
     <nav class="mobile-bottom-nav">
@@ -353,7 +359,7 @@
             // Store in session storage to not show again this session
             sessionStorage.setItem('emailNagDismissed', 'true');
         }
-        
+
         // Check if already dismissed this session
         if (sessionStorage.getItem('emailNagDismissed') === 'true') {
             const banner = document.querySelector('.email-nag-banner');
@@ -365,7 +371,7 @@
     {% else %}
     <script src="{{ url_for('static', filename='js/splash.js') }}"></script>
     {% endif %}
-    
+
     <!-- Custom Tracking Script -->
     {% if tracking_script_enabled and tracking_script_code %}
         {{ tracking_script_code|safe }}

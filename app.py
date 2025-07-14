@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file, abort
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, session, g, Response, send_file, abort, send_from_directory
 from flask_migrate import Migrate
 from models import db, TimeEntry, WorkConfig, User, SystemSettings, Team, Role, Project, Company, CompanyWorkConfig, CompanySettings, UserPreferences, WorkRegion, AccountType, ProjectCategory, Task, SubTask, TaskStatus, TaskPriority, TaskDependency, Sprint, SprintStatus, Announcement, SystemEvent, WidgetType, UserDashboard, DashboardWidget, WidgetTemplate, Comment, CommentVisibility, BrandingSettings, CompanyInvitation, Note, NoteFolder, NoteShare
 from data_formatting import (
@@ -396,6 +396,47 @@ def sitemap_xml():
     sitemap_xml += '</urlset>'
     
     return Response(sitemap_xml, mimetype='application/xml')
+
+@app.route('/site.webmanifest')
+def serve_webmanifest():
+    """Serve web manifest with correct icon paths"""
+    manifest = {
+        "name": "TimeTrack",
+        "short_name": "TimeTrack",
+        "icons": [
+            {
+                "src": url_for('static', filename='android-chrome-192x192.png'),
+                "sizes": "192x192",
+                "type": "image/png"
+            },
+            {
+                "src": url_for('static', filename='android-chrome-512x512.png'),
+                "sizes": "512x512",
+                "type": "image/png"
+            }
+        ],
+        "theme_color": "#667eea",
+        "background_color": "#ffffff",
+        "display": "standalone"
+    }
+    return jsonify(manifest)
+
+# Favicon routes for compatibility
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(app.static_folder, 'favicon.ico', mimetype='image/x-icon')
+
+@app.route('/favicon-32x32.png')
+def favicon_32():
+    return send_from_directory(app.static_folder, 'favicon-32x32.png', mimetype='image/png')
+
+@app.route('/favicon-16x16.png')
+def favicon_16():
+    return send_from_directory(app.static_folder, 'favicon-16x16.png', mimetype='image/png')
+
+@app.route('/apple-touch-icon.png')
+def apple_touch_icon():
+    return send_from_directory(app.static_folder, 'apple-touch-icon.png', mimetype='image/png')
 
 @app.route('/')
 def home():
