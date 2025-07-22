@@ -638,6 +638,8 @@ def register():
         error = None
         if not username:
             error = 'Username is required'
+        elif not email:
+            error = 'Email is required'
         elif not password:
             error = 'Password is required'
         elif password != confirm_password:
@@ -799,6 +801,8 @@ def register_freelancer():
         error = None
         if not username:
             error = 'Username is required'
+        elif not email:
+            error = 'Email is required'
         elif not password:
             error = 'Password is required'
         elif password != confirm_password:
